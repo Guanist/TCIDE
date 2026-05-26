@@ -1,0 +1,74 @@
+{
+  "appId": "com.guanist.tcide",
+  "productName": "虎猫 TCIDE",
+  "copyright": "Copyright © 2026 Guanist, Inc.",
+  "directories": {
+    "output": "release",
+    "buildResources": "resources"
+  },
+  "files": [
+    "dist/**/*",
+    "node_modules/sql.js/dist/sql-wasm.wasm"
+  ],
+  "extraResources": [
+    {
+      "from": "node_modules/sql.js/dist/sql-wasm.wasm",
+      "to": "sql-wasm.wasm"
+    },
+    {
+      "from": "resources/tray-icon.png",
+      "to": "tray-icon.png"
+    },
+    {
+      "from": "resources/tray-icon@2x.png",
+      "to": "tray-icon@2x.png"
+    },
+    {
+      "from": "resources/icon.png",
+      "to": "icon.png"
+    },
+    {
+      "from": "resources/icon.ico",
+      "to": "icon.ico"
+    },
+    {
+      "from": "resources/about-icon.png",
+      "to": "about-icon.png"
+    }
+  ],
+  "asar": true,
+  "compression": "maximum",
+  "win": {
+    "target": [
+      {
+        "target": "nsis",
+        "arch": ["x64"]
+      },
+      {
+        "target": "portable",
+        "arch": ["x64"]
+      }
+    ],
+    "icon": "resources/icon.ico",
+    "publisherName": "Guanist, Inc.",
+    "artifactName": "TCIDE-${version}-${arch}.${ext}"
+  },
+  "nsis": {
+    "oneClick": false,
+    "allowToChangeInstallationDirectory": true,
+    "createDesktopShortcut": true,
+    "createStartMenuShortcut": true,
+    "shortcutName": "虎猫TCIDE",
+    "installerIcon": "icon.ico",
+    "uninstallerIcon": "icon.ico",
+    "installerSidebar": "installer-sidebar.bmp",
+    "include": "scripts/installer.nsh"
+  },
+  "portable": {
+    "artifactName": "TCIDE-${version}-portable.${ext}"
+  },
+  "buildDependenciesFromSource": false,
+  "npmRebuild": false,
+  "nodeGypRebuild": false,
+  "afterPack": "./scripts/after-pack.js"
+}
