@@ -50,7 +50,9 @@
       }
     ],
     "icon": "resources/icon.ico",
-    "publisherName": "Guanist, Inc.",
+    "signtoolOptions": {
+      "publisherName": "Guanist, Inc."
+    },
     "artifactName": "TCIDE-${version}-${arch}.${ext}"
   },
   "nsis": {
