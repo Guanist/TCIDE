@@ -1,4 +1,3 @@
-
 # 🐅 虎猫 TCIDE — 个人专属超级 AI 编程 IDE
 
 <p align="center">
