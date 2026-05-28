@@ -136,11 +136,12 @@
         <div class="welcome-hero">
           <img src="icons/brand/welcome-illustration.png" alt="虎猫" class="welcome-illustration" />
           <h1 class="welcome-title">虎猫 TCIDE</h1>
-          <p class="welcome-subtitle">个人专属 AI 编程 IDE</p>
+          <p class="welcome-subtitle" id="welcome-subtitle">个人专属 AI 编程 IDE · v1.1.0</p>
         </div>
         <div class="welcome-actions">
           <button id="welcome-open-project" class="welcome-btn primary">📂 打开项目</button>
           <button id="welcome-new-project" class="welcome-btn">🆕 新建项目</button>
+          <button id="welcome-snake-demo" class="welcome-btn demo">🐍 贪吃蛇 Demo</button>
         </div>
         <div id="welcome-recent" class="welcome-recent hidden">
           <h3 class="welcome-section-title">最近项目</h3>
@@ -374,6 +375,7 @@
             <div class="settings-tabs">
               <button class="settings-tab active" data-settings-tab="providers">模型服务商</button>
               <button class="settings-tab" data-settings-tab="custom">自定义配置</button>
+              <button class="settings-tab" data-settings-tab="changelog">📋 版本记录</button>
             </div>
             <div id="settings-providers" class="settings-tab-content active">
               <div class="provider-list" id="provider-list">
@@ -470,6 +472,15 @@
                   <button id="btn-import-config" class="test-btn">📥 导入配置</button>
                 </div>
                 <div id="cfg-status" class="cfg-status"></div>
+              </div>
+            </div>
+            <div id="settings-changelog" class="settings-tab-content hidden">
+              <div class="changelog-header">
+                <h4>🐅 虎猫 TCIDE 版本记录</h4>
+                <p class="changelog-subtitle">从第一版至今的完整迭代历程</p>
+              </div>
+              <div class="changelog-timeline" id="changelog-timeline">
+                <div class="changelog-loading">加载中...</div>
               </div>
             </div>
           </div>
@@ -574,7 +585,7 @@
       <div class="about-header">
         <img src="icons/brand/mascot-happy.png" alt="虎猫" class="about-logo-img" />
         <h2>虎猫 TCIDE</h2>
-        <p class="about-version">版本 1.0.0</p>
+        <p class="about-version" id="about-version">版本 1.1.0</p>
       </div>
       <div class="about-body">
         <p class="about-desc">个人专属 AI 编程助手</p>

@@ -1,4 +1,4 @@
-/**
+﻿﻿/**
  * PersonalIDE - Renderer Main Entry
  * 三栏 UI 交互、Monaco Editor、文件树、AI 面板全部逻辑
  */
@@ -16,6 +16,7 @@ interface OpenFile {
   content: string;
   dirty: boolean;
   language: string;
+  isAI?: boolean;  // AI 生成的虚拟文件
 }
 
 interface ChatMessage {
@@ -82,7 +83,7 @@ let terminalInitialized = false;
 // Monaco Editor 初始化
 // ─────────────────────────────────────────
 function initMonaco(): void {
-  // 配置 Monaco（去除多余功能，保持轻量）
+  // 配置 Monaco(去除多余功能,保持轻量)
   self.MonacoEnvironment = {
     getWorker(_workerId: string, _label: string) {
       return new Worker(
@@ -92,7 +93,7 @@ function initMonaco(): void {
     },
   };
 
-  // 注入暗色主题（老虎）
+  // 注入暗色主题(老虎)
   monaco.editor.defineTheme('trae-dark', {
     base: 'vs-dark',
     inherit: true,
@@ -122,7 +123,7 @@ function initMonaco(): void {
     },
   });
 
-  // 注入浅色主题（白虎）
+  // 注入浅色主题(白虎)
   monaco.editor.defineTheme('trae-light', {
     base: 'vs',
     inherit: true,
@@ -198,7 +199,7 @@ function initMonaco(): void {
         state.openFiles[state.activeFileIndex].dirty = true;
         const dirtyEl = document.getElementById('status-dirty');
         if (dirtyEl) dirtyEl.style.display = '';
-        // ⏳ 自动保存：3 秒无操作后保存
+        // ⏳ 自动保存:3 秒无操作后保存
         scheduleAutoSave();
       }
     }
@@ -233,7 +234,7 @@ function initMonaco(): void {
   // 光标位置同步到状态栏
   updateEditorStatusBar();
 
-  // ── AI 实时代码补全（Inline Completion） ──
+  // ── AI 实时代码补全(Inline Completion) ──
   const inlineLangs = ['javascript', 'typescript', 'python', 'java', 'kotlin',
     'go', 'rust', 'cpp', 'c', 'csharp', 'swift', 'ruby', 'php',
     'html', 'css', 'scss', 'json', 'yaml', 'xml', 'markdown', 'shell', 'sql', 'dart'];
@@ -283,7 +284,7 @@ function initMonaco(): void {
   }
 
   // ── AI 一键编程 Action ──────────────────
-  // 快捷键：Ctrl+Shift+I 或右键菜单
+  // 快捷键:Ctrl+Shift+I 或右键菜单
   editor.addAction({
     id: 'tcide-ai-insert',
     label: 'AI 生成代码并插入',
@@ -295,7 +296,7 @@ function initMonaco(): void {
       if (!selection) return;
       const selectedText = ed.getModel()?.getValueInRange(selection) ?? '';
       const prompt = selectedText
-        ? `请改进以下代码，直接返回完整代码块，不要解释：\n\n${selectedText}`
+        ? `请改进以下代码,直接返回完整代码块,不要解释:\n\n${selectedText}`
         : `请根据当前文件上下文生成代码。当前光标位置在行 ${selection?.startLineNumber}。`;
       aiGenerateAndInsert(ed, prompt, selection);
     },
@@ -315,7 +316,7 @@ function initMonaco(): void {
         showMiniToast('请先选中要解释的代码');
         return;
       }
-      const prompt = `请用中文简洁解释以下代码的功能（不超过5句话）：\n\n${selectedText}`;
+      const prompt = `请用中文简洁解释以下代码的功能(不超过5句话):\n\n${selectedText}`;
       aiGenerateAndInsert(ed, prompt, selection, true); // true = 插入为注释
     },
   });
@@ -335,7 +336,7 @@ function initMonaco(): void {
         return;
       }
       const lang = state.openFiles[state.activeFileIndex]?.language || 'code';
-      const prompt = `重构以下${lang}代码，提高可读性和可维护性，保持功能不变。直接返回完整重构后的代码块，不要解释：\n\n${selectedText}`;
+      const prompt = `重构以下${lang}代码,提高可读性和可维护性,保持功能不变。直接返回完整重构后的代码块,不要解释:\n\n${selectedText}`;
       aiGenerateAndInsert(ed, prompt, selection);
     },
   });
@@ -355,7 +356,7 @@ function initMonaco(): void {
         return;
       }
       const lang = state.openFiles[state.activeFileIndex]?.language || 'code';
-      const prompt = `为以下${lang}代码生成完整的单元测试。覆盖主要功能和边界情况。直接返回测试代码块，不要解释：\n\n${selectedText}`;
+      const prompt = `为以下${lang}代码生成完整的单元测试。覆盖主要功能和边界情况。直接返回测试代码块,不要解释:\n\n${selectedText}`;
       aiGenerateAndInsert(ed, prompt, selection);
     },
   });
@@ -374,7 +375,7 @@ function initMonaco(): void {
         showMiniToast('请先选中可能有 Bug 的代码');
         return;
       }
-      const prompt = `检查并修复以下代码中的潜在 Bug、性能问题和安全漏洞。直接返回修复后的完整代码块，不要解释：\n\n${selectedText}`;
+      const prompt = `检查并修复以下代码中的潜在 Bug、性能问题和安全漏洞。直接返回修复后的完整代码块,不要解释:\n\n${selectedText}`;
       aiGenerateAndInsert(ed, prompt, selection);
     },
   });
@@ -394,7 +395,7 @@ function initMonaco(): void {
         return;
       }
       const lang = state.openFiles[state.activeFileIndex]?.language || 'code';
-      const prompt = `为以下${lang}代码生成详细的文档注释（JSDoc/KDoc/Docstring格式），包含参数说明和返回值说明。只返回注释块，不要返回代码：\n\n${selectedText}`;
+      const prompt = `为以下${lang}代码生成详细的文档注释(JSDoc/KDoc/Docstring格式),包含参数说明和返回值说明。只返回注释块,不要返回代码:\n\n${selectedText}`;
       aiGenerateAndInsert(ed, prompt, selection);
     },
   });
@@ -403,6 +404,9 @@ function initMonaco(): void {
   window.addEventListener('resize', () => {
     editor?.layout();
   });
+
+  // 首次启动：显示欢迎 README
+  setTimeout(() => showFirstLaunchReadme(), 500);
 }
 
 // ─────────────────────────────────────────
@@ -437,14 +441,14 @@ function getFileIcon(name: string, isDir: boolean): string {
   const base = name.toLowerCase();
   const ext = name.split('.').pop()?.toLowerCase() || '';
 
-  // ── 目录：特殊文件夹有专属图标 ──
+  // ── 目录:特殊文件夹有专属图标 ──
   if (isDir) {
     const dirIcon = FOLDER_ICONS[base];
     if (dirIcon) return `<span class="file-icon-emoji">${dirIcon}</span>`;
     return '<span class="file-icon-emoji">📁</span>';
   }
 
-  // ── 无扩展名文件（无点号或多段点号特殊名）──
+  // ── 无扩展名文件(无点号或多段点号特殊名)──
   const noExtFiles: Record<string, string> = {
     dockerfile: '🐳', containerfile: '🐳', vagrantfile: '📦',
     makefile: '🔨', gnumakefile: '🔨', justfile: '🔨',
@@ -592,7 +596,7 @@ function getFileIcon(name: string, isDir: boolean): string {
   const model3dExts = new Set(['obj','fbx','blend','stl','glb','gltf','3ds','dae','ply','usd','usda','usdc','usdz']);
   if (model3dExts.has(ext)) return '<span class="file-icon-emoji">🧊</span>';
 
-  // 兜底：无扩展名文件
+  // 兜底:无扩展名文件
   if (!ext) return '<span class="file-icon-emoji">📄</span>';
 
   return '<img src="icons/file/file-default.png" alt="" class="ft-icon" />';
@@ -713,7 +717,7 @@ async function openFile(filePath: string, name: string): Promise<void> {
       const content = [
         `文件: ${name}`,
         `大小: ${(hexData.size / 1024).toFixed(1)} KB`,
-        `${hexData.truncated ? `（仅显示前 ${(hexData.maxBytes / 1024).toFixed(0)} KB）` : ''}`,
+        `${hexData.truncated ? `(仅显示前 ${(hexData.maxBytes / 1024).toFixed(0)} KB)` : ''}`,
         '',
         hexData.hex
       ].join('\n');
@@ -757,7 +761,7 @@ async function openFile(filePath: string, name: string): Promise<void> {
   if (lang === 'pdf') {
     try {
       const { base64 } = await window.api.readPdfBase64(filePath);
-      // 创建 Blob URL（Electron file:// 兼容）
+      // 创建 Blob URL(Electron file:// 兼容)
       const byteChars = atob(base64);
       const byteNums = new Array(byteChars.length);
       for (let i = 0; i < byteChars.length; i++) byteNums[i] = byteChars.charCodeAt(i);
@@ -968,7 +972,7 @@ async function showGitDiffDecorations(filePath: string): Promise<void> {
       });
     }
     for (const ln of diff.removed) {
-      // 已删除行在当前版本中不存在，跳过（或显示在附近行）
+      // 已删除行在当前版本中不存在,跳过(或显示在附近行)
     }
     if (gitDiffDeco) gitDiffDeco.clear();
     gitDiffDeco = editor.createDecorationsCollection(decorations);
@@ -984,13 +988,13 @@ let htmlMode: 'preview' | 'source' = 'preview';
 
 function toggleHtmlMode(mode?: 'preview' | 'source'): void {
   if (mode) htmlMode = mode; else htmlMode = htmlMode === 'preview' ? 'source' : 'preview';
-  
+
   const frame = document.getElementById('html-preview') as HTMLIFrameElement;
   const toolbar = document.getElementById('html-toolbar');
   const editorEl = document.getElementById('monaco-container')!;
   const toggleBtn = document.getElementById('html-mode-toggle');
   const errCon = document.getElementById('html-error-console');
-  
+
   if (htmlMode === 'preview') {
     if (frame) {
       frame.classList.remove('hidden');
@@ -1065,7 +1069,7 @@ document.getElementById('html-mode-toggle')?.addEventListener('click', () => tog
 function generateFileOutline(content: string, lang: string): string {
   const lines = content.split('\n');
   const parts: string[] = [];
-  
+
   // 搜索结构化标记
   const patterns: Array<{ regex: RegExp; label: string }> = [];
   if (['html', 'xml'].includes(lang)) {
@@ -1089,7 +1093,7 @@ function generateFileOutline(content: string, lang: string): string {
   } else if (lang === 'css') {
     patterns.push({ regex: /^([.#@]?[\w-]+)\s*\{/gm, label: '$1 {}' });
   } else {
-    // 通用：搜索缩进为 0 的行（顶层结构）
+    // 通用:搜索缩进为 0 的行(顶层结构)
     patterns.push({ regex: /^(?!\s)(.+)$/gm, label: '$1' });
   }
 
@@ -1104,11 +1108,11 @@ function generateFileOutline(content: string, lang: string): string {
     }
   }
 
-  // 按行号排序，最多 100 条
+  // 按行号排序,最多 100 条
   const sorted = Array.from(found.entries()).sort((a, b) => a[0] - b[0]).slice(0, 100);
-  
+
   if (sorted.length === 0) {
-    // 降级：显示行号范围
+    // 降级:显示行号范围
     const chunkSize = Math.ceil(lines.length / 20);
     for (let i = 1; i <= lines.length; i += chunkSize) {
       const line = lines[i - 1]?.trim().slice(0, 60) || '';
@@ -1120,7 +1124,7 @@ function generateFileOutline(content: string, lang: string): string {
     }
   }
 
-  return `共 ${lines.length} 行，${sorted.length} 个结构标记:\n${parts.join('\n')}`;
+  return `共 ${lines.length} 行,${sorted.length} 个结构标记:\n${parts.join('\n')}`;
 }
 
 function streamToAI(userMsg: string, ctxMsg: string, fileName: string): void {
@@ -1212,7 +1216,7 @@ function appendStreamChunk(chunk: string): void {
 }
 
 function renderMarkdown(text: string): string {
-  // 先用占位符替换代码块，处理完其他 markdown 后再还原
+  // 先用占位符替换代码块,处理完其他 markdown 后再还原
   const codeBlocks: Array<{ lang: string; code: string }> = [];
   let html = text.replace(/```(\w*)\n([\s\S]*?)```/g, (_m, lang, code) => {
     codeBlocks.push({ lang: lang || '', code });
@@ -1231,7 +1235,7 @@ function renderMarkdown(text: string): string {
   html = html.replace(/\n\n/g, '<br><br>');
   html = html.replace(/\n/g, '<br>');
 
-  // 还原代码块：带语言标签 + 复制按钮
+  // 还原代码块：带语言标签 + 复制按钮 + 打开编辑 + 预览
   html = html.replace(/___CODEBLOCK_(\d+)___/g, (_m, idx) => {
     const block = codeBlocks[parseInt(idx)];
     if (!block) return '';
@@ -1239,14 +1243,167 @@ function renderMarkdown(text: string): string {
       .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
       .replace(/"/g, '&quot;');
     const langLabel = block.lang ? `<span class="code-lang">${block.lang}</span>` : '';
-    const copyId = 'cb_' + Math.random().toString(36).slice(2, 8);
+    const codeId = 'cb_' + Math.random().toString(36).slice(2, 8);
+    
+    // 可预览的语言
+    const previewable = ['html', 'htm', 'xml', 'svg', 'css', 'javascript', 'js', 'typescript', 'ts'];
+    const canPreview = previewable.includes((block.lang || '').toLowerCase());
+    
+    // 构建代码属性，用于打开编辑
+    const escapedLang = block.lang.replace(/'/g, "\\'");
+    const escapedCode = block.code.replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/\n/g, '\\n');
+    
+    const actionsHtml = `
+      <button class="code-action-btn code-open-btn" title="在编辑器中打开" 
+        onclick="event.stopPropagation();(function(){const el=document.getElementById('${codeId}');const code=el?el.textContent:'';window.__openCodeInEditor__('${escapedLang}',code)})()">📂 打开</button>
+      ${canPreview ? `<button class="code-action-btn code-preview-btn" title="预览效果"
+        onclick="event.stopPropagation();(function(){const el=document.getElementById('${codeId}');const code=el?el.textContent:'';window.__previewCode__('${escapedLang}',code)})()">👁 预览</button>` : ''}
+    `;
+    
     return `<div class="code-block-wrapper">
-      <div class="code-block-header">${langLabel}<span class="code-block-spacer"></span><button class="copy-code-btn" data-copy-id="${copyId}" onclick="var t=this.parentElement.nextElementSibling.textContent;navigator.clipboard.writeText(t).then(()=>{this.textContent='✓已复制';setTimeout(()=>{this.textContent='📋 复制'},2000)})">📋 复制</button></div>
-      <pre class="code-block-pre"><code class="lang-${block.lang}">${escaped}</code></pre>
+      <div class="code-block-header">${langLabel}<span class="code-block-spacer"></span>${actionsHtml}<button class="copy-code-btn" onclick="var t=this.parentElement.parentElement.querySelector('code').textContent;navigator.clipboard.writeText(t).then(()=>{this.textContent='✓已复制';setTimeout(()=>{this.textContent='📋 复制'},2000)})">📋 复制</button></div>
+      <pre class="code-block-pre"><code id="${codeId}" class="lang-${block.lang}">${escaped}</code></pre>
     </div>`;
   });
 
   return html;
+}
+
+// ─────────────────────────────────────────
+// AI 代码块：打开编辑 / 预览
+// ─────────────────────────────────────────
+
+// 全局桥接：从 onclick handler 调用（代码块中的按钮）
+(self as any).__openCodeInEditor__ = function(lang: string, code: string): void {
+  if (!editor) { showToast('编辑器未初始化', 'warning'); return; }
+  
+  // 推断文件名
+  const extMap: Record<string, string> = {
+    html: '.html', htm: '.html', xml: '.xml', svg: '.svg',
+    css: '.css',
+    javascript: '.js', js: '.js', jsx: '.jsx',
+    typescript: '.ts', ts: '.ts', tsx: '.tsx',
+    python: '.py', py: '.py',
+    java: '.java', kotlin: '.kt', kt: '.kt',
+    c: '.c', cpp: '.cpp', csharp: '.cs', cs: '.cs',
+    go: '.go', rust: '.rs', rs: '.rs',
+    json: '.json', yaml: '.yml', yml: '.yml',
+    markdown: '.md', md: '.md',
+    shell: '.sh', bash: '.sh', bat: '.bat',
+    sql: '.sql',
+  };
+  const ext = extMap[lang.toLowerCase()] || '.txt';
+  const name = `ai-generated-${Date.now().toString(36)}${ext}`;
+  
+  // 在编辑区打开
+  const model = editor.getModel();
+  if (model && model.getValue() === '' && state.openFiles.length <= 1) {
+    // 如果当前是空白页，直接替换
+    model.setValue(code);
+    const langId = mapLangToMonaco(lang);
+    monaco.editor.setModelLanguage(model, langId);
+    showToast(`已加载到编辑器 (${name})`, 'success');
+  } else {
+    // 新建标签页
+    const langId = mapLangToMonaco(lang);
+    state.openFiles.push({ name, path: `virtual://${name}`, content: code, language: langId, dirty: false, isAI: true });
+    state.activeFileIndex = state.openFiles.length - 1;
+    switchToFile(state.activeFileIndex);
+    renderTabs();
+    showToast(`已打开: ${name}`, 'success');
+  }
+  
+  // 缓存到本地 .tcide/generated/
+  cacheAICode(name, code);
+};
+
+let _lastPreviewFrame: HTMLIFrameElement | null = null;
+
+(self as any).__previewCode__ = function(lang: string, code: string): void {
+  const langLower = lang.toLowerCase();
+  
+  // 找到或创建预览面板
+  let previewContainer = document.getElementById('code-preview-panel');
+  if (!previewContainer) {
+    previewContainer = document.createElement('div');
+    previewContainer.id = 'code-preview-panel';
+    previewContainer.className = 'code-preview-panel';
+    previewContainer.innerHTML = `
+      <div class="code-preview-header">
+        <span class="code-preview-title" id="code-preview-title">代码预览</span>
+        <button class="code-preview-close" onclick="document.getElementById('code-preview-panel').remove()">✕</button>
+        <button class="code-preview-open-editor" id="code-preview-open-btn" title="在编辑器中打开">📂 编辑</button>
+      </div>
+      <div class="code-preview-content">
+        <iframe id="code-preview-frame" class="code-preview-frame" sandbox="allow-scripts allow-same-origin"></iframe>
+      </div>
+    `;
+    document.body.appendChild(previewContainer);
+    
+    // 打开编辑按钮事件
+    document.getElementById('code-preview-open-btn')?.addEventListener('click', () => {
+      (self as any).__openCodeInEditor__(lang, code);
+      previewContainer?.remove();
+    });
+  }
+  
+  const title = document.getElementById('code-preview-title');
+  if (title) title.textContent = `代码预览 · ${lang}`;
+  
+  const frame = document.getElementById('code-preview-frame') as HTMLIFrameElement;
+  if (frame) {
+    if (langLower === 'html' || langLower === 'htm') {
+      frame.srcdoc = code;
+    } else if (langLower === 'svg') {
+      const blob = new Blob([code], { type: 'image/svg+xml' });
+      frame.src = URL.createObjectURL(blob);
+    } else if (langLower === 'css') {
+      frame.srcdoc = `<html><head><style>${code}</style></head><body><div style="padding:40px;font-family:sans-serif;color:#888">CSS 预览 — 样式已应用到此页面</div></body></html>`;
+    } else if (langLower === 'javascript' || langLower === 'js' || langLower === 'ts') {
+      frame.srcdoc = `<html><head></head><body><div id="output" style="padding:20px;font-family:monospace"></div><script>try{const out=document.getElementById('output');const origLog=console.log;console.log=function(...args){out.innerHTML+=args.join(' ')+'<br>'};${code};console.log=origLog}catch(e){document.getElementById('output').innerHTML='<span style="color:red">❌ Error: '+e.message+'</span>'}<\/script></body></html>`;
+    } else {
+      frame.srcdoc = `<html><body style="padding:20px;font-family:monospace;background:#1e1e1e;color:#d4d4d4"><h3>🔍 ${lang} 源码预览</h3><pre style="white-space:pre-wrap">${code.replace(/&/g,'&amp;').replace(/</g,'&lt;')}</pre></body></html>`;
+    }
+  }
+  
+  _lastPreviewFrame = frame;
+  previewContainer.classList.remove('hidden');
+};
+
+// 缓存 AI 生成的代码
+async function cacheAICode(name: string, code: string): Promise<void> {
+  if (!state.projectPath) return;
+  try {
+    const dir = `${state.projectPath}/.tcide/generated`;
+    await window.api.writeFile(`${dir}/${name}`, code);
+  } catch {
+    // 静默失败 — .tcide/generated 可能不存在或没有权限
+    try {
+      const dir = `${state.projectPath}/.tcide`;
+      const genDir = `${dir}/generated`;
+      await window.api.writeFile(`${genDir}/_init_`, '');
+      await window.api.writeFile(`${genDir}/${name}`, code);
+    } catch { /* 忽略 */ }
+  }
+}
+
+// 将语言名映射到 Monaco language ID
+function mapLangToMonaco(lang: string): string {
+  const map: Record<string, string> = {
+    html: 'html', htm: 'html', xml: 'xml', svg: 'xml',
+    css: 'css', scss: 'scss', less: 'less',
+    javascript: 'javascript', js: 'javascript', jsx: 'javascript', cjs: 'javascript', mjs: 'javascript',
+    typescript: 'typescript', ts: 'typescript', tsx: 'typescript', mts: 'typescript',
+    python: 'python', py: 'python',
+    java: 'java', kotlin: 'kotlin', kt: 'kotlin',
+    c: 'c', cpp: 'cpp', csharp: 'csharp', cs: 'csharp',
+    go: 'go', rust: 'rust', rs: 'rust',
+    json: 'json', yaml: 'yaml', yml: 'yaml',
+    markdown: 'markdown', md: 'markdown',
+    shell: 'shell', bash: 'shell', bat: 'bat',
+    sql: 'sql',
+  };
+  return map[lang.toLowerCase()] || 'plaintext';
 }
 
 // ─────────────────────────────────────────
@@ -1350,7 +1507,7 @@ function populateModelSelector(): void {
   const provider = state.config.provider || 'deepseek';
   const providerModels = modelListCache.filter(m => m.provider === provider);
 
-  // 头部：已配置 provider 的模型
+  // 头部:已配置 provider 的模型
   sel.innerHTML = '<option value="">-- 选择模型 --</option>';
   if (providerModels.length > 0) {
     const icon = provider === 'deepseek' ? '🐋' : provider === 'huoshan' ? '🌋' : provider === 'ollama' ? '🦙' : '⚙️';
@@ -1361,7 +1518,7 @@ function populateModelSelector(): void {
     }
   }
 
-  // 分隔线 + 其他 provider 的模型（归入"自定义"）
+  // 分隔线 + 其他 provider 的模型(归入"自定义")
   const otherModels = modelListCache.filter(m => m.provider !== provider);
   if (otherModels.length > 0) {
     sel.innerHTML += '<option disabled>──────────</option>';
@@ -1416,7 +1573,7 @@ function ensureSession(): ChatSession {
     createSession();
   }
   const s = state.chatSessions.find(s => s.id === state.currentSessionId)!;
-  // 向后兼容：迁移旧 chatHistory
+  // 向后兼容:迁移旧 chatHistory
   if (state.chatHistory.length > 0 && s.chatHistory.length === 0) {
     s.chatHistory = [...state.chatHistory];
     state.chatHistory = [];
@@ -1440,7 +1597,7 @@ function createSession(name?: string): ChatSession {
   return session;
 }
 
-// ═══ 会话持久化（聊天记忆） ═══
+// ═══ 会话持久化(聊天记忆) ═══
 async function saveSessionsToDisk(): Promise<void> {
   if (!state.projectPath) return;
   try {
@@ -1476,7 +1633,7 @@ async function loadSessionsFromDisk(): Promise<void> {
       addChatMessage('system', `📂 已恢复 ${state.chatSessions.length} 个历史会话`);
     }
   } catch (e) {
-    // 文件不存在或损坏，忽略
+    // 文件不存在或损坏,忽略
   }
 }
 
@@ -1486,10 +1643,10 @@ function confirmAiRead(start: number, end: number): void {
   if (!session) return;
   if (!session.pendingReads) session.pendingReads = [];
   session.pendingReads.push({ start, end });
-  
+
   const container = document.getElementById('chat-messages');
   if (!container) return;
-  
+
   const readId = `read-${session.pendingReads.length}`;
   const file = state.openFiles[state.activeFileIndex];
   const readDiv = document.createElement('div');
@@ -1504,7 +1661,7 @@ function confirmAiRead(start: number, end: number): void {
         <button class="btn-read-deny">❌ 拒绝</button>
       </div>
     </div>`;
-  
+
   readDiv.querySelector('.btn-read-confirm')?.addEventListener('click', () => {
     readDiv.remove();
     executeAiRead(start, end);
@@ -1513,7 +1670,7 @@ function confirmAiRead(start: number, end: number): void {
     readDiv.remove();
     addChatMessage('system', '⏭ 已拒绝分段读取请求');
   });
-  
+
   container.appendChild(readDiv);
   readDiv.scrollIntoView({ behavior: 'smooth' });
 }
@@ -1525,33 +1682,33 @@ async function executeAiRead(start: number, end: number): Promise<void> {
   const sliceStart = Math.max(0, start - 1);
   const sliceEnd = Math.min(lines.length, end);
   const chunk = lines.slice(sliceStart, sliceEnd).join('\n');
-  
+
   addChatMessage('system', `📄 ${file.name} L${sliceStart + 1}-L${sliceEnd}:\n\`\`\`${file.language}\n${chunk}\n\`\`\``);
-  
+
   state.isStreaming = true;
   state.currentStreamContent = '';
   document.getElementById('btn-send')!.classList.add('hidden');
   document.getElementById('btn-abort')!.classList.remove('hidden');
-  
+
   const session = state.chatSessions.find(s => s.id === state.currentSessionId)!;
   const historyMsgs = session.chatHistory.slice(-30).map(m => ({ role: m.role, content: m.content }));
   const msg = [
-    { role: 'system' as const, content: `你是虎猫 TCIDE 的 AI 助手。文件 ${file.name} 的 L${sliceStart + 1}-L${sliceEnd} 行已发送给你。如需继续，在回复中用 /read N-M 请求更多行。` },
+    { role: 'system' as const, content: `你是虎猫 TCIDE 的 AI 助手。文件 ${file.name} 的 L${sliceStart + 1}-L${sliceEnd} 行已发送给你。如需继续,在回复中用 /read N-M 请求更多行。` },
     ...historyMsgs,
-    { role: 'user' as const, content: `已读取 L${sliceStart + 1}-L${sliceEnd}，请继续分析。` },
+    { role: 'user' as const, content: `已读取 L${sliceStart + 1}-L${sliceEnd},请继续分析。` },
   ];
   window.api.sendToAIStream(msg, { model: state.config.model });
   showTypingIndicator();
 }
 
-// ═══ 会话删除 / 重命名（带确认） ═══
+// ═══ 会话删除 / 重命名(带确认) ═══
 function deleteSession(id: string): void {
   const session = state.chatSessions.find(s => s.id === id);
   if (!session) return;
   const name = session.name;
   const title = session.chatHistory.find(m => m.role === 'user')?.content?.slice(0, 30) || name;
-  
-  showConfirm(`确定要删除「${title}」吗？此操作不可撤销。`, () => {
+
+  showConfirm(`确定要删除「${title}」吗?此操作不可撤销。`, () => {
     state.chatSessions = state.chatSessions.filter(s => s.id !== id);
     if (state.currentSessionId === id) {
       state.currentSessionId = state.chatSessions[0]?.id || '';
@@ -1668,11 +1825,11 @@ async function sendToAI(): Promise<void> {
 
   input.value = '';
 
-  // ── /task 命令：Builder → Coder 自动执行循环 ──
+  // ── /task 命令:Builder → Coder 自动执行循环 ──
   if (text.startsWith('/task') && state.projectPath) {
     const desc = text.replace(/^\/task\s*/, '').trim();
     if (!desc) {
-      addChatMessage('assistant', '命令列表:\n/task <描述> — Builder 架构模式，自动拆分任务并执行\n/file — 发送当前文件给 AI（超大文件自动生成大纲）\n/lines N-M — 发送指定行范围，如 /lines 100-200');
+      addChatMessage('assistant', '命令列表:\n/task <描述> - Builder 架构模式,自动拆分任务并执行\n/file - 发送当前文件给 AI(超大文件自动生成大纲)\n/lines N-M - 发送指定行范围,如 /lines 100-200');
       return;
     }
     addChatMessage('user', text);
@@ -1680,21 +1837,21 @@ async function sendToAI(): Promise<void> {
     return;
   }
 
-  // ── /file 命令：发送当前文件给 AI（超大文件自动生成大纲）──
+  // ── /file 命令:发送当前文件给 AI(超大文件自动生成大纲)──
   if (text.startsWith('/file') && state.activeFileIndex >= 0) {
     const file = state.openFiles[state.activeFileIndex];
     const lines = file.content.split('\n');
     const totalChars = file.content.length;
     const MAX_SEND = 200000;
     let ctx: string;
-    
+
     if (totalChars <= MAX_SEND) {
-      // 小文件：直接发送
+      // 小文件:直接发送
       ctx = `📄 ${file.name} (${lines.length} 行, ${(totalChars/1000).toFixed(0)}k 字符):\n\`\`\`${file.language}\n${file.content}\n\`\`\`\n\n请分析以上文件内容。`;
     } else {
-      // 大文件：生成结构化大纲
+      // 大文件:生成结构化大纲
       const outline = generateFileOutline(file.content, file.language);
-      ctx = `📐 ${file.name} — 文件过大，发送结构化大纲\n\n文件行数: ${lines.length} | 字符数: ${(totalChars/1000).toFixed(0)}k\n\n## 文件结构大纲:\n${outline}\n\n---\n💡 使用 /lines N-M 命令获取指定行范围的内容。\n例如: /lines 1500-1600 查看第 1500 到 1600 行。\n\n请根据大纲回答，需要查看具体代码时告诉我行号范围。`;
+      ctx = `📐 ${file.name} - 文件过大,发送结构化大纲\n\n文件行数: ${lines.length} | 字符数: ${(totalChars/1000).toFixed(0)}k\n\n## 文件结构大纲:\n${outline}\n\n---\n💡 使用 /lines N-M 命令获取指定行范围的内容。\n例如: /lines 1500-1600 查看第 1500 到 1600 行。\n\n请根据大纲回答,需要查看具体代码时告诉我行号范围。`;
     }
 
     const fileMsg = text.replace(/^\/file\s*/, '').trim() || file.name;
@@ -1704,7 +1861,7 @@ async function sendToAI(): Promise<void> {
     return;
   }
 
-  // ── /lines 命令：发送指定行范围 ──
+  // ── /lines 命令:发送指定行范围 ──
   const linesMatch = text.match(/^\/lines\s+(\d+)(?:\s*-\s*(\d+))?/);
   if (linesMatch && state.activeFileIndex >= 0) {
     const file = state.openFiles[state.activeFileIndex];
@@ -1723,10 +1880,10 @@ async function sendToAI(): Promise<void> {
 
   addChatMessage('user', text, [...attachments]);
 
-  // 构建附件上下文（仅手动附件 + 编辑器选中内容）
+  // 构建附件上下文(仅手动附件 + 编辑器选中内容)
   let attachContext = '';
 
-  // 1) 编辑器选中文本（用户主动选择 = 明确意图）
+  // 1) 编辑器选中文本(用户主动选择 = 明确意图)
   if (editor) {
     const selection = editor.getSelection();
     if (selection && !selection.isEmpty()) {
@@ -1734,15 +1891,15 @@ async function sendToAI(): Promise<void> {
       if (selectedText) {
         const activeFile = state.openFiles[state.activeFileIndex];
         const lang = activeFile?.language || '';
-        // 20 万字符以内直接发送，超出则智能截断（头+尾）
+        // 20 万字符以内直接发送,超出则智能截断(头+尾)
         const MAX_SELECTION = 200000;
         let sendText = selectedText;
         let truncNote = '';
         if (selectedText.length > MAX_SELECTION) {
-          sendText = selectedText.slice(0, MAX_SELECTION * 0.3) + 
-            `\n\n...（中间省略 ${selectedText.length - MAX_SELECTION * 0.6} 字符）...\n\n` +
+          sendText = selectedText.slice(0, MAX_SELECTION * 0.3) +
+            `\n\n...(中间省略 ${selectedText.length - MAX_SELECTION * 0.6} 字符)...\n\n` +
             selectedText.slice(-MAX_SELECTION * 0.3);
-          truncNote = `（已截断：共 ${(selectedText.length/1000).toFixed(0)}k 字符，发送了开头和结尾各 ${(MAX_SELECTION*0.3/1000).toFixed(0)}k）`;
+          truncNote = `(已截断:共 ${(selectedText.length/1000).toFixed(0)}k 字符,发送了开头和结尾各 ${(MAX_SELECTION*0.3/1000).toFixed(0)}k)`;
         }
         attachContext += `\n---\n📌 选中代码 ${truncNote} (${activeFile?.name || '编辑器'}):\n\`\`\`${lang}\n${sendText}\n\`\`\`\n---\n`;
       }
@@ -1779,10 +1936,10 @@ async function sendToAI(): Promise<void> {
     const userContent = attachContext ? text + '\n\n' + attachContext : text;
     const messages = [
       { role: 'system' as const, content: `【绝对规则 - 必须遵守】
-你正在虎猫 TCIDE（本地 IDE）中运行，直接嵌在用户的编辑器中。
+你正在虎猫 TCIDE(本地 IDE)中运行,直接嵌在用户的编辑器中。
 
 ## 你的真实能力
-你已接入 IDE 的文件系统、终端和项目上下文。你可以：
+你已接入 IDE 的文件系统、终端和项目上下文。你可以:
 • 看到用户当前打开的文件和编辑器选区
 • 分析项目代码结构
 • 生成/修改代码
@@ -1794,13 +1951,13 @@ ${state.openFiles.length > 0 ? `已打开文件: ${state.openFiles.slice(0, 10).
 ${state.activeFileIndex >= 0 && state.openFiles[state.activeFileIndex] ? `当前活跃文件: ${state.openFiles[state.activeFileIndex].name}` : ''}
 
 ## 严禁事项
-• 严禁说「我无法访问你的文件」「我看不到你的屏幕」「请粘贴内容」—— 你已经在 IDE 里了
-• 严禁说「我是一个纯文本模型」—— 你是有工具接入的 IDE Agent
-• 严禁假装自己是网页版 AI —— 你是桌面 IDE 内置助手
-• 如果用户问文件内容但你缺上下文，直接说：「请打开该文件或在编辑器中选中相关代码，我就能看到」
+• 严禁说「我无法访问你的文件」「我看不到你的屏幕」「请粘贴内容」-- 你已经在 IDE 里了
+• 严禁说「我是一个纯文本模型」-- 你是有工具接入的 IDE Agent
+• 严禁假装自己是网页版 AI -- 你是桌面 IDE 内置助手
+• 如果用户问文件内容但你缺上下文,直接说:「请打开该文件或在编辑器中选中相关代码,我就能看到」
 
 ## 应该这样做
-• 用户问「左边是什么文件」→ 看上面已打开文件列表，直接回答
+• 用户问「左边是什么文件」→ 看上面已打开文件列表,直接回答
 • 用户问「帮我改这个文件」→ 直接给出修改后的完整代码
 • 用户问项目结构 → 描述你知道的上下文
 • 用户说「继续」→ 继续之前的工作` },
@@ -1834,7 +1991,7 @@ function stopStreaming(): void {
   document.getElementById('btn-abort')!.classList.add('hidden');
 }
 
-// ── Agent 自动执行循环（/task 命令） ──
+// ── Agent 自动执行循环(/task 命令) ──
 async function executeTaskAgentLoop(description: string): Promise<void> {
   if (!state.projectPath) {
     addChatMessage('assistant', '⚠️ 请先打开一个项目文件夹');
@@ -1842,12 +1999,12 @@ async function executeTaskAgentLoop(description: string): Promise<void> {
   }
 
   // Step 1: Builder 分解任务
-  addChatMessage('assistant', '🧱 **Builder 正在分析需求…**');
+  addChatMessage('assistant', '🧱 **Builder 正在分析需求...**');
   let tasks: any[];
   try {
     tasks = await window.api.runBuilder(description, { projectPath: state.projectPath });
     if (!tasks || (tasks as any).length === 0) {
-      addChatMessage('assistant', '⚠️ Builder 未生成有效任务，请更具体地描述需求。');
+      addChatMessage('assistant', '⚠️ Builder 未生成有效任务,请更具体地描述需求。');
       return;
     }
   } catch (err: any) {
@@ -1858,7 +2015,7 @@ async function executeTaskAgentLoop(description: string): Promise<void> {
   // 显示计划
   const planLines = tasks.map((t: any, i: number) =>
     `${i + 1}. ${t.title || t.name || t.description || `子任务 ${i + 1}`}`);
-  addChatMessage('assistant', `📋 **执行计划**（共 ${tasks.length} 个任务）：
+  addChatMessage('assistant', `📋 **执行计划**(共 ${tasks.length} 个任务):
 
 ${planLines.join('\n')}`);
 
@@ -1877,7 +2034,7 @@ ${planLines.join('\n')}`);
       // 自动修复循环
       while (!result.success && retries < maxRetries) {
         retries++;
-        addChatMessage('assistant', `⚠️ ${title} 失败（第 ${retries} 次尝试），自动分析错误…`);
+        addChatMessage('assistant', `⚠️ ${title} 失败(第 ${retries} 次尝试),自动分析错误...`);
 
         const fixTask = {
           ...task,
@@ -1902,11 +2059,11 @@ ${planLines.join('\n')}`);
     }
   }
 
-  addChatMessage('assistant', `🏁 **全部完成！** ${successCount}/${tasks.length} 个任务成功。`);
+  addChatMessage('assistant', `🏁 **全部完成!** ${successCount}/${tasks.length} 个任务成功。`);
 }
 
 // ─────────────────────────────────────────
-// Toast 通知系统（支持队列、多类型、自动消失）
+// Toast 通知系统(支持队列、多类型、自动消失)
 // ─────────────────────────────────────────
 interface ToastItem {
   id: string;
@@ -1935,7 +2092,7 @@ function processToastQueue(): void {
 
 function renderToast(toast: ToastItem): void {
   const container = document.getElementById('toast-container')!;
-  const icons: Record<string, string> = { success: '✅', warn: '⚠️', error: '❌', info: 'ℹ️' };
+  const icons: Record<string, string> = { success: '✅', warn: '⚠️', error: '❌', info: 'i️' };
   const el = document.createElement('div');
   el.className = `toast-item toast-${toast.type}`;
   el.id = `toast-${toast.id}`;
@@ -1967,14 +2124,14 @@ function dismissToast(id: string): void {
   processToastQueue();
 }
 
-// 保留 showMiniToast 别名（兼容旧代码）
+// 保留 showMiniToast 别名(兼容旧代码)
 function showMiniToast(msg: string, duration: number = 2000): void {
   showToast(msg, 'info', duration);
 }
 
 
 // ─────────────────────────────────────────
-// AI 代码生成 & 插入（Monaco 集成）
+// AI 代码生成 & 插入(Monaco 集成)
 // ─────────────────────────────────────────
 
 /** 提取 Markdown 代码块内容 */
@@ -1991,7 +2148,7 @@ function extractCodeBlocks(text: string): string {
   return blocks.join('\n\n');
 }
 
-/** 构建滑动窗口上下文（最近 N 轮对话 + 当前文件上下文）*/
+/** 构建滑动窗口上下文(最近 N 轮对话 + 当前文件上下文)*/
 function buildSlidingWindowContext(
   chatHistory: ChatMessage[],
   maxRounds: number = 5,
@@ -2015,7 +2172,7 @@ function buildSlidingWindowContext(
   return messages;
 }
 
-// ── 打字指示器（AI 响应时显示动画点）──
+// ── 打字指示器(AI 响应时显示动画点)──
 function showTypingIndicator(): void {
   hideTypingIndicator();
   const container = document.getElementById('chat-messages')!;
@@ -2051,9 +2208,9 @@ function updateModelIndicator(): void {
   dot.className = 'ai-model-dot';
 }
 
-/** 错误降级：返回缓存的模板提示 */
+/** 错误降级:返回缓存的模板提示 */
 function getFallbackResponse(): string {
-  return '// 网络异常，请检查 API 配置后重试\n// 提示：设置 → 模型服务商 → 测试连接';
+  return '// 网络异常,请检查 API 配置后重试\n// 提示:设置 → 模型服务商 → 测试连接';
 }
 
 // ── Diff 预览 ──
@@ -2107,7 +2264,7 @@ function closeDiffModal(): void {
   document.getElementById('diff-modal')!.style.display = 'none';
 }
 
-// 暴露到全局（供 HTML onclick 使用）
+// 暴露到全局(供 HTML onclick 使用)
 (window as any).acceptDiff = acceptDiff;
 (window as any).closeDiffModal = closeDiffModal;
 
@@ -2132,7 +2289,7 @@ async function aiGenerateAndInsert(
     const originalText = ed.getModel()?.getValueInRange(selection) || '';
     const insertText = asComment ? `// [AI] ${code.split('\n').join('\n// ')}` : code;
 
-    // 有原始选中文本 → Diff 预览；无原文（空选择）→ 直接插入
+    // 有原始选中文本 → Diff 预览;无原文(空选择)→ 直接插入
     if (originalText.trim() && originalText !== insertText) {
       showDiffModal(originalText, insertText, selection, ed);
     } else {
@@ -2192,7 +2349,7 @@ function updateSettingsUI(): void {
   updateModelMetaDisplay();
 }
 
-// ── 动态模型列表（从注册表加载） ──
+// ── 动态模型列表(从注册表加载) ──
 interface ModelItem {
   id: string;
   provider: string;
@@ -2287,7 +2444,7 @@ function selectBuiltinModel(provider: string, model: string): void {
   state.config.provider = provider;
   state.config.model = model;
 
-  // 默认 baseUrl（后续可在自定义 Tab 中覆盖）
+  // 默认 baseUrl(后续可在自定义 Tab 中覆盖)
   const defaultBaseUrls: Record<string, string> = {
     deepseek: 'https://api.deepseek.com/v1',
     huoshan: 'https://ark.cn-beijing.volces.com/api/v3',
@@ -2309,17 +2466,95 @@ function selectBuiltinModel(provider: string, model: string): void {
 
   // 火山引擎特殊提示
   if (provider === 'huoshan') {
-    showToast('⚠️ 火山引擎需要推理接入点ID，请在火山方舟控制台创建接入点后填写', 'warning');
+    showToast('⚠️ 火山引擎需要推理接入点ID,请在火山方舟控制台创建接入点后填写', 'warning');
   }
 }
 
 function switchSettingsSubTab(tab: string): void {
   document.querySelectorAll('.settings-tab').forEach(t => t.classList.remove('active'));
   document.querySelectorAll('.settings-tab-content').forEach(t => t.classList.add('hidden'));
-  
+
   const targetTab = document.querySelector(`[data-settings-tab="${tab}"]`) as HTMLElement;
   targetTab?.classList.add('active');
   document.getElementById(`settings-${tab}`)?.classList.remove('hidden');
+
+  // 切换到版本记录 Tab 时渲染时间线
+  if (tab === 'changelog') renderChangelog();
+}
+
+// ─────────────────────────────────────────
+// 版本记录
+// ─────────────────────────────────────────
+const VERSION_HISTORY: Array<{ version: string; date: string; emoji: string; title: string; features: string[]; philosophy: string }> = [
+  {
+    version: 'v1.0.0',
+    date: '2026-05-26',
+    emoji: '🐯',
+    title: '虎猫诞生 - 个人专属 AI 编程 IDE',
+    features: [
+      'Electron 三进程架构(Main / Renderer / Preload)',
+      'Monaco Editor 集成,23 种语言高亮',
+      'AI 双 Agent 引擎:Builder 需求拆分 + Coder 代码执行',
+      'DeepSeek / Ollama / Anthropic / 自定义 OpenAI 多模型支持',
+      '文件树 + 拖拽面板 + 右键菜单',
+      'SQLite 项目索引 & Schema 理解',
+      '暗色主题(Trae 风格)+ 虎猫品牌',
+      '三栏布局:文件树 / 编辑器 / AI 面板',
+    ],
+    philosophy: '把 AI 工程师装进 IDE。不是又一个套壳 ChatGPT,而是让 AI 真正理解项目上下文,规划、编码、验证一条龙。'
+  },
+  {
+    version: 'v1.1.0',
+    date: '2026-05-28',
+    emoji: '🐅',
+    title: '全面升级 - 双主题 / Git 集成 / 文件预览 / 终端',
+    features: [
+      '🎨 白虎/老虎双主题一键切换,Monaco 编辑器联动',
+      '🔀 Git 面板:Status / Diff 行标记 / 一键 Stage→Commit→Push',
+      '📄 文件预览增强:PDF(Blob URL) / DOCX(EOCD) / HTML双模式 / SVG / Hex查看器',
+      '💬 对话管理:删除(二次确认) / 重命名 / 会话持久化到 .tcide/chat',
+      '🖥️ xterm.js 多标签终端,独立命令历史',
+      '🤖 AI 自动读取协议 / /file 大纲 / /lines N-M / 禁止话术清单',
+      '🔌 火山方舟 Coding Plan 适配 + ark- 密钥',
+      '💾 自动保存(2s 去抖)+ 状态栏脏标记',
+      '🏗️ 架构分析器:依赖分析 + 代码异味检测',
+      '📂 文件监听(递归 + 500ms 去抖)+ 右键重命名',
+      '🐛 修复:图标路径 / DOC 二进制提取 / CSP 策略 / 编码乱码',
+    ],
+    philosophy: '从"能跑"到"好用"。每一个细节都打磨过--文件预览、Git 流程、对话体验、主题切换。让工具适配人,而不是人适应工具。'
+  },
+];
+
+function renderChangelog(): void {
+  const container = document.getElementById('changelog-timeline');
+  if (!container) return;
+
+  let html = '';
+  VERSION_HISTORY.slice().reverse().forEach((v, i) => {
+    const isLatest = i === 0;
+    html += `
+    <div class="changelog-entry ${isLatest ? 'changelog-entry-latest' : ''}">
+      <div class="changelog-dot">
+        <span class="changelog-emoji">${v.emoji}</span>
+      </div>
+      <div class="changelog-card">
+        <div class="changelog-card-header">
+          <span class="changelog-version">${v.version}</span>
+          ${isLatest ? '<span class="changelog-badge">最新</span>' : ''}
+          <span class="changelog-date">${v.date}</span>
+        </div>
+        <h4 class="changelog-title">${v.title}</h4>
+        <ul class="changelog-features">
+          ${v.features.map(f => `<li>${f}</li>`).join('')}
+        </ul>
+        <div class="changelog-philosophy">
+          <span class="changelog-philosophy-label">💡 设计理念</span>
+          <p>${v.philosophy}</p>
+        </div>
+      </div>
+    </div>`;
+  });
+  container.innerHTML = html;
 }
 
 /** Provider 切换时自动填充默认 baseUrl + 协议 */
@@ -2370,11 +2605,11 @@ function updateProviderDefaults(): void {
   const modelInput = document.getElementById('cfg-model') as HTMLInputElement;
   const modelHint = document.getElementById('hint-model-id');
   const hints: Record<string, { placeholder: string; hint: string }> = {
-    deepseek: { placeholder: '如：deepseek-chat、deepseek-reasoner', hint: '在 DeepSeek 平台的 API Keys 页面查看可用模型' },
-    huoshan: { placeholder: 'ep-20240601xxxxxxxx-xxxxx', hint: '⚠️ 火山引擎需要推理接入点ID（endpoint ID），不是模型名。在火山方舟控制台 → 推理接入 → 创建接入点后获取。每个模型需单独创建接入点。' },
-    ollama: { placeholder: '如：qwen2.5:7b、codellama', hint: '运行 ollama list 查看本地已拉取的模型' },
-    anthropic: { placeholder: '如：claude-sonnet-4-20250514', hint: '在 Anthropic Console 创建 API Key，模型名可查文档' },
-    custom: { placeholder: '如：gpt-4o、qwen-max', hint: '自定义 OpenAI 兼容接口，填入服务商提供的模型名称' },
+    deepseek: { placeholder: '如:deepseek-chat、deepseek-reasoner', hint: '在 DeepSeek 平台的 API Keys 页面查看可用模型' },
+    huoshan: { placeholder: 'ep-20240601xxxxxxxx-xxxxx', hint: '⚠️ 火山引擎需要推理接入点ID(endpoint ID),不是模型名。在火山方舟控制台 → 推理接入 → 创建接入点后获取。每个模型需单独创建接入点。' },
+    ollama: { placeholder: '如:qwen2.5:7b、codellama', hint: '运行 ollama list 查看本地已拉取的模型' },
+    anthropic: { placeholder: '如:claude-sonnet-4-20250514', hint: '在 Anthropic Console 创建 API Key,模型名可查文档' },
+    custom: { placeholder: '如:gpt-4o、qwen-max', hint: '自定义 OpenAI 兼容接口,填入服务商提供的模型名称' },
   };
   const hint = hints[provider] || hints.custom;
   if (modelInput) modelInput.placeholder = hint.placeholder;
@@ -2409,7 +2644,7 @@ async function updateModelMetaDisplay(): Promise<void> {
     } else {
       if (ctxEl) ctxEl.textContent = '未知';
       if (maxTokEl) maxTokEl.textContent = '未知';
-      if (costEl) costEl.textContent = '未知（默认 ¥0.3/0.6）';
+      if (costEl) costEl.textContent = '未知(默认 ¥0.3/0.6)';
       if (reasoningBadge) reasoningBadge.style.display = 'none';
     }
   } catch { /* ignore */ }
@@ -2444,9 +2679,9 @@ async function testConfig(): Promise<void> {
     const testResult = await window.api.testModelConnection({
       provider, baseUrl, apiKey, model
     });
-    
+
     if (testResult.success) {
-      showConfigStatus(`连接成功！${testResult.message || ''}`, 'success');
+      showConfigStatus(`连接成功!${testResult.message || ''}`, 'success');
     } else {
       showConfigStatus(`连接失败: ${testResult.message}`, 'error');
     }
@@ -2475,7 +2710,7 @@ async function saveConfig(): Promise<void> {
   }
   if (!model || model.trim() === '') {
     if (provider === 'huoshan' && apiKey.startsWith('ark-')) {
-      // 火山方舟 endpoint key 自带端点，model 可为空
+      // 火山方舟 endpoint key 自带端点,model 可为空
     } else {
       showConfigStatus('模型 ID 不能为空', 'error');
       return;
@@ -2498,7 +2733,7 @@ async function saveConfig(): Promise<void> {
 
   try {
     await window.api.saveModelConfig(state.config);
-    showConfigStatus('配置已保存，切换到「模型服务商」选择要使用的模型', 'success');
+    showConfigStatus('配置已保存,切换到「模型服务商」选择要使用的模型', 'success');
     updateModelListSelection();
     updateModelIndicator();
     // 隐藏快速配置按钮
@@ -2583,7 +2818,7 @@ function initSettingsEvents(): void {
     try {
       const imported = await window.api.importConfig();
       if (!imported) return; // 用户取消
-      // 应用导入的配置（保留当前 API Key）
+      // 应用导入的配置(保留当前 API Key)
       if (imported.provider) state.config.provider = imported.provider as string;
       if (imported.baseUrl) state.config.baseUrl = imported.baseUrl as string;
       if (imported.model) state.config.model = imported.model as string;
@@ -2616,7 +2851,7 @@ function renderTaskProgress(tasks: Array<{ taskId: string; status: string; messa
 }
 
 // ─────────────────────────────────────────
-// 终端（多标签）
+// 终端(多标签)
 // ─────────────────────────────────────────
 interface TermSession {
   id: number;
@@ -2874,7 +3109,7 @@ async function handleContextAction(action: string): Promise<void> {
       break;
     }
     case 'delete':
-      if (confirm(`确定删除 ${contextMenuTarget.name || path}？`)) {
+      if (confirm(`确定删除 ${contextMenuTarget.name || path}?`)) {
         await window.api.deleteFile(path);
         if (state.projectPath) await loadFileTree(state.projectPath);
       }
@@ -2909,7 +3144,7 @@ async function handleContextAction(action: string): Promise<void> {
       }
       const latest = snapshots[snapshots.length - 1];
       await window.api.restoreSnapshot(latest.id);
-      // 如果当前编辑器中是该文件，更新内容
+      // 如果当前编辑器中是该文件,更新内容
       const openEntry = state.openFiles.find(f => f.path === path);
       if (openEntry) {
         try {
@@ -2934,11 +3169,11 @@ function setupEventListeners(): void {
     await loadFileTree(state.projectPath);
     // 记录到最近项目
     window.api.addRecentProject?.(state.projectPath).catch(() => {});
-    // 📋 加载 AI 行为规则（CLAUDE.md）
+    // 📋 加载 AI 行为规则(CLAUDE.md)
     try {
       const rules = await window.api.getProjectRules(state.projectPath);
       window.api.setProjectRules(rules);
-    } catch (_) { /* 无规则文件，使用内置默认 */ }
+    } catch (_) { /* 无规则文件,使用内置默认 */ }
     // 清除欢迎消息
     const container = document.getElementById('chat-messages')!;
     container.innerHTML = '';
@@ -2948,7 +3183,7 @@ function setupEventListeners(): void {
       <div class="welcome-icon">🤖</div>
       <div class="welcome-text">
         <h3>虎猫</h3>
-        <p>项目已加载：${path.basename(state.projectPath)}</p>
+        <p>项目已加载:${path.basename(state.projectPath)}</p>
         <div class="quick-actions">
           <button class="quick-btn" data-action="new-feature">新增功能</button>
           <button class="quick-btn" data-action="refactor">代码重构</button>
@@ -3091,18 +3326,18 @@ function setupEventListeners(): void {
     } else if (e.key === 'Escape' && state.isStreaming) {
       stopStreaming();
     } else if (ctrl && e.shiftKey && e.key.toUpperCase() === 'B') {
-      // Builder 模式：直接输入需求
+      // Builder 模式:直接输入需求
       e.preventDefault();
       const builderInput = document.getElementById('chat-input') as HTMLTextAreaElement;
       builderInput.focus();
-      builderInput.placeholder = 'Builder 模式 — 在此输入你的需求…';
+      builderInput.placeholder = 'Builder 模式 - 在此输入你的需求...';
       showToast('🧱 Builder 模式激活', 'info');
     } else if (ctrl && e.shiftKey && e.key.toUpperCase() === 'C') {
-      // Coder 模式：输入代码指令
+      // Coder 模式:输入代码指令
       e.preventDefault();
       const coderInput = document.getElementById('chat-input') as HTMLTextAreaElement;
       coderInput.focus();
-      coderInput.placeholder = 'Coder 模式 — 在此输入代码指令…';
+      coderInput.placeholder = 'Coder 模式 - 在此输入代码指令...';
       showToast('🔧 Coder 模式激活', 'info');
     } else if (ctrl && e.shiftKey && e.key.toUpperCase() === 'P') {
       // 命令面板
@@ -3138,7 +3373,7 @@ function setupEventListeners(): void {
         switchToFile(prev);
       }
     } else if (ctrl && e.key === 'p') {
-      // 快速打开文件：触发全局搜索
+      // 快速打开文件:触发全局搜索
       e.preventDefault();
       openSearchPanel();
     } else if (ctrl && e.shiftKey && e.key.toUpperCase() === 'X') {
@@ -3181,7 +3416,7 @@ function setupEventListeners(): void {
       const action = (btn as HTMLElement).dataset.action;
       const chatInput = document.getElementById('chat-input') as HTMLTextAreaElement;
       if (action === 'config-deepseek') {
-        // 快速配置 DeepSeek：切到设置并预填
+        // 快速配置 DeepSeek:切到设置并预填
         switchToSettingsTab();
         const provEl = document.getElementById('cfg-provider') as HTMLSelectElement;
         const baseEl = document.getElementById('cfg-base-url') as HTMLInputElement;
@@ -3189,7 +3424,7 @@ function setupEventListeners(): void {
         if (baseEl) baseEl.value = 'https://api.deepseek.com/v1';
         updateProviderDefaults();
         if (baseEl) baseEl.focus();
-        showToast('已切换到 DeepSeek，请在下方填入 API Key', 'info');
+        showToast('已切换到 DeepSeek,请在下方填入 API Key', 'info');
       } else if (action === 'config-ollama') {
         switchToSettingsTab();
         const provEl = document.getElementById('cfg-provider') as HTMLSelectElement;
@@ -3199,7 +3434,7 @@ function setupEventListeners(): void {
         const modelEl = document.getElementById('cfg-model') as HTMLInputElement;
         if (modelEl) modelEl.value = 'llama3.2';
         updateProviderDefaults();
-        showToast('已切换到 Ollama，请确保本地服务已启动', 'info');
+        showToast('已切换到 Ollama,请确保本地服务已启动', 'info');
       } else {
         const prompts: Record<string, string> = {
           'open-project': '',
@@ -3246,7 +3481,7 @@ function setupEventListeners(): void {
   document.getElementById('btn-send')?.addEventListener('click', sendToAI);
   document.getElementById('btn-abort')?.addEventListener('click', stopStreaming);
 
-  // ── 输入框键盘：Ctrl+Enter 发送，Shift+Enter 换行 ──
+  // ── 输入框键盘:Ctrl+Enter 发送,Shift+Enter 换行 ──
   document.getElementById('chat-input')?.addEventListener('keydown', (e) => {
     const ke = e as KeyboardEvent;
     if (ke.key === 'Enter' && ke.ctrlKey) {
@@ -3289,7 +3524,7 @@ function setupEventListeners(): void {
     document.querySelectorAll('.arrow.open').forEach(el => el.classList.remove('open'));
   });
 
-  // ═══ 活动栏：视图切换 ═══
+  // ═══ 活动栏:视图切换 ═══
   document.querySelectorAll('.activity-btn').forEach(btn => {
     btn.addEventListener('click', () => {
       const view = (btn as HTMLElement).dataset.view;
@@ -3320,7 +3555,7 @@ function setupEventListeners(): void {
         document.getElementById('sidebar')?.querySelector('.sidebar-title')?.replaceChildren('ARCH');
         refreshArchPanel();
       } else if (view === 'settings') {
-        // settings 打开设置弹窗，保持当前视图
+        // settings 打开设置弹窗,保持当前视图
         switchToSettingsTab();
         // 恢复激活状态到 explorer
         document.querySelectorAll('.activity-btn').forEach(b => b.classList.remove('active'));
@@ -3329,7 +3564,7 @@ function setupEventListeners(): void {
     });
   });
 
-  // ═══ 主题切换（白虎 / 老虎） ═══
+  // ═══ 主题切换(白虎 / 老虎) ═══
   const themeBtn = document.getElementById('btn-toggle-theme');
   function applyEditorTheme(isLight: boolean): void {
     if (editor) {
@@ -3339,14 +3574,14 @@ function setupEventListeners(): void {
   if (themeBtn) {
     themeBtn.addEventListener('click', () => {
       const isLight = document.documentElement.classList.toggle('theme-light');
-      themeBtn.setAttribute('title', isLight ? '切换为老虎（暗色）' : '切换为白虎（亮色）');
+      themeBtn.setAttribute('title', isLight ? '切换为老虎(暗色)' : '切换为白虎(亮色)');
       applyEditorTheme(isLight);
       try { localStorage.setItem('tcide-theme', isLight ? 'light' : 'dark'); } catch {}
     });
     try {
       if (localStorage.getItem('tcide-theme') === 'light') {
         document.documentElement.classList.add('theme-light');
-        themeBtn.setAttribute('title', '切换为老虎（暗色）');
+        themeBtn.setAttribute('title', '切换为老虎(暗色)');
         applyEditorTheme(true);
       }
     } catch {}
@@ -3443,12 +3678,12 @@ function setupEventListeners(): void {
       if (overview) overview.innerHTML = '<div class="arch-empty">请先打开项目</div>';
       return;
     }
-    overview.innerHTML = '<div class="arch-empty">正在分析依赖… ⏳</div>';
+    overview.innerHTML = '<div class="arch-empty">正在分析依赖... ⏳</div>';
     if (depsEl) depsEl.classList.add('hidden');
     if (smellsEl) smellsEl.classList.add('hidden');
     try {
       const arch = await window.api.analyzeArchitecture(state.projectPath);
-      
+
       // 语言颜色
       const langColors: Record<string, string> = {
         kotlin: '#7F52FF', java: '#b07219', typescript: '#3178c6', javascript: '#f7df1e',
@@ -3487,7 +3722,7 @@ function setupEventListeners(): void {
         ` : ''}
       `;
 
-      // 依赖图（Top 15 被依赖最多的文件）
+      // 依赖图(Top 15 被依赖最多的文件)
       const fileNodes = arch.nodes.filter((n: any) => n.type === 'file').sort((a: any, b: any) => b.depCount - a.depCount).slice(0, 15);
       if (fileNodes.length > 0 && depsEl) {
         depsEl.classList.remove('hidden');
@@ -3636,7 +3871,7 @@ function setupEventListeners(): void {
     document.addEventListener('mouseup', onMouseUp);
   });
 
-  // ── AI 面板：新建对话 ──
+  // ── AI 面板:新建对话 ──
   document.getElementById('btn-new-chat')?.addEventListener('click', () => {
     const welcome = document.getElementById('ai-welcome');
     if (welcome) welcome.style.display = '';
@@ -3650,7 +3885,7 @@ function setupEventListeners(): void {
     showToast('新对话已创建', 'success');
   });
 
-  // ── AI 面板：对话历史 ──
+  // ── AI 面板:对话历史 ──
   document.getElementById('btn-chat-history')?.addEventListener('click', () => {
     const listView = document.getElementById('chat-list-view')!;
     const contentView = document.getElementById('chat-content-view')!;
@@ -3752,11 +3987,11 @@ async function openProjectDialog(): Promise<void> {
       if (state.projectPath) loadFileTree(state.projectPath);
     });
 
-    // 📋 加载 AI 行为规则（CLAUDE.md）
+    // 📋 加载 AI 行为规则(CLAUDE.md)
     try {
       const rules = await window.api.getProjectRules(path);
       window.api.setProjectRules(rules);
-    } catch (_) { /* 无规则文件，使用内置默认 */ }
+    } catch (_) { /* 无规则文件,使用内置默认 */ }
 
     // ⏯ 检查断点续做
     try {
@@ -3766,7 +4001,7 @@ async function openProjectDialog(): Promise<void> {
         if (Array.isArray(tasks) && tasks.length > 0) {
           const pending = tasks.filter((t: { status: string }) => t.status !== 'done');
           if (pending.length > 0) {
-            addChatMessage('system', '⏯ 检测到 ' + pending.length + ' 个未完成的任务（上次中断于 ' + new Date(session.updatedAt).toLocaleString() + '），输入"继续"以恢复。');
+            addChatMessage('system', '⏯ 检测到 ' + pending.length + ' 个未完成的任务(上次中断于 ' + new Date(session.updatedAt).toLocaleString() + '),输入"继续"以恢复。');
             (state as Record<string, unknown>).pendingTasks = tasks;
           }
         }
@@ -3780,7 +4015,7 @@ async function newFileDialog(): Promise<void> {
     alert('请先打开项目 (Ctrl+O)');
     return;
   }
-  const name = prompt('文件名：');
+  const name = prompt('文件名:');
   if (!name) return;
   const filePath = `${state.projectPath}/${name}`;
   try {
@@ -3994,12 +4229,184 @@ function hideWelcomePage(): void {
   document.getElementById('monaco-container')!.style.display = '';
 }
 
+// ─────────────────────────────────────────
+// 贪吃蛇 Demo 项目
+// ─────────────────────────────────────────
+
+const SNAKE_GAME_HTML = `<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>🐍 贪吃蛇 · 虎猫 TCIDE</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; background: #1a1a2e; font-family: 'Segoe UI', system-ui, sans-serif; color: #e0e0e0; }
+.header { text-align: center; margin-bottom: 12px; }
+.header h1 { font-size: 26px; color: #ff8c00; }
+.header p { font-size: 12px; color: #888; margin-top: 4px; }
+canvas { border: 2px solid #ff8c00; border-radius: 8px; background: #16213e; box-shadow: 0 0 20px rgba(255,140,0,0.2); }
+.score-board { display: flex; justify-content: space-between; width: 420px; margin-top: 12px; font-size: 15px; }
+.score-board span { color: #ff8c00; font-weight: 700; }
+.controls { margin-top: 12px; display: flex; gap: 8px; }
+.btn { padding: 8px 18px; border: 1px solid #ff8c00; border-radius: 6px; background: transparent; color: #ff8c00; cursor: pointer; font-size: 13px; transition: all 0.2s; }
+.btn:hover { background: #ff8c00; color: #1a1a2e; }
+.btn-primary { background: #ff8c00; color: #1a1a2e; font-weight: 700; }
+.game-over-overlay { position: absolute; top: 0; left: 0; right: 0; bottom: 0; display: none; flex-direction: column; align-items: center; justify-content: center; background: rgba(0,0,0,0.75); border-radius: 8px; }
+.game-over-overlay.show { display: flex; }
+.game-over-overlay h2 { color: #ff4444; font-size: 28px; margin-bottom: 10px; }
+.game-over-overlay p { color: #ccc; margin-bottom: 14px; }
+.game-container { position: relative; }
+.hint { margin-top: 10px; font-size: 11px; color: #555; }
+</style>
+</head>
+<body>
+<div class="header"><h1>🐍 贪吃蛇</h1><p>方向键控制 · P 暂停 · 空格开始</p></div>
+<div class="game-container">
+<canvas id="canvas" width="400" height="400"></canvas>
+<div class="game-over-overlay" id="gameOver"><h2>游戏结束</h2><p>得分：<span id="finalScore">0</span></p><button class="btn btn-primary" onclick="startGame()">重新开始</button></div>
+</div>
+<div class="score-board"><div>🍎 得分：<span id="score">0</span></div><div>🏆 最高：<span id="highScore">0</span></div><div>⚡ 速度：<span id="speed">1</span>x</div></div>
+<div class="controls"><button class="btn btn-primary" onclick="startGame()">▶ 开始</button><button class="btn" onclick="togglePause()">⏯ 暂停</button><button class="btn" onclick="resetHighScore()">🔄 重置</button></div>
+<div class="hint">🚀 由虎猫 TCIDE AI 生成 · 右键预览查看效果</div>
+<script>
+const canvas=document.getElementById('canvas'),ctx=canvas.getContext('2d'),GRID=20,COLS=canvas.width/GRID,ROWS=canvas.height/GRID;
+let snake,food,direction,nextDirection,score,highScore,gameLoop,speed,running,paused;
+function init(){highScore=parseInt(localStorage.getItem('snake-hs')||'0');document.getElementById('highScore').textContent=highScore;}
+function startGame(){snake=[{x:10,y:10},{x:9,y:10},{x:8,y:10}];direction={x:1,y:0};nextDirection={x:1,y:0};score=0;speed=120;running=true;paused=false;document.getElementById('score').textContent='0';document.getElementById('speed').textContent='1';document.getElementById('gameOver').classList.remove('show');spawnFood();if(gameLoop)clearInterval(gameLoop);gameLoop=setInterval(gameTick,speed);}
+function spawnFood(){do{food={x:Math.floor(Math.random()*COLS),y:Math.floor(Math.random()*ROWS)};}while(snake.some(s=>s.x===food.x&&s.y===food.y));}
+function gameTick(){if(!running||paused)return;direction={...nextDirection};const head={x:snake[0].x+direction.x,y:snake[0].y+direction.y};if(head.x<0||head.x>=COLS||head.y<0||head.y>=ROWS||snake.some(s=>s.x===head.x&&s.y===head.y))return endGame();snake.unshift(head);if(head.x===food.x&&head.y===food.y){score+=10;document.getElementById('score').textContent=score;spawnFood();if(score%50===0){speed=Math.max(40,speed-15);clearInterval(gameLoop);gameLoop=setInterval(gameTick,speed);document.getElementById('speed').textContent=Math.round((120/speed)*10)/10;}}else{snake.pop();}draw();}
+function draw(){ctx.fillStyle='#16213e';ctx.fillRect(0,0,canvas.width,canvas.height);ctx.strokeStyle='#1a2332';ctx.lineWidth=0.5;for(let x=0;x<canvas.width;x+=GRID){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,canvas.height);ctx.stroke();}for(let y=0;y<canvas.height;y+=GRID){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(canvas.width,y);ctx.stroke();}snake.forEach((s,i)=>{ctx.fillStyle=i===0?'#ff8c00':'hsl('+(120+i*5)+',70%,50%)';ctx.fillRect(s.x*GRID+1,s.y*GRID+1,GRID-2,GRID-2);});ctx.fillStyle='#ff4444';ctx.beginPath();ctx.arc(food.x*GRID+GRID/2,food.y*GRID+GRID/2,GRID/2-1,0,Math.PI*2);ctx.fill();}
+function endGame(){running=false;clearInterval(gameLoop);if(score>highScore){highScore=score;localStorage.setItem('snake-hs',highScore.toString());document.getElementById('highScore').textContent=highScore;}document.getElementById('finalScore').textContent=score.toString();document.getElementById('gameOver').classList.add('show');draw();}
+function togglePause(){if(!running)return;paused=!paused;}
+function resetHighScore(){highScore=0;localStorage.removeItem('snake-hs');document.getElementById('highScore').textContent='0';}
+document.addEventListener('keydown',e=>{if(!running)return;const km={ArrowUp:{x:0,y:-1},ArrowDown:{x:0,y:1},ArrowLeft:{x:-1,y:0},ArrowRight:{x:1,y:0},w:{x:0,y:-1},W:{x:0,y:-1},s:{x:0,y:1},S:{x:0,y:1},a:{x:-1,y:0},A:{x:-1,y:0},d:{x:1,y:0},D:{x:1,y:0}};const nd=km[e.key];if(nd&&!(nd.x===-direction.x&&nd.y===-direction.y))nextDirection=nd;if(e.key==='p'||e.key==='P')togglePause();if(e.key===' '){e.preventDefault();startGame();}});
+init();draw();
+</script>
+</body>
+</html>`;
+
+function createSnakeDemo(): void {
+  if (!editor) return;
+  const model = editor.getModel();
+  if (!model) return;
+  model.setValue(SNAKE_GAME_HTML);
+  monaco.editor.setModelLanguage(model, 'html');
+  
+  // 同时更新 openFiles 中的条目
+  const existingIdx = state.openFiles.findIndex(f => f.path === 'virtual://snake.html');
+  if (existingIdx >= 0) {
+    state.openFiles[existingIdx].content = SNAKE_GAME_HTML;
+    state.activeFileIndex = existingIdx;
+  } else {
+    state.openFiles.push({ name: 'snake.html', path: 'virtual://snake.html', content: SNAKE_GAME_HTML, language: 'html', dirty: false, isAI: true });
+    state.activeFileIndex = state.openFiles.length - 1;
+  }
+  switchToFile(state.activeFileIndex);
+  renderTabs();
+  hideWelcomePage();
+  showToast('🐍 贪吃蛇已加载！右键选择「👁 预览」查看效果', 'success');
+}
+
+// ─────────────────────────────────────────
+// 首次启动欢迎 README
+// ─────────────────────────────────────────
+const FIRST_LAUNCH_README = `# 🐅 欢迎使用虎猫 TCIDE v1.1.0
+
+**个人专属超级 AI 编程 IDE**
+
+---
+
+## 🚀 快速开始
+
+### 1️⃣ 配置 AI 模型
+点击右上角 ⚙️ **设置** → 选择服务商 → 填入 API Key
+
+支持：**DeepSeek** | **火山方舟** | **Ollama** | **自定义 OpenAI**
+
+### 2️⃣ 打开项目文件夹
+点击 **📂 打开项目** 或拖拽文件夹到界面
+
+TCIDE 会自动索引项目文件，理解项目结构
+
+### 3️⃣ 开始对话
+在右侧 AI 面板输入需求，AI 会帮你：
+- \`/task 需求描述\` — 自动拆分任务 → 编码 → 编译
+- 选中代码 → 右键 AI 菜单 → 解释/修复/重构
+- 自由对话获取编程建议
+
+---
+
+## 🐍 试试贪吃蛇 Demo
+
+点击左侧 **🐍 贪吃蛇 Demo** 按钮，一键打开一个完整的 HTML5 贪吃蛇游戏！
+
+在编辑区右键 → **👁 预览** 可以在侧边栏玩游戏。
+
+---
+
+## ⌨️ 常用快捷键
+
+| 快捷键 | 功能 |
+|--------|------|
+| \`Ctrl+P\` | 快速打开文件 |
+| \`Ctrl+W\` | 关闭当前文件 |
+| \`Ctrl+Tab\` | 切换文件标签 |
+| \`Ctrl+J\` | 打开底部面板 |
+| \`Ctrl+,\` | 打开设置 |
+| \`Ctrl+Shift+I\` | AI 面板 |
+| \`Ctrl+N\` | 新建文件 |
+
+---
+
+## 🎨 主题切换
+
+点击左下角 **☀️** 按钮在 🐯 老虎（暗色）和 🐅 白虎（亮色）之间切换。
+
+---
+
+## 📖 更多
+
+- **版本记录**：设置 → 📋 版本记录
+- **键盘快捷键**：按 \`?\` 查看帮助
+- **GitHub**：https://github.com/Guanist/TCIDE
+
+> 💡 内置 Builder + Coder 双 Agent 引擎，用对话驱动完整项目开发。
+> 试试在 AI 面板说：「帮我做一个 ToDo 应用」！
+`;
+
+function showFirstLaunchReadme(): void {
+  // 只在没有项目和文件打开时显示
+  if (state.projectPath) return;
+  if (!editor) return;
+  const model = editor.getModel();
+  if (!model) return;
+  if (model.getValue().trim() !== '') return; // 编辑器已有内容，不覆盖
+  
+  model.setValue(FIRST_LAUNCH_README);
+  monaco.editor.setModelLanguage(model, 'markdown');
+  
+  state.openFiles = [{
+    name: 'Welcome.md',
+    path: 'virtual://welcome.md',
+    content: FIRST_LAUNCH_README,
+    language: 'markdown',
+    dirty: false,
+    isAI: true,
+  }];
+  state.activeFileIndex = 0;
+  renderTabs();
+}
+
 function initWelcomePage(): void {
   document.getElementById('welcome-open-project')?.addEventListener('click', () => openProjectDialog());
   document.getElementById('welcome-new-project')?.addEventListener('click', () => {
     openProjectDialog().then(() => {
       if (state.projectPath) newFileDialog();
     });
+  });
+  document.getElementById('welcome-snake-demo')?.addEventListener('click', () => {
+    createSnakeDemo();
   });
   loadRecentProjects().then(() => renderWelcomePage());
   if (!state.projectPath) showWelcomePage();
@@ -4018,7 +4425,7 @@ function parseOutlineSymbols(code: string, language: string): OutlineSymbol[] {
   const lang = language.toLowerCase();
 
   if (['kotlin', 'java', 'typescript', 'javascript', 'go', 'rust', 'python'].includes(lang)) {
-    // 通用：匹配 fun/function/def/func/fn 定义
+    // 通用:匹配 fun/function/def/func/fn 定义
     const funcRegex = /^\s*(?:fun\s+|function\s+|def\s+|func\s+|fn\s+|public\s+(?:fun\s+|function\s+)?|private\s+(?:fun\s+|function\s+)?|protected\s+(?:fun\s+|function\s+)?|suspend\s+fun\s+)([\w]+)\s*\(/;
     const classRegex = /^\s*(?:class\s+|interface\s+|object\s+|enum\s+class\s+|data\s+class\s+|sealed\s+class\s+)([\w]+)/;
 
@@ -4111,7 +4518,7 @@ function renderOutline(): void {
 
 function initOutline(): void {
   document.getElementById('outline-filter')?.addEventListener('input', renderOutline);
-  // 监听编辑器内容变化，更新大纲
+  // 监听编辑器内容变化,更新大纲
   editor?.onDidChangeModelContent(() => {
     if (!document.getElementById('tab-outline')?.classList.contains('hidden')) {
       renderOutline();
@@ -4326,7 +4733,7 @@ function toggleTerminal(): void {
   const resizer = document.getElementById('panel-resizer')!;
   const toggle = document.getElementById('status-panel-toggle');
   const isVisible = !panel.classList.contains('hidden');
-  
+
   if (isVisible) {
     panel.classList.add('hidden');
     resizer.classList.add('hidden');
@@ -4335,7 +4742,7 @@ function toggleTerminal(): void {
     panel.classList.remove('hidden');
     resizer.classList.remove('hidden');
     toggle?.classList.add('panel-visible');
-    // 自动初始化终端（如果还没创建）
+    // 自动初始化终端(如果还没创建)
     initTerminal();
     setTimeout(() => fitActiveTerminal(), 100);
   }
@@ -4343,7 +4750,7 @@ function toggleTerminal(): void {
 }
 
 // ─────────────────────────────────────────
-// 标签拖拽：同步文件顺序
+// 标签拖拽:同步文件顺序
 // ─────────────────────────────────────────
 function syncOpenFilesOrder(): void {
   const tabs = document.getElementById('editor-tabs')!.querySelectorAll('.tab-item');
@@ -4539,7 +4946,7 @@ async function restoreLastSession(): Promise<void> {
         projectPath: s.projectPath,
       }));
       state.currentSessionId = saved.currentSessionId || state.chatSessions[0]?.id || '';
-      
+
       // 恢复对话 UI
       if (state.currentSessionId) {
         renderChatSessions();
@@ -4575,7 +4982,7 @@ async function restoreLastSession(): Promise<void> {
             state.openFiles.push({ path: f.path, name: f.name, content, dirty: false, language: f.language || detectLanguage(f.name) });
           }
         } catch {
-          // 文件可能已被删除，跳过
+          // 文件可能已被删除,跳过
         }
       }
 
@@ -4602,11 +5009,11 @@ async function restoreLastSession(): Promise<void> {
   }
 }
 
-// 辅助：path.basename polyfill
+// 辅助:path.basename polyfill
 const path = { basename: (p: string) => p.split(/[\\/]/).pop() || p };
 
 
-// 状态栏 Git 分支点击：复制分支名
+// 状态栏 Git 分支点击:复制分支名
 const statusGitEl = document.getElementById('status-git');
 if (statusGitEl) {
   statusGitEl.addEventListener('click', () => {
@@ -4705,7 +5112,7 @@ async function updateStatusBarUsage(): Promise<void> {
 function showBalanceWarning(detail: string): void {
   const dialog = document.getElementById('balance-warning-dialog');
   const msg    = document.getElementById('balance-warning-msg');
-  if (msg)    msg.textContent = `API 余额不足或欠费，请充值后继续使用。\n\n详情：${detail}`;
+  if (msg)    msg.textContent = `API 余额不足或欠费,请充值后继续使用。\n\n详情:${detail}`;
   if (dialog) dialog.classList.remove('hidden');
 }
 
