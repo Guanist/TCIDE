@@ -14,7 +14,12 @@ export async function initDatabase(): Promise<void> {
   const userDataPath = app.getPath('userData');
   dbPath = path.join(userDataPath, 'personal-ide.db');
 
-  const SQL = await initSqlJs();
+  // 生产环境（asar 打包），wasm 文件在 extraResources 中
+  const wasmPath = app.isPackaged
+    ? path.join(process.resourcesPath, 'sql-wasm.wasm')
+    : undefined;
+
+  const SQL = wasmPath ? await initSqlJs({ locateFile: () => wasmPath }) : await initSqlJs();
   if (fs.existsSync(dbPath)) {
     const buffer = fs.readFileSync(dbPath);
     db = new SQL.Database(buffer);

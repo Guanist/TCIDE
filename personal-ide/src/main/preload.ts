@@ -84,6 +84,13 @@ const api = {
   readDirectory: (dirPath: string): Promise<FileTreeNode[]> =>
     ipcRenderer.invoke('file:readDir', dirPath),
 
+  watchProject: (projectPath: string, enable: boolean): Promise<{ watching: boolean }> =>
+    ipcRenderer.invoke('file:watch', projectPath, enable),
+
+  onFileChanged: (callback: (projectPath: string) => void): void => {
+    ipcRenderer.on('file:changed', (_e: IpcRendererEvent, projectPath: string) => callback(projectPath));
+  },
+
   getFileStats: (filePath: string): Promise<{ size: number; mtime: number; isDirectory: boolean }> =>
     ipcRenderer.invoke('file:stats', filePath),
 
@@ -287,6 +294,31 @@ const api = {
   getGitUser: (projectPath: string): Promise<{ name: string | null; email: string | null }> =>
     ipcRenderer.invoke('git:getUser', projectPath),
 
+  getGitStatus: (projectPath: string): Promise<{ success: boolean; branch: string; files: Array<{ status: string; path: string }>; ahead: number; behind: number; dirty: boolean }> =>
+    ipcRenderer.invoke('git:status', projectPath),
+
+  stageAll: (projectPath: string): Promise<{ success: boolean; error?: string }> =>
+    ipcRenderer.invoke('git:stageAll', projectPath),
+
+  commit: (projectPath: string, message: string): Promise<{ success: boolean; output?: string; error?: string }> =>
+    ipcRenderer.invoke('git:commit', projectPath, message),
+
+  push: (projectPath: string): Promise<{ success: boolean; output?: string; error?: string }> =>
+    ipcRenderer.invoke('git:push', projectPath),
+
+  getDiff: (filePath: string, projectPath: string): Promise<{ success: boolean; added: number[]; removed: number[]; modified: number[] }> =>
+    ipcRenderer.invoke('git:diff', filePath, projectPath),
+
+  pull: (projectPath: string): Promise<{ success: boolean; output?: string; error?: string }> =>
+    ipcRenderer.invoke('git:pull', projectPath),
+
+  getGitLog: (projectPath: string, count?: number): Promise<{ success: boolean; commits: Array<{ hash: string; message: string }> }> =>
+    ipcRenderer.invoke('git:log', projectPath, count || 10),
+
+  // ── 架构分析 ──
+  analyzeArchitecture: (projectPath: string): Promise<any> =>
+    ipcRenderer.invoke('arch:analyze', projectPath),
+
   // ── Gradle 快捷操作 ──
   gradleExec: (projectPath: string, task: string): Promise<{ output: string; exitCode: number }> =>
     ipcRenderer.invoke('gradle:exec', projectPath, task),
@@ -297,6 +329,84 @@ const api = {
 
   readTextFile: (filePath: string): Promise<string> =>
     ipcRenderer.invoke('file:readText', filePath),
+
+  readFileAsDataURL: (filePath: string): Promise<string> =>
+    ipcRenderer.invoke('file:readAsDataURL', filePath),
+
+  readDocxText: (filePath: string): Promise<string> =>
+    ipcRenderer.invoke('file:readDocx', filePath),
+
+  readHex: (filePath: string, maxBytes?: number): Promise<{ hex: string; size: number; truncated: boolean; maxBytes: number }> =>
+    ipcRenderer.invoke('file:readHex', filePath, maxBytes),
+
+  readPdfBase64: (filePath: string): Promise<{ base64: string; name: string }> =>
+    ipcRenderer.invoke('file:readPdfBase64', filePath),
+
+  readPdfDataUrl: (filePath: string): Promise<string> =>
+    ipcRenderer.invoke('file:readPdfDataUrl', filePath),
+
+  // ── 文件/目录操作 ──
+  createDir: (dirPath: string): Promise<void> =>
+    ipcRenderer.invoke('file:mkdir', dirPath),
+
+  createFile: (filePath: string, content?: string): Promise<void> =>
+    ipcRenderer.invoke('file:create', filePath, content),
+
+  // ── 会话持久化 ──
+  saveSession: (state: {
+    projectPath: string | null;
+    openFiles: Array<{ path: string; name: string; language: string }>;
+    activeFileIndex: number;
+    chatSessions: Array<{
+      id: string; name: string;
+      chatHistory: Array<{ id: string; role: string; content: string; timestamp: number }>;
+      createdAt: number; updatedAt: number; projectPath?: string;
+    }>;
+    currentSessionId: string;
+    scrollPositions: Record<string, { scrollTop: number; scrollLeft: number }>;
+  }): Promise<void> =>
+    ipcRenderer.invoke('session:save', state),
+
+  restoreSession: (): Promise<{
+    projectPath: string | null;
+    openFiles: Array<{ path: string; name: string; language: string }>;
+    activeFileIndex: number;
+    chatSessions: Array<{
+      id: string; name: string;
+      chatHistory: Array<{ id: string; role: string; content: string; timestamp: number }>;
+      createdAt: number; updatedAt: number; projectPath?: string;
+    }>;
+    currentSessionId: string;
+    scrollPositions: Record<string, { scrollTop: number; scrollLeft: number }>;
+    timestamp: number;
+  } | null> =>
+    ipcRenderer.invoke('session:restore'),
+
+  // ── 系统操作 ──
+  openExternal: (target: string): Promise<void> =>
+    ipcRenderer.invoke('system:openExternal', target),
+
+  openBrowser: (url: string): Promise<void> =>
+    ipcRenderer.invoke('system:openBrowser', url),
+
+  openTerminal: (cwd?: string): Promise<void> =>
+    ipcRenderer.invoke('system:openTerminal', cwd),
+
+  openFolder: (folderPath?: string): Promise<void> =>
+    ipcRenderer.invoke('system:openFolder', folderPath),
+
+  openSystemFile: (filePath: string): Promise<void> =>
+    ipcRenderer.invoke('system:openFile', filePath),
+
+  getProjectRoot: (): Promise<string | null> =>
+    ipcRenderer.invoke('project:getRoot'),
+
+  // ── 配置导入/导出 ──
+  exportConfig: (): Promise<{ success: boolean; path?: string }> =>
+    ipcRenderer.invoke('config:export'),
+
+  importConfig: (): Promise<Record<string, unknown> | null> =>
+    ipcRenderer.invoke('config:import'),
 
   // ── 事件监听 ──
   on: (channel: string, callback: (event: IpcRendererEvent, ...args: unknown[]) => void): void => {
@@ -326,6 +436,17 @@ const api = {
 
   decrypt: (encrypted: string): Promise<string> =>
     ipcRenderer.invoke('crypto:decrypt', encrypted),
+
+  // ── 项目搜索 ──
+  searchInProject: (projectPath: string, query: string): Promise<Array<{ file: string; line: number; text: string }>> =>
+    ipcRenderer.invoke('search:project', projectPath, query),
+
+  // ── 最近项目 ──
+  getRecentProjects: (): Promise<Array<{ path: string; name: string; lastOpened: number }>> =>
+    ipcRenderer.invoke('project:getRecent'),
+
+  addRecentProject: (projectPath: string): Promise<void> =>
+    ipcRenderer.invoke('project:addRecent', projectPath),
 };
 
 contextBridge.exposeInMainWorld('api', api);

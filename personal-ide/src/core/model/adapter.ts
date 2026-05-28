@@ -187,9 +187,9 @@ export class ModelAdapter {
     const startTime = Date.now();
 
     const body: Record<string, unknown> = {
-      model,
       messages,
       stream,
+      ...(model && { model }),  // 允许空 model（火山方舟 endpoint key 自带端点）
       ...(temperature !== undefined && { temperature }),
       ...(maxTokens !== undefined && { max_tokens: maxTokens }),
     };

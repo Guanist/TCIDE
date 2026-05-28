@@ -153,6 +153,17 @@ const BUILTIN_MODELS: ModelMeta[] = [
     capabilities: ['text', 'code', 'reasoning'],
     supportsStreaming: true,
   },
+  {
+    id: 'coding-plan',
+    provider: 'huoshan',
+    name: '火山引擎 Coding Plan',
+    contextWindow: 131072,
+    maxTokens: 4096,
+    reasoning: false,
+    cost: { input: 2.0, output: 8.0 },
+    capabilities: ['text', 'code'],
+    supportsStreaming: true,
+  },
 
   // ── Anthropic (Claude) ──
   {

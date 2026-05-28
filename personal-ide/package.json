@@ -1,7 +1,7 @@
 {
   "name": "tcide",
   "productName": "TCIDE",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "虎猫 - 个人专属超级AI编程IDE",
   "main": "dist/main/index.js",
   "author": "Guanist, Inc.",

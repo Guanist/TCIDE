@@ -173,6 +173,16 @@ interface TcIdeApi {
   // ── 附件上传 ──
   openFileDialog(): Promise<Array<{ name: string; path: string; size: number; mtime: number }>>;
   readTextFile(filePath: string): Promise<string>;
+  readFileAsDataURL(filePath: string): Promise<string>;
+  readDocxText(filePath: string): Promise<string>;
+  readPdfDataUrl(filePath: string): Promise<string>;
+
+  // ── 文件/目录操作 ──
+  createDir(dirPath: string): Promise<void>;
+
+  // ── 配置导入/导出 ──
+  exportConfig(): Promise<{ success: boolean; path?: string }>;
+  importConfig(): Promise<Record<string, unknown> | null>;
 
   // ── 工程兼容 ──
   loadProjectCompat(projectPath: string): Promise<Record<string, unknown>>;
@@ -185,6 +195,13 @@ interface TcIdeApi {
   getClipboardText(): Promise<string>;
   encrypt(plainText: string): Promise<string>;
   decrypt(encrypted: string): Promise<string>;
+
+  // ── 项目搜索 ──
+  searchInProject(projectPath: string, query: string): Promise<Array<{ file: string; line: number; text: string }>>;
+
+  // ── 最近项目 ──
+  getRecentProjects(): Promise<Array<{ path: string; name: string; lastOpened: number }>>;
+  addRecentProject(projectPath: string): Promise<Array<{ path: string; name: string; lastOpened: number }>>;
 
   // ── 事件 ──
   on(event: string, handler: (...args: unknown[]) => void): void;

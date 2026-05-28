@@ -34,6 +34,14 @@
     {
       "from": "resources/about-icon.png",
       "to": "about-icon.png"
+    },
+    {
+      "from": "resources/brand/mascot-happy.png",
+      "to": "brand/mascot-happy.png"
+    },
+    {
+      "from": "resources/brand/welcome-illustration.png",
+      "to": "brand/welcome-illustration.png"
     }
   ],
   "asar": true,

@@ -4,6 +4,7 @@
 import { app, BrowserWindow, ipcMain, dialog, Menu, Tray, globalShortcut, nativeImage, protocol, net } from 'electron';
 import * as path from 'path';
 import { pathToFileURL } from 'url';
+import * as fs from 'fs';
 import { setupIpcHandlers } from './ipc-handlers';
 import { initDatabase, closeDatabase } from './db/sqlite';
 import { PrivacyNet } from './privacy-net';
@@ -52,9 +53,17 @@ function createWindow(): void {
   if (isDev) {
     mainWindow.loadURL('http://localhost:5173/');
   } else {
-    mainWindow.loadFile(path.join(__dirname, '..', 'renderer', 'index.html'));
+    const loadPath = path.join(__dirname, '..', 'renderer', 'index.html');
+    console.log('[Main] Loading:', loadPath);
+    mainWindow.loadFile(loadPath).then(() => console.log('[Main] loadFile resolved')).catch((err) => console.error('[Main] loadFile error:', err));
   }
 
+  mainWindow.webContents.on('did-start-loading', () => console.log('[Main] did-start-loading'));
+  mainWindow.webContents.on('did-finish-load', () => console.log('[Main] did-finish-load'));
+  mainWindow.webContents.on('did-fail-load', (_e, code, desc, url) => console.error('[Main] did-fail-load:', code, desc, url));
+  mainWindow.webContents.on('did-fail-provisional-load', (_e, code, desc, url) => console.error('[Main] did-fail-provisional-load:', code, desc, url));
+  mainWindow.webContents.on('console-message', (_e, level, message) => console.log('[Renderer]', message));
+  
   mainWindow.on('close', (event) => {
     if (tray && !isQuitting) {
       event.preventDefault();
@@ -227,9 +236,33 @@ function scheduleMemoryCleanup(): void {
 }
 
 // ─────────────────────────────────────────
+// 单实例锁 + 托盘退出
+// ─────────────────────────────────────────
+if (process.platform === 'win32') {
+  app.setAppUserModelId('com.tcide.personal-ide');
+}
+
+const gotLock = app.requestSingleInstanceLock();
+
+if (!gotLock) {
+  app.quit();
+} else {
+  app.on('second-instance', () => {
+    if (mainWindow) {
+      if (mainWindow.isMinimized()) mainWindow.restore();
+      mainWindow.show();
+      mainWindow.focus();
+    }
+  });
+}
+
+// ─────────────────────────────────────────
 // 应用生命周期
 // ─────────────────────────────────────────
 app.whenReady().then(async () => {
+  try { fs.writeFileSync(path.join(app.getPath('userData'), 'tcide-debug.log'), 'START\n'); } catch {}
+  function dlog(msg: string) { console.log(msg); try { fs.appendFileSync(path.join(app.getPath('userData'), 'tcide-debug.log'), msg + '\n'); } catch {} }
+  dlog('[Main] STEP: whenReady entered');
   // ── 自定义协议 ──
   // Electron 33+ 要求在 whenReady 后注册 protocol
   protocol.handle('tcide', (request) => {
@@ -246,25 +279,36 @@ app.whenReady().then(async () => {
     }
   });
 
-  console.log('[Main] PersonalIDE starting...');
+  dlog('[Main] PersonalIDE starting...');
 
   try {
     await initDatabase();
-    console.log('[Main] Database initialized');
+    dlog('[Main] Database initialized');
   } catch (err) {
-    console.error('[Main] Database init failed:', err);
+    dlog('[Main] Database init failed: ' + err);
   }
 
   if (!isDev) {
+    dlog('[Main] STEP: creating PrivacyNet');
     const privacyNet = new PrivacyNet();
     privacyNet.enable();
   }
 
+  dlog('[Main] isDev=' + isDev);
+  dlog('[Main] __dirname=' + __dirname);
+  dlog('[Main] STEP: setupIpcHandlers');
   setupIpcHandlers();
+  dlog('[Main] STEP: createAppMenu');
   createAppMenu();
+  dlog('[Main] STEP: createWindow');
   createWindow();
+  dlog('[Main] STEP: afterCreateWindow');
+  dlog('[Main] STEP: createTray');
   createTray();
+  dlog('[Main] STEP: afterCreateTray');
+  dlog('[Main] STEP: registerGlobalShortcuts');
   registerGlobalShortcuts();
+  dlog('[Main] STEP: scheduleMemoryCleanup');
   scheduleMemoryCleanup();
 
   app.on('activate', () => {

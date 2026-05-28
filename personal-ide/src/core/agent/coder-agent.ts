@@ -9,7 +9,9 @@ import * as path from 'path';
 import * as fs from 'fs';
 import { saveSnapshot } from '../../main/db/sqlite';
 
-const CODER_SYSTEM_PROMPT = `你是一个严谨的程序员。你会收到一个 JSON 任务描述，请根据项目现有代码和任务描述，直接生成或修改相应文件。
+const CODER_SYSTEM_PROMPT = `你是虎猫 TCIDE 的 AI 程序员，运行在用户的本地开发环境中。你拥有对项目文件的完整读写权限和终端执行能力。你可以直接读取、修改、创建项目中的任何文件，也可以执行 gradle、npm、终端命令。
+
+你会收到一个 JSON 任务描述，请根据项目现有代码和任务描述，直接生成或修改相应文件。
 
 你有以下工具能力：
 1. read_file(path) - 读取文件内容
@@ -54,7 +56,7 @@ export class CoderAgent {
 
     try {
       const response = await this.model.send(messages, options);
-      const result = await this.executeCoderActions(response, projectRoot, task.id);
+      const result = await this.executeCoderActions(response, projectRoot, task);
       return result;
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
@@ -95,7 +97,7 @@ export class CoderAgent {
     return contents.join('\n\n') || '（无相关文件，需新建）';
   }
 
-  private async executeCoderActions(response: string, projectRoot: string, taskId: string): Promise<{ success: boolean; output: string }> {
+  private async executeCoderActions(response: string, projectRoot: string, task: Task): Promise<{ success: boolean; output: string }> {
     const lines = response.split('\n');
     const actions: Array<{ type: string; path?: string; content?: string; command?: string; cwd?: string }> = [];
 
@@ -130,7 +132,7 @@ export class CoderAgent {
           // 📸 自动快照：写入前备份原文件
           if (fs.existsSync(fullPath)) {
             const originalContent = fs.readFileSync(fullPath, 'utf-8');
-            saveSnapshot(projectRoot, taskId, fullPath, originalContent);
+            saveSnapshot(projectRoot, task.id, fullPath, originalContent);
           }
           this.fileService.write(fullPath, action.content);
         } catch (err: unknown) {
@@ -142,6 +144,7 @@ export class CoderAgent {
 
     // 执行终端操作
     const terminalOutputs: string[] = [];
+    let buildSucceeded = false;
     for (const action of actions) {
       if (action.type === 'run' && action.command) {
         const { exec } = await import('child_process');
@@ -155,6 +158,10 @@ export class CoderAgent {
             windowsHide: true,
           });
           terminalOutputs.push(`[TERM] ${action.command}\nstdout: ${stdout.slice(0, 2000)}\nstderr: ${stderr.slice(0, 1000)}`);
+          // 检测是否为构建命令且成功
+          if (/gradle|assemble|build|compile/i.test(action.command) && !stderr.includes('FAILED') && !stderr.includes('BUILD FAILED')) {
+            buildSucceeded = true;
+          }
         } catch (err: unknown) {
           const error = err as { stderr?: string; stdout?: string };
           terminalOutputs.push(`[TERM] ${action.command} FAILED\n${error.stderr || ''}`);
@@ -162,9 +169,24 @@ export class CoderAgent {
       }
     }
 
+    // 🔄 构建成功 → 自动 Git 提交
+    const fileCount = actions.filter(a => a.type === 'write').length;
+    let gitCommitResult = '';
+    if (buildSucceeded && fileCount > 0) {
+      try {
+        const { execSync } = require('child_process');
+        const msg = `Auto: ${task.desc.slice(0, 60)} [task:${task.id}]`;
+        execSync('git add -A', { cwd: projectRoot, timeout: 10000 });
+        const commitOutput = execSync(`git commit -m "${msg.replace(/"/g, '\\"')}"`, { cwd: projectRoot, timeout: 10000 }).toString().trim();
+        gitCommitResult = `\n[GIT] ✅ 自动提交: ${commitOutput}`;
+      } catch (err: unknown) {
+        gitCommitResult = `\n[GIT] ⚠️ 自动提��失败: ${(err as Error).message}`;
+      }
+    }
+
     return {
       success: true,
-      output: `执行完成。\n文件变更：${actions.filter(a => a.type === 'write').length} 个\n终端操作：${terminalOutputs.length} 个\n\n${terminalOutputs.join('\n\n')}`,
+      output: `执行完成。\n文件变更：${fileCount} 个\n终端操作：${terminalOutputs.length} 个${gitCommitResult}\n\n${terminalOutputs.join('\n\n')}`,
     };
   }
 }

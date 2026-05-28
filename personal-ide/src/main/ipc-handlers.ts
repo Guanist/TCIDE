@@ -13,6 +13,8 @@ import { configManager } from '../core/config/config-manager';
 import { ProjectCompatManager } from '../core/compat/project-compat';
 import { queryDb, runDb, insertUsage, queryUsage } from './db/sqlite';
 import { getStore } from './store';
+import * as zlib from 'zlib';
+import * as path from 'path';
 
 let currentAbortController: AbortController | null = null;
 let currentProjectPath: string | null = null;
@@ -20,8 +22,7 @@ let projectRules: string = '';
 const fileService = new FileService();
 
 function getModelConfig(): ModelConfig {
-  const store = getStore() as unknown as Record<string, unknown>;
-  const saved = store['modelConfig'] as ModelConfig | undefined;
+  const saved = getStore().get('modelConfig') as unknown as ModelConfig | undefined;
   if (saved) {
     // 解密存储的 API Key
     const config = { ...saved };
@@ -88,6 +89,38 @@ export function setupIpcHandlers(): void {
   ipcMain.handle('file:rename', async (_e, oldPath: string, newPath: string) => fileService.rename(oldPath, newPath));
   ipcMain.handle('file:mkdir', async (_e, dirPath: string) => fileService.mkdir(dirPath));
   ipcMain.handle('file:readDir', async (_e, dirPath: string) => fileService.readDir(dirPath));
+
+  // ── 文件监听（通知渲染进程刷新文件树）──
+  let fileWatchers: Map<string, any> = new Map();
+  ipcMain.handle('file:watch', async (_e, projectPath: string, enable: boolean) => {
+    const fs = await import('fs');
+    if (!enable) {
+      const w = fileWatchers.get(projectPath);
+      if (w) { w.close(); fileWatchers.delete(projectPath); }
+      return { watching: false };
+    }
+    // 关闭旧监听
+    const old = fileWatchers.get(projectPath);
+    if (old) old.close();
+    // 启动新监听（递归监听 + 去抖）
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    try {
+      const watcher = fs.watch(projectPath, { recursive: true }, (_event, _filename) => {
+        if (timer) return;
+        timer = setTimeout(() => {
+          timer = null;
+          const win = BrowserWindow.getAllWindows()[0];
+          if (win && !win.isDestroyed()) {
+            win.webContents.send('file:changed', projectPath);
+          }
+        }, 500);
+      });
+      fileWatchers.set(projectPath, watcher);
+      return { watching: true };
+    } catch {
+      return { watching: false };
+    }
+  });
   ipcMain.handle('file:stats', async (_e, filePath: string) => fileService.stats(filePath));
 
   // 项目
@@ -146,13 +179,13 @@ export function setupIpcHandlers(): void {
   ipcMain.handle('model:getConfig', async () => getModelConfig());
 
   ipcMain.handle('model:saveConfig', async (_e, config: ModelConfig) => {
-    const store = getStore() as unknown as Record<string, unknown>;
+    const store = getStore();
     // 🔐 加密存储 API Key（safeStorage 不可用时保持明文）
     const toSave = { ...config };
     if (toSave.apiKey && safeStorage.isEncryptionAvailable()) {
       toSave.apiKey = safeStorage.encryptString(toSave.apiKey).toString('base64');
     }
-    store['modelConfig'] = toSave;
+    store.set('modelConfig', toSave);
   });
 
   ipcMain.handle('model:testConnection', async (_e, params: { provider: string; baseUrl: string; apiKey: string; model: string }) => {
@@ -245,12 +278,10 @@ export function setupIpcHandlers(): void {
 
   // 系统设置
   ipcMain.handle('settings:get', async () => {
-    const store = getStore() as unknown as Record<string, unknown>;
-    return store['settings'] ?? {};
+    return getStore().get('settings') ?? {};
   });
   ipcMain.handle('settings:save', async (_e, settings: Record<string, unknown>) => {
-    const store = getStore() as unknown as Record<string, unknown>;
-    store['settings'] = settings;
+    getStore().set('settings', settings);
   });
   ipcMain.handle('system:showInFolder', async (_e, filePath: string) => { const { shell } = await import('electron'); shell.showItemInFolder(filePath); });
   ipcMain.handle('system:getClipboardText', async () => { const { clipboard } = await import('electron'); return clipboard.readText(); });
@@ -425,6 +456,78 @@ export function setupIpcHandlers(): void {
     }
   });
 
+  // ── 会话持久化 ──
+  ipcMain.handle('session:save', async (_e, sessionState: {
+    projectPath: string | null;
+    openFiles: Array<{ path: string; name: string; language: string }>;
+    activeFileIndex: number;
+    chatSessions: Array<{
+      id: string; name: string;
+      chatHistory: Array<{ id: string; role: string; content: string; timestamp: number }>;
+      createdAt: number; updatedAt: number; projectPath?: string;
+    }>;
+    currentSessionId: string;
+    scrollPositions: Record<string, { scrollTop: number; scrollLeft: number }>;
+  }) => {
+    getStore().set('sessionState', { ...sessionState, timestamp: Date.now() });
+  });
+
+  ipcMain.handle('session:restore', async () => {
+    return getStore().get('sessionState') || null;
+  });
+
+  // ── 文件创建 ──
+  ipcMain.handle('file:create', async (_e, filePath: string, content?: string) => {
+    const fs = await import('fs');
+    const pathMod = await import('path');
+    const dir = pathMod.dirname(filePath);
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(filePath, content || '', 'utf-8');
+  });
+
+  // ── 系统：打开外部应用/文件 ──
+  ipcMain.handle('system:openExternal', async (_e, target: string) => {
+    const { shell } = await import('electron');
+    await shell.openPath(target);
+  });
+
+  // ── 系统：在浏览器中打开 URL ──
+  ipcMain.handle('system:openBrowser', async (_e, url: string) => {
+    const { shell } = await import('electron');
+    await shell.openExternal(url.startsWith('http') ? url : `https://${url}`);
+  });
+
+  // ── 系统：打开终端 ──
+  ipcMain.handle('system:openTerminal', async (_e, cwd?: string) => {
+    const { spawn } = await import('child_process');
+    const targetDir = cwd || currentProjectPath || process.cwd();
+    if (process.platform === 'win32') {
+      spawn('cmd', ['/c', 'start', 'cmd', '/k', `cd /d "${targetDir}"`], { shell: true, detached: true, stdio: 'ignore' }).unref();
+    } else if (process.platform === 'darwin') {
+      spawn('open', ['-a', 'Terminal', targetDir], { detached: true, stdio: 'ignore' }).unref();
+    } else {
+      spawn('x-terminal-emulator', [], { cwd: targetDir, detached: true, stdio: 'ignore' }).unref();
+    }
+  });
+
+  // ── 系统：在文件管理器中打开 ──
+  ipcMain.handle('system:openFolder', async (_e, folderPath?: string) => {
+    const { shell } = await import('electron');
+    const target = folderPath || currentProjectPath;
+    if (target) await shell.openPath(target);
+  });
+
+  // ── 系统：用默认程序打开文件 ──
+  ipcMain.handle('system:openFile', async (_e, filePath: string) => {
+    const fs = await import('fs');
+    if (!fs.existsSync(filePath)) throw new Error(`文件不存在: ${filePath}`);
+    const { shell } = await import('electron');
+    await shell.openPath(filePath);
+  });
+
+  // ── 项目：获取目录结构（用于文件树创建）──
+  ipcMain.handle('project:getRoot', async () => currentProjectPath);
+
   // 文件快照 & 任务会话 & Git 集成
   setupSnapshotIpc();
 }
@@ -499,6 +602,119 @@ export function setupSnapshotIpc(): void {
     }
   });
 
+  // ── Git 状态 ──
+  ipcMain.handle('git:status', async (_e, projectPath: string) => {
+    try {
+      const { execSync } = require('child_process');
+      const output = execSync('git status --porcelain -b', { cwd: projectPath, timeout: 5000 }).toString();
+      const lines = output.split('\n').filter(Boolean);
+      const branchLine = lines[0];
+      const branch = branchLine.startsWith('## ') ? branchLine.slice(3).split('...')[0] : 'unknown';
+      const files = lines.slice(1).map((l: string) => ({
+        status: l.slice(0, 2).trim(),
+        path: l.slice(3).trim(),
+      }));
+      const ahead = branchLine.match(/\[ahead (\d+)\]/)?.[1] || '0';
+      const behind = branchLine.match(/\[behind (\d+)\]/)?.[1] || '0';
+      return { success: true, branch, files, ahead: parseInt(ahead), behind: parseInt(behind), dirty: files.length > 0 };
+    } catch {
+      return { success: false, branch: '', files: [], ahead: 0, behind: 0, dirty: false };
+    }
+  });
+
+  // ── Git Stage All ──
+  ipcMain.handle('git:stageAll', async (_e, projectPath: string) => {
+    try {
+      const { execSync } = require('child_process');
+      execSync('git add -A', { cwd: projectPath, timeout: 10000 });
+      return { success: true };
+    } catch (err: unknown) {
+      return { success: false, error: (err as Error).message };
+    }
+  });
+
+  // ── Git Commit ──
+  ipcMain.handle('git:commit', async (_e, projectPath: string, message: string) => {
+    try {
+      const { execSync } = require('child_process');
+      const safeMsg = message.replace(/"/g, '\\"');
+      const output = execSync(`git commit -m "${safeMsg}"`, { cwd: projectPath, timeout: 10000 }).toString().trim();
+      return { success: true, output };
+    } catch (err: unknown) {
+      return { success: false, error: (err as Error).message };
+    }
+  });
+
+  // ── Git Push ──
+  ipcMain.handle('git:push', async (_e, projectPath: string) => {
+    try {
+      const { execSync } = require('child_process');
+      const branch = execSync('git rev-parse --abbrev-ref HEAD', { cwd: projectPath, timeout: 3000 }).toString().trim();
+      const output = execSync(`git push origin ${branch}`, { cwd: projectPath, timeout: 30000 }).toString().trim();
+      return { success: true, output };
+    } catch (err: unknown) {
+      return { success: false, error: (err as Error).message };
+    }
+  });
+
+  // ── Git Diff（返回文件改动行号）──
+  ipcMain.handle('git:diff', async (_e, filePath: string, projectPath: string) => {
+    try {
+      const { execSync } = require('child_process');
+      const relative = path.relative(projectPath, filePath).replace(/\\/g, '/');
+      const output = execSync(`git diff -U0 HEAD -- "${relative}"`, { cwd: projectPath, timeout: 5000 }).toString();
+      // 解析 unified diff 获取改动行号
+      const added: number[] = [];
+      const removed: number[] = [];
+      const modified: number[] = [];
+      for (const line of output.split('\n')) {
+        if (line.startsWith('@@')) {
+          const m = line.match(/@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@/);
+          if (m) {
+            const newStart = parseInt(m[3]);
+            const newCount = m[4] ? parseInt(m[4]) : 1;
+            for (let i = 0; i < newCount; i++) modified.push(newStart + i);
+          }
+        } else if (line.startsWith('+') && !line.startsWith('+++')) {
+          const prev = added[added.length - 1] || modified[modified.length - 1] || 0;
+          added.push(prev + 1);
+        } else if (line.startsWith('-') && !line.startsWith('---')) {
+          const prev = removed[removed.length - 1] || (modified[modified.length - 1] || 0) - 1;
+          removed.push(prev + 1);
+        }
+      }
+      return { success: true, added, removed, modified };
+    } catch {
+      return { success: false, added: [], removed: [], modified: [] };
+    }
+  });
+
+  // ── Git Pull ──
+  ipcMain.handle('git:pull', async (_e, projectPath: string) => {
+    try {
+      const { execSync } = require('child_process');
+      const output = execSync('git pull', { cwd: projectPath, timeout: 30000 }).toString().trim();
+      return { success: true, output };
+    } catch (err: unknown) {
+      return { success: false, error: (err as Error).message };
+    }
+  });
+
+  // ── Git Log ──
+  ipcMain.handle('git:log', async (_e, projectPath: string, count: number = 10) => {
+    try {
+      const { execSync } = require('child_process');
+      const output = execSync(`git log --oneline -${count}`, { cwd: projectPath, timeout: 5000 }).toString().trim();
+      const commits = output.split('\n').filter(Boolean).map((l: string) => {
+        const [hash, ...msg] = l.split(' ');
+        return { hash, message: msg.join(' ') };
+      });
+      return { success: true, commits };
+    } catch {
+      return { success: false, commits: [] };
+    }
+  });
+
   // ── AI 行为规则（CLAUDE.md） ──
   ipcMain.handle('config:getRules', async (_e, projectPath: string) => {
     return configManager.getRules(projectPath);
@@ -506,6 +722,13 @@ export function setupSnapshotIpc(): void {
 
   ipcMain.handle('config:setRules', async (_e, rules: string) => {
     projectRules = rules || '';
+  });
+
+  // ── 架构分析 ──
+  ipcMain.handle('arch:analyze', async (_e, projectPath: string) => {
+    const { ArchitectureAnalyzer } = await import('../core/arch/arch-analyzer');
+    const analyzer = new ArchitectureAnalyzer(projectPath);
+    return analyzer.analyze();
   });
 
   // ── AI 实时代码补全 ──
@@ -550,4 +773,359 @@ export function setupSnapshotIpc(): void {
     if (stat.size > 10 * 1024 * 1024) throw new Error('文件过大');
     return fs.readFileSync(filePath, 'utf-8');
   });
+
+  // ── 读取文件为 base64 data URL（图片/附件预览） ──
+  ipcMain.handle('file:readAsDataURL', async (_e, filePath: string) => {
+    const fs = await import('fs');
+    const pathMod = await import('path');
+    if (!fs.existsSync(filePath)) throw new Error('文件不存在');
+    const stat = fs.statSync(filePath);
+    if (stat.size > 5 * 1024 * 1024) throw new Error('文件过大（最大 5MB）');
+    const buffer = fs.readFileSync(filePath);
+    const ext = pathMod.extname(filePath).toLowerCase();
+    const mimeMap: Record<string, string> = {
+      '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg',
+      '.gif': 'image/gif', '.webp': 'image/webp', '.bmp': 'image/bmp',
+      '.svg': 'image/svg+xml', '.ico': 'image/x-icon',
+    };
+    const mime = mimeMap[ext] || 'application/octet-stream';
+    return `data:${mime};base64,${buffer.toString('base64')}`;
+  });
+
+  // ── 提取 DOCX/文本文件内容 ──
+  ipcMain.handle('file:readDocx', async (_e, filePath: string) => {
+    const fs = await import('fs');
+    const zlib = await import('zlib');
+    if (!fs.existsSync(filePath)) throw new Error('文件不存在');
+    const buf = fs.readFileSync(filePath);
+    const ext = path.extname(filePath).toLowerCase();
+    
+    // .doc 文件：旧格式 OLE 二进制，尝试提取可读文本
+    if (ext === '.doc' && (buf[0] !== 0x50 || buf[1] !== 0x4B)) {
+      return extractTextFromBinary(buf, filePath);
+    }
+
+    // 检测 Office 临时文件（~$ 前缀）
+    const baseName = path.basename(filePath);
+    if (baseName.startsWith('~$')) {
+      const realName = baseName.slice(2);
+      return `[Office 临时锁定文件]
+文件: ${baseName}
+
+这是 Microsoft Office 的临时锁定文件。当 Word/Excel 打开文档时自动生成，关闭文档后自动删除。
+
+请打开真正的文档文件: ${realName}
+
+文件大小: ${(buf.length / 1024).toFixed(1)} KB`;
+    }
+    
+    // 检查是否为 ZIP/DOCX
+    if (buf[0] !== 0x50 || buf[1] !== 0x4B) {
+      return `[无法解析] ${baseName}
+
+该文件不是有效的 DOCX/ZIP 格式（文件头不是 PK）。可能原因：
+• 文件已损坏
+• 这是旧版 .doc 格式（请用 Word 另存为 .docx）
+• 文件正在被其他程序占用尚未写完
+
+文件大小: ${(buf.length / 1024).toFixed(1)} KB`;
+    }
+
+    // 稳健 ZIP 解析：找到中央目录获取所有文件条目
+    let xmlText = '';
+    const entries = parseZipEntries(buf);
+
+    if (entries.length === 0) {
+      return `[无法解析] ZIP 文件没有可用条目\n大小: ${(buf.length / 1024).toFixed(1)} KB`;
+    }
+    
+    for (const entry of entries) {
+      if (entry.name === 'word/document.xml') {
+        try {
+          xmlText = entry.decompress(buf);
+          break;
+        } catch (e) {
+          console.warn('[DOCX] document.xml decompress failed:', e);
+        }
+      }
+    }
+
+    if (xmlText) {
+      const text = extractTextFromDocxXml(xmlText);
+      if (text.trim()) return text;
+    }
+
+    // 降级：扫描全部 XML 提取文本
+    for (const entry of entries) {
+      if (entry.name.endsWith('.xml')) {
+        try {
+          xmlText += entry.decompress(buf) + '\n';
+        } catch { /* skip */ }
+        if (xmlText.length > 500000) break;
+      }
+    }
+    
+    if (xmlText) {
+      const textOnly = xmlText.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+      return textOnly.slice(0, 50000) || '（无法提取文档内容）';
+    }
+    return '（无法提取文档内容）';
+  });
+
+  // ── 读取二进制文件为 hex dump ──
+  ipcMain.handle('file:readHex', async (_e, filePath: string, maxBytes: number = 16384) => {
+    const fs = await import('fs');
+    if (!fs.existsSync(filePath)) throw new Error('文件不存在');
+    const stat = fs.statSync(filePath);
+    if (stat.size > 100 * 1024 * 1024) throw new Error('文件过大（最大 100MB）');
+    const fd = fs.openSync(filePath, 'r');
+    const buf = Buffer.alloc(Math.min(stat.size, maxBytes));
+    fs.readSync(fd, buf, 0, buf.length, 0);
+    fs.closeSync(fd);
+    
+    // 生成 hex dump
+    let hex = '';
+    for (let i = 0; i < buf.length; i += 16) {
+      const chunk = buf.slice(i, Math.min(i + 16, buf.length));
+      const offset = i.toString(16).padStart(8, '0');
+      const hexPart = Array.from(chunk).map(b => b.toString(16).padStart(2, '0')).join(' ');
+      const asciiPart = Array.from(chunk).map(b => (b >= 32 && b <= 126) ? String.fromCharCode(b) : '.').join('');
+      hex += `${offset}  ${hexPart.padEnd(48)} ${asciiPart}\n`;
+    }
+    
+    return {
+      hex: hex,
+      size: stat.size,
+      truncated: stat.size > maxBytes,
+      maxBytes: maxBytes,
+    };
+  });
+
+  // ── 读取 PDF 为 base64（渲染进程创建 Blob URL）──
+  ipcMain.handle('file:readPdfBase64', async (_e, filePath: string) => {
+    const fs = await import('fs');
+    if (!fs.existsSync(filePath)) throw new Error('文件不存在');
+    const stat = fs.statSync(filePath);
+    if (stat.size > 50 * 1024 * 1024) throw new Error('PDF 文件过大（最大 50MB）');
+    const buffer = fs.readFileSync(filePath);
+    return { base64: buffer.toString('base64'), name: path.basename(filePath) };
+  });
+
+  // ── 配置导入/导出 ──
+  ipcMain.handle('config:export', async () => {
+    const result = await dialog.showSaveDialog({
+      title: '导出配置',
+      defaultPath: 'tcide-config.json',
+      filters: [{ name: 'JSON', extensions: ['json'] }],
+    });
+    if (result.canceled || !result.filePath) return { success: false };
+    const fs = await import('fs');
+    const config = getModelConfig();
+    // 不导出敏感 API Key
+    const safeConfig = { ...config, apiKey: '' };
+    fs.writeFileSync(result.filePath, JSON.stringify(safeConfig, null, 2), 'utf-8');
+    return { success: true, path: result.filePath };
+  });
+
+  ipcMain.handle('config:import', async () => {
+    const result = await dialog.showOpenDialog({
+      title: '导入配置',
+      filters: [{ name: 'JSON', extensions: ['json'] }],
+      properties: ['openFile'],
+    });
+    if (result.canceled || result.filePaths.length === 0) return null;
+    const fs = await import('fs');
+    const content = fs.readFileSync(result.filePaths[0], 'utf-8');
+    return JSON.parse(content);
+  });
+
+  // ── 项目搜索 ──
+  ipcMain.handle('search:project', async (_e, projectPath: string, query: string) => {
+    const fs = await import('fs');
+    const path = await import('path');
+    const results: Array<{ file: string; line: number; text: string }> = [];
+
+    const searchDir = (dir: string) => {
+      try {
+        const entries = fs.readdirSync(dir, { withFileTypes: true });
+        for (const entry of entries) {
+          const fullPath = path.join(dir, entry.name);
+          if (entry.name.startsWith('.') || entry.name === 'node_modules' || entry.name === 'build' || entry.name === 'dist' || entry.name === '.git') continue;
+          if (entry.isDirectory()) {
+            if (results.length < 200) searchDir(fullPath);
+          } else if (entry.isFile()) {
+            if (results.length >= 200) return;
+            try {
+              const stat = fs.statSync(fullPath);
+              if (stat.size > 500 * 1024) return; // 跳过 > 500KB 文件
+              const content = fs.readFileSync(fullPath, 'utf-8');
+              const lines = content.split('\n');
+              for (let i = 0; i < lines.length; i++) {
+                if (lines[i].toLowerCase().includes(query.toLowerCase())) {
+                  results.push({ file: fullPath, line: i + 1, text: lines[i].trim() });
+                  if (results.length >= 200) return;
+                }
+              }
+            } catch { /* 跳过无法读取的文件 */ }
+          }
+        }
+      } catch { /* 跳过无法访问的目录 */ }
+    };
+
+    searchDir(projectPath);
+    return results;
+  });
+
+  // ── 最近项目 ──
+  ipcMain.handle('project:getRecent', async () => {
+    return getStore().get('recentProjects') || [];
+  });
+
+  ipcMain.handle('project:addRecent', async (_e, projectPath: string) => {
+    const pathModule = await import('path');
+    const store = getStore();
+    const recent: Array<{ path: string; name: string; lastOpened: number }> = store.get('recentProjects') || [];
+    const existing = recent.findIndex(r => r.path === projectPath);
+    const entry = { path: projectPath, name: pathModule.basename(projectPath), lastOpened: Date.now() };
+    if (existing >= 0) {
+      recent.splice(existing, 1);
+    }
+    recent.unshift(entry);
+    if (recent.length > 20) recent.length = 20;
+    store.set('recentProjects', recent);
+    return recent;
+  });
+}
+
+// ─────────────────────────────────────────
+// DOCX / ZIP / DOC 解析辅助
+// ─────────────────────────────────────────
+
+function extractTextFromBinary(buf: Buffer, filePath: string): string {
+  // .doc (OLE binary) → 提取可读文本段
+  let text = '';
+  let current = '';
+  for (let i = 0; i < buf.length && text.length < 100000; i++) {
+    const b = buf[i];
+    // ASCII 可打印字符 + 常见中文 Unicode（UTF-8 序列检测）
+    if ((b >= 32 && b <= 126) || b === 0x0A || b === 0x0D || b === 0x09) {
+      current += String.fromCharCode(b);
+    } else {
+      if (current.length > 3) {
+        text += current + '\n';
+      }
+      current = '';
+    }
+  }
+  if (current.length > 3) text += current;
+  const cleaned = text.replace(/[^\x20-\x7E\u4e00-\u9fff\u3000-\u303f\uFF00-\uFFEF\n\r\t]/g, '').replace(/\n{3,}/g, '\n\n').trim();
+  if (cleaned.length > 100) {
+    return `[旧格式 .doc 文本提取]\n文件: ${path.basename(filePath)}\n大小: ${(buf.length / 1024).toFixed(1)} KB\n\n${cleaned.slice(0, 50000)}`;
+  }
+  return `[旧格式 .doc]\n文件: ${path.basename(filePath)}\n大小: ${(buf.length / 1024).toFixed(1)} KB\n\n此文件为旧版 Word 格式（OLE 二进制），仅支持有限文本提取。建议用 Word 另存为 .docx 格式以获得完整支持。`;
+}
+
+interface ZipEntry {
+  name: string;
+  compMethod: number;
+  compSize: number;
+  uncompSize: number;
+  localOffset: number;
+  decompress(buf: Buffer): string;
+}
+
+function parseZipEntries(buf: Buffer): ZipEntry[] {
+  const entries: ZipEntry[] = [];
+  // 从末尾查找中央目录
+  let eocdOffset = buf.length - 22;
+  while (eocdOffset >= 0) {
+    if (buf[eocdOffset] === 0x50 && buf[eocdOffset+1] === 0x4B &&
+        buf[eocdOffset+2] === 0x05 && buf[eocdOffset+3] === 0x06) {
+      const cdOffset = buf.readUInt32LE(eocdOffset + 16);
+      let offset = cdOffset;
+      while (offset < eocdOffset) {
+        if (buf[offset] !== 0x50 || buf[offset+1] !== 0x4B ||
+            buf[offset+2] !== 0x01 || buf[offset+3] !== 0x02) break;
+        const compMethod = buf.readUInt16LE(offset + 10);
+        const compSize = buf.readUInt32LE(offset + 20);
+        const uncompSize = buf.readUInt32LE(offset + 24);
+        const nameLen = buf.readUInt16LE(offset + 28);
+        const extraLen = buf.readUInt16LE(offset + 30);
+        const commentLen = buf.readUInt16LE(offset + 32);
+        const localOffset = buf.readUInt32LE(offset + 42);
+        const name = buf.toString('utf8', offset + 46, offset + 46 + nameLen);
+        entries.push({
+          name,
+          compMethod,
+          compSize,
+          uncompSize,
+          localOffset,
+          decompress: (b: Buffer) => {
+            const localNameLen = b.readUInt16LE(localOffset + 26);
+            const localExtraLen = b.readUInt16LE(localOffset + 28);
+            const dataStart = localOffset + 30 + localNameLen + localExtraLen;
+            const compressed = b.slice(dataStart, dataStart + compSize);
+            if (compMethod === 0) {
+              return compressed.toString('utf8');
+            } else if (compMethod === 8) {
+              try {
+                return zlib.inflateRawSync(compressed).toString('utf8');
+              } catch {
+                try {
+                  return zlib.inflateSync(compressed).toString('utf8');
+                } catch {
+                  return compressed.toString('utf8');
+                }
+              }
+            }
+            return compressed.toString('utf8');
+          },
+        });
+        offset += 46 + nameLen + extraLen + commentLen;
+      }
+      break;
+    }
+    eocdOffset--;
+  }
+  return entries;
+}
+function extractTextFromDocxXml(xml: string): string {
+  // 按段落分割
+  const paragraphs = xml.split(/<w:p[\s>]/);
+  const lines: string[] = [];
+  let inTable = false;
+
+  for (const p of paragraphs) {
+    // 跳过空段落和修订标记
+    if (!p.includes('<w:t')) continue;
+
+    // 检测表格
+    if (p.includes('<w:tbl>')) { inTable = true; continue; }
+    if (p.includes('</w:tbl>')) { inTable = false; continue; }
+
+    // 提取所有文本运行
+    const runs = p.match(/<w:t[^>]*>([^<]*)<\/w:t>/g);
+    if (!runs) continue;
+
+    const text = runs.map(r => r.replace(/<w:t[^>]*>/, '').replace(/<\/w:t>/, '')).join('');
+    if (!text.trim()) continue;
+
+    // 标题检测
+    if (p.includes('<w:pStyle w:val="Heading1"') || p.includes('<w:pStyle w:val="1"')) {
+      lines.push(`\n# ${text.trim()}`);
+    } else if (p.includes('<w:pStyle w:val="Heading2"') || p.includes('<w:pStyle w:val="2"')) {
+      lines.push(`\n## ${text.trim()}`);
+    } else if (p.includes('<w:pStyle w:val="Heading3"') || p.includes('<w:pStyle w:val="3"')) {
+      lines.push(`\n### ${text.trim()}`);
+    } else if (p.includes('<w:numPr>')) {
+      // 列表项
+      lines.push(`- ${text.trim()}`);
+    } else if (inTable) {
+      lines.push(`| ${text.trim()} |`);
+    } else {
+      lines.push(text.trim());
+    }
+  }
+
+  return lines.join('\n\n').replace(/\n{3,}/g, '\n\n') || '（文档为空）';
 }

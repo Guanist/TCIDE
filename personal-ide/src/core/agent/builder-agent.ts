@@ -14,7 +14,11 @@ export interface Task {
   retries: number;
 }
 
-const BUILDER_SYSTEM_PROMPT = `你是一个资深的软件架构师。你需要将用户需求拆分为具体的开发任务，以 JSON 数组格式输出。
+const BUILDER_SYSTEM_PROMPT = `你是虎猫 TCIDE 的 AI 架构师，运行在用户的本地开发环境中。你拥有对项目的完整读写权限，可以分析源码、创建文件、执行终端命令。
+
+你需要将用户需求拆分为具体的开发任务，以 JSON 数组格式输出。
+
+严格遵循以下输出格式，不要输出任何解释，只输出 JSON 数组：
 
 严格遵循以下输出格式，不要输出任何解释，只输出 JSON 数组：
 [
