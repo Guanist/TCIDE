@@ -1,0 +1,658 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; font-src 'self' data:; img-src 'self' data: blob:; frame-src data: blob:; connect-src 'self' localhost:* 127.0.0.1:* https://api.deepseek.com https://api.openai.com https://*.volces.com;">
+  <title>虎猫 TCIDE</title>
+  <link rel="stylesheet" href="./styles/main.css" />
+  <link rel="stylesheet" href="./styles/usage.css" />
+  <link rel="stylesheet" href="./styles/settings.css" />
+</head>
+<body>
+  <div id="app">
+
+    <!-- ═══ Activity Bar（活动栏）═══ -->
+    <nav id="activity-bar" class="activity-bar">
+      <div class="activity-top">
+        <button class="activity-btn active" data-view="explorer" title="资源管理器 (Ctrl+Shift+E)">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+        </button>
+        <button class="activity-btn" data-view="search" title="搜索 (Ctrl+Shift+F)">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+        </button>
+        <button class="activity-btn" data-view="git" title="Git 版本控制">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><circle cx="18" cy="6" r="3"/><path d="M6 6v3M18 6v3M12 6v9"/><line x1="6" y1="9" x2="12" y2="15"/><line x1="18" y1="9" x2="12" y2="15"/></svg>
+        </button>
+        <button class="activity-btn" data-view="arch" title="架构分析">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><line x1="6.5" y1="10" x2="6.5" y2="14"/><line x1="17.5" y1="10" x2="17.5" y2="14"/><line x1="10" y1="6.5" x2="14" y2="6.5"/><line x1="10" y1="17.5" x2="14" y2="17.5"/></svg>
+        </button>
+      </div>
+      <div class="activity-bottom">
+        <button class="activity-btn" id="btn-toggle-theme" title="切换主题 (白虎/老虎)">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+        </button>
+      </div>
+    </nav>
+
+    <!-- ═══ 左侧：文件树 / 搜索 ═══ -->
+    <aside id="sidebar" class="sidebar">
+      <div class="sidebar-header">
+        <span class="sidebar-title">EXPLORER</span>
+        <div class="sidebar-actions">
+          <button id="btn-new-file" class="icon-btn" title="新建文件 (Ctrl+N)">+</button>
+          <button id="btn-new-folder" class="icon-btn" title="新建文件夹">📁</button>
+          <button id="btn-collapse-all" class="icon-btn" title="折叠全部">⊟</button>
+          <span class="toolbar-sep">|</span>
+          <button id="btn-open-terminal" class="icon-btn" title="打开终端 (Ctrl+Shift+T)">💻</button>
+          <button id="btn-open-browser" class="icon-btn" title="浏览器测试 (Ctrl+Shift+U)">🌐</button>
+          <button id="btn-open-folder" class="icon-btn" title="文件管理器 (Ctrl+Shift+O)">📂</button>
+        </div>
+      </div>
+      <div class="sidebar-search" id="sidebar-search-explorer">
+        <input id="file-tree-search" type="text" placeholder="搜索文件..." />
+        <button id="btn-clear-search" class="search-clear hidden">✕</button>
+      </div>
+      <div id="file-tree" class="file-tree view-panel">
+        <div class="empty-state">
+          <img src="icons/brand/empty-files.png" alt="空" class="empty-illustration" />
+          <p>打开项目开始 (Ctrl+O)</p>
+        </div>
+      </div>
+      <!-- Git 面板 -->
+      <div id="git-panel" class="view-panel hidden">
+        <div class="git-panel-header">
+          <span id="git-branch-name" class="git-branch">main</span>
+          <div class="git-actions">
+            <button id="btn-git-pull" class="icon-btn" title="拉取 (Pull)">↓</button>
+            <button id="btn-git-commit" class="icon-btn primary" title="提交 (Commit)">✓</button>
+            <button id="btn-git-push" class="icon-btn" title="推送 (Push)">↑</button>
+          </div>
+        </div>
+        <div id="git-status-list" class="git-status-list">
+          <div class="git-empty">加载中...</div>
+        </div>
+        <div class="git-commit-area hidden" id="git-commit-area">
+          <input id="git-commit-message" type="text" placeholder="提交信息..." />
+          <button id="btn-git-do-commit" class="welcome-btn primary" style="width:100%;margin-top:4px">提交并推送</button>
+        </div>
+      </div>
+      <!-- 架构分析面板 -->
+      <div id="arch-panel" class="view-panel hidden">
+        <div class="arch-panel-header">
+          <span class="arch-panel-title">📐 架构分析</span>
+          <button id="btn-arch-refresh" class="icon-btn" title="刷新分析">↻</button>
+        </div>
+        <div id="arch-overview" class="arch-overview">
+          <div class="arch-empty">点击 ↻ 开始分析</div>
+        </div>
+        <div id="arch-deps" class="arch-deps hidden">
+          <div class="arch-section-title">📊 依赖图</div>
+          <div id="arch-dep-graph" class="arch-dep-graph"></div>
+        </div>
+        <div id="arch-smells" class="arch-smells hidden">
+          <div class="arch-section-title">⚠️ 代码异味</div>
+          <div id="arch-smell-list" class="arch-smell-list"></div>
+        </div>
+      </div>
+    </aside>
+
+    <!-- 拖拽调整器 -->
+    <div id="sidebar-resizer" class="resizer"></div>
+
+    <!-- ═══ 中间：编辑器区 + 底部面板 ═══ -->
+    <main id="editor-area">
+      <!-- 面包屑导航 -->
+      <div id="breadcrumb-bar" class="breadcrumb-bar hidden">
+        <span id="breadcrumb-path"></span>
+        <span id="breadcrumb-symbol"></span>
+      </div>
+      <!-- 项目搜索面板 -->
+      <div id="search-panel" class="search-panel hidden">
+        <div class="search-panel-header">
+          <input id="search-input" type="text" placeholder="搜索..." />
+          <input id="search-replace" type="text" placeholder="替换为..." class="hidden" />
+          <select id="search-file-filter">
+            <option value="*">所有文件</option>
+            <option value="*.kt,*.java">Kotlin/Java</option>
+            <option value="*.ts,*.js">TypeScript/JS</option>
+            <option value="*.py">Python</option>
+            <option value="*.go">Go</option>
+            <option value="*.rs">Rust</option>
+          </select>
+          <div class="search-actions">
+            <button id="btn-toggle-replace" title="切换替换模式">↔</button>
+            <button id="btn-search-prev" title="上一个">↑</button>
+            <button id="btn-search-next" title="下一个">↓</button>
+            <button id="btn-search-close" title="关闭">✕</button>
+          </div>
+        </div>
+        <div id="search-results" class="search-results">
+          <div class="search-empty">输入搜索内容开始搜索</div>
+        </div>
+      </div>
+      <!-- 欢迎页 -->
+      <div id="welcome-page" class="welcome-page">
+        <div class="welcome-hero">
+          <img src="icons/brand/welcome-illustration.png" alt="虎猫" class="welcome-illustration" />
+          <h1 class="welcome-title">虎猫 TCIDE</h1>
+          <p class="welcome-subtitle" id="welcome-subtitle">个人专属 AI 编程 IDE · v1.1.0</p>
+        </div>
+        <div class="welcome-actions">
+          <button id="welcome-open-project" class="welcome-btn primary">📂 打开项目</button>
+          <button id="welcome-new-project" class="welcome-btn">🆕 新建项目</button>
+          <button id="welcome-snake-demo" class="welcome-btn demo">🐍 贪吃蛇 Demo</button>
+        </div>
+        <div id="welcome-recent" class="welcome-recent hidden">
+          <h3 class="welcome-section-title">最近项目</h3>
+          <div id="welcome-recent-list" class="welcome-recent-list"></div>
+        </div>
+        <div class="welcome-tips">
+          <h3 class="welcome-section-title">快速开始</h3>
+          <ul class="welcome-tip-list">
+            <li><kbd>Ctrl+O</kbd> 打开已有项目</li>
+            <li><kbd>Ctrl+N</kbd> 新建文件</li>
+            <li>在 AI 面板输入需求开始编码</li>
+            <li>设置中配置 API Key 解锁 AI 功能</li>
+          </ul>
+        </div>
+      </div>
+      <!-- 标签栏 -->
+      <div id="editor-tabs" class="editor-tabs"></div>
+      <!-- Monaco 编辑器 -->
+      <div id="monaco-container" class="monaco-container"></div>
+      <!-- PDF 预览 -->
+      <iframe id="pdf-preview" class="pdf-preview hidden" sandbox="allow-scripts allow-same-origin"></iframe>
+      <!-- HTML 预览（srcdoc 内嵌，自带隔离）-->
+      <iframe id="html-preview" class="html-preview hidden"></iframe>
+      <div id="html-toolbar" class="html-toolbar" style="display:none">
+        <button id="html-mode-toggle" class="html-mode-btn">📝 源码</button>
+        <span id="html-error-indicator" class="html-error-indicator hidden" title="预览中有错误">⚠️ 错误</span>
+      </div>
+      <div id="html-error-console" class="html-error-console hidden"></div>
+
+      <!-- ═══ 底部面板 ═══ -->
+      <div id="panel-resizer" class="panel-resizer hidden"></div>
+      <div id="panel-area" class="panel-area hidden">
+        <div class="panel-tabs" id="panel-tabs">
+          <button class="panel-tab active" data-panel="terminal">终端</button>
+          <button class="panel-tab" data-panel="problems">
+            问题
+            <span class="panel-badge hidden" id="problems-badge">0</span>
+          </button>
+          <button class="panel-tab" data-panel="output">输出</button>
+          <div class="panel-tabs-spacer"></div>
+          <button class="panel-close" id="btn-panel-close" title="关闭面板 (Ctrl+J)">✕</button>
+        </div>
+        <!-- 终端面板 -->
+        <div id="panel-terminal" class="panel-content active">
+          <div class="terminal-tabs" id="terminal-tabs">
+            <div class="terminal-tabs-list" id="terminal-tabs-list"></div>
+            <button class="terminal-tab-add" id="btn-terminal-add" title="新建终端">+</button>
+          </div>
+          <div id="terminal-container" class="terminal-container"></div>
+        </div>
+        <!-- 问题面板 -->
+        <div id="panel-problems" class="panel-content">
+          <div class="problems-empty" id="problems-empty">
+            <p>尚未检测到代码问题</p>
+            <span class="problems-empty-hint">编译后将自动显示错误和警告</span>
+          </div>
+          <div class="problems-list hidden" id="problems-list"></div>
+        </div>
+        <!-- 输出面板 -->
+        <div id="panel-output" class="panel-content">
+          <div class="output-toolbar">
+            <select id="output-channel" class="output-channel-select">
+              <option value="build">构建输出</option>
+              <option value="ai">AI 执行日志</option>
+              <option value="main">主进程日志</option>
+            </select>
+            <button id="btn-clear-output" class="output-clear-btn" title="清空输出">🗑</button>
+          </div>
+          <div id="output-content" class="output-content">
+            <div class="output-empty">选择输出通道查看日志</div>
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <!-- 拖拽调整器 -->
+    <div id="ai-panel-resizer" class="resizer"></div>
+
+    <!-- ═══ 右侧：AI 面板 ═══ -->
+    <aside id="ai-panel" class="ai-panel">
+      <div class="ai-panel-header">
+        <div class="ai-panel-title-area">
+          <span class="ai-panel-title">AI 助手</span>
+          <span id="ai-model-dot" class="ai-model-dot"></span>
+          <span id="ai-model-name" class="ai-model-name-text">加载中...</span>
+          <select id="model-select-header" class="model-select-header" title="切换模型">
+            <option value="">选择模型...</option>
+          </select>
+        </div>
+        <div class="ai-header-actions">
+          <button id="btn-new-chat" class="icon-btn" title="新建对话">+</button>
+          <button id="btn-chat-history" class="icon-btn" title="对话历史">☰</button>
+        </div>
+      </div>
+
+      <!-- AI 标签栏 -->
+      <div class="ai-tabs-bar">
+        <button class="ai-tab active" data-tab="chat">💬 对话</button>
+        <button class="ai-tab" data-tab="settings">⚙ 设置</button>
+      </div>
+
+      <!-- 对话列表视图（切换历史对话时） -->
+      <div id="chat-list-view" class="chat-list-view hidden">
+        <div class="chat-list-header">
+          <span>对话历史</span>
+          <button id="btn-back-to-chat" class="icon-btn" title="返回对话">←</button>
+        </div>
+        <div id="chat-list" class="chat-list">
+          <div class="chat-list-empty">暂无历史对话</div>
+        </div>
+      </div>
+
+      <!-- 对话内容 -->
+      <div id="chat-content-view" class="chat-content-view">
+        <!-- 对话 Tab -->
+        <div id="tab-chat" class="ai-tab-content active">
+          <div id="chat-messages" class="chat-messages">
+            <div id="ai-welcome" class="ai-welcome-section">
+              <div class="ai-welcome-icon">
+                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="var(--tc-orange)" stroke-width="1" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2Z"/>
+                  <path d="M12 6v6l4 2"/>
+                  <circle cx="8.5" cy="8.5" r="1.5"/>
+                  <circle cx="15.5" cy="8.5" r="1.5"/>
+                  <path d="M8 13c0 2 2 3 4 3s4-1 4-3"/>
+                </svg>
+              </div>
+              <p class="ai-welcome-title">你好，我是虎猫 AI</p>
+              <p class="ai-welcome-desc">选择一个模型并填入 API Key 即可开始。支持 DeepSeek、火山引擎、Ollama 等。</p>
+              <div class="ai-welcome-actions">
+                <button class="quick-btn primary" data-action="config-deepseek">快速配置 DeepSeek</button>
+                <button class="quick-btn" data-action="config-ollama">配置本地 Ollama</button>
+              </div>
+              <div class="ai-welcome-prompts">
+                <p class="ai-prompts-label">试试这样问我：</p>
+                <button class="ai-prompt-chip" data-prompt="帮我写一个 REST API 接口">"帮我写一个 REST API 接口"</button>
+                <button class="ai-prompt-chip" data-prompt="解释一下这个文件的作用">"解释一下这个文件的作用"</button>
+                <button class="ai-prompt-chip" data-prompt="优化这段代码的性能">"优化这段代码的性能"</button>
+              </div>
+            </div>
+          </div>
+          <div id="chat-input-area" class="chat-input-area">
+            <!-- 附件预览栏 -->
+            <div id="attachment-preview" class="attachment-preview hidden"></div>
+            <!-- 输入工具栏 -->
+            <div class="chat-input-row">
+              <div class="chat-input-actions">
+                <button id="btn-attach" class="chat-tool-btn" title="添加附件 / 图片">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
+                </button>
+              </div>
+              <textarea id="chat-input" placeholder="输入消息，Shift+Enter 换行，Enter 发送..." rows="3"></textarea>
+              <button id="btn-send" class="send-btn" title="发送 (Enter)">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+              </button>
+              <button id="btn-abort" class="abort-btn hidden" title="终止生成 (Esc)">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><rect x="4" y="4" width="16" height="16" rx="2"/></svg>
+              </button>
+            </div>
+            <div class="chat-input-footer">
+              <span class="chat-footer-model" id="chat-footer-model">未选择模型</span>
+              <span class="chat-footer-hint">Enter 发送 · Shift+Enter 换行</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- 任务 Tab -->
+        <div id="tab-tasks" class="ai-tab-content hidden">
+          <div id="task-list" class="task-list">
+            <div class="task-empty">
+              <img src="icons/brand/empty-tasks.png" alt="空" class="empty-illustration" />
+              <p>暂无任务队列</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- 大纲 Tab -->
+        <div id="tab-outline" class="ai-tab-content hidden">
+          <div class="outline-panel">
+            <div class="outline-search">
+              <input id="outline-filter" type="text" placeholder="搜索符号..." />
+            </div>
+            <div id="outline-tree" class="outline-tree">
+              <div class="outline-empty">
+                <img src="icons/brand/empty-files.png" alt="空" class="empty-illustration" />
+                <p>打开文件以查看大纲</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 用量统计 Tab -->
+        <div id="tab-usage" class="ai-tab-content hidden">
+          <div class="usage-panel">
+            <h3>用量统计</h3>
+            <div class="usage-summary-cards">
+              <div class="usage-card" id="usage-today-card">
+                <div class="usage-card-title">今日</div>
+                <div class="usage-card-value" id="usage-today-tokens">--</div>
+                <div class="usage-card-label">tokens</div>
+                <div class="usage-card-cost" id="usage-today-cost">-- 元</div>
+              </div>
+              <div class="usage-card" id="usage-total-card">
+                <div class="usage-card-title">累计</div>
+                <div class="usage-card-value" id="usage-total-tokens">--</div>
+                <div class="usage-card-label">tokens</div>
+                <div class="usage-card-cost" id="usage-total-cost">-- 元</div>
+              </div>
+            </div>
+            <div class="usage-detail-section">
+              <div class="usage-detail-header">
+                <h4>按项目统计</h4>
+                <button class="usage-refresh-btn" id="btn-refresh-usage">刷新</button>
+              </div>
+              <div class="usage-project-list" id="usage-project-list">
+                <div class="usage-empty">暂无数据</div>
+              </div>
+            </div>
+            <div class="usage-detail-section">
+              <h4>最近 30 天趋势</h4>
+              <div class="usage-chart" id="usage-chart">
+                <div class="usage-chart-bars" id="usage-chart-bars"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 设置 Tab -->
+        <div id="tab-settings" class="ai-tab-content hidden">
+          <div class="settings-panel">
+            <div class="settings-tabs">
+              <button class="settings-tab active" data-settings-tab="providers">模型服务商</button>
+              <button class="settings-tab" data-settings-tab="custom">自定义配置</button>
+              <button class="settings-tab" data-settings-tab="changelog">📋 版本记录</button>
+            </div>
+            <div id="settings-providers" class="settings-tab-content active">
+              <div class="provider-list" id="provider-list">
+                <div class="provider-section">
+                  <div class="provider-section-title">已注册模型</div>
+                  <div id="model-list-container">
+                    <div class="model-list-loading">加载中...</div>
+                  </div>
+                </div>
+                <div class="provider-section">
+                  <div class="provider-section-title">自定义</div>
+                  <div id="custom-models-list"></div>
+                  <button class="add-model-btn" id="btn-add-model">+ 添加模型</button>
+                </div>
+              </div>
+            </div>
+            <div id="settings-custom" class="settings-tab-content hidden">
+              <div class="model-config-form">
+                <h4>编辑模型</h4>
+                <div class="form-row">
+                  <div class="form-group required">
+                    <label>服务商</label>
+                    <select id="cfg-provider">
+                      <option value="deepseek">DeepSeek</option>
+                      <option value="huoshan">火山引擎 Plan</option>
+                      <option value="ollama">Ollama (本地)</option>
+                      <option value="anthropic">Anthropic Claude</option>
+                      <option value="custom">自定义 OpenAI 接口</option>
+                    </select>
+                  </div>
+                </div>
+                <div class="form-row">
+                  <div class="form-group required">
+                    <label>模型 ID</label>
+                    <div class="input-with-hint">
+                      <input id="cfg-model" type="text" placeholder="如：deepseek-chat" />
+                      <span class="input-hint" id="hint-model-id"></span>
+                      <a href="#" class="input-link" id="link-provider-docs" target="_blank">📖 查看文档</a>
+                    </div>
+                  </div>
+                </div>
+                <div class="form-row">
+                  <div class="form-group required">
+                    <label>API 密钥</label>
+                    <div class="input-with-hint">
+                      <input id="cfg-api-key" type="password" placeholder="输入您的 API Key" />
+                      <a href="#" class="input-link" id="link-get-api-key" target="_blank">获取 API 密钥</a>
+                    </div>
+                  </div>
+                </div>
+                <div class="form-row" id="cfg-base-url-row">
+                  <div class="form-group">
+                    <label>API 协议</label>
+                    <select id="cfg-api-protocol">
+                      <option value="openai-compatible">OpenAI 兼容 (Chat Completions)</option>
+                      <option value="ollama">Ollama 原生</option>
+                      <option value="anthropic">Anthropic Messages</option>
+                    </select>
+                  </div>
+                </div>
+                <div class="form-row">
+                  <div class="form-group">
+                    <label>API Base URL</label>
+                    <input id="cfg-base-url" type="text" placeholder="https://api.deepseek.com" />
+                  </div>
+                </div>
+                <div class="form-row" id="cfg-meta-row">
+                  <div class="form-group">
+                    <label>模型信息</label>
+                    <div class="model-meta-display" id="cfg-meta-display">
+                      <span class="meta-item">上下文: <strong id="meta-context">-</strong></span>
+                      <span class="meta-item">最大输出: <strong id="meta-max-tokens">-</strong></span>
+                      <span class="meta-item">费用: <strong id="meta-cost">-</strong></span>
+                      <span class="meta-item" id="meta-reasoning-badge" style="display:none">🧠 支持推理</span>
+                    </div>
+                  </div>
+                </div>
+                <div class="form-row">
+                  <div class="form-group">
+                    <label>模型能力</label>
+                    <div class="model-roles">
+                      <label class="role-checkbox"><input type="checkbox" id="cfg-role-chat" checked /><span>对话</span></label>
+                      <label class="role-checkbox"><input type="checkbox" id="cfg-role-builder" /><span>架构 (Builder)</span></label>
+                      <label class="role-checkbox"><input type="checkbox" id="cfg-role-coder" checked /><span>编码 (Coder)</span></label>
+                    </div>
+                  </div>
+                </div>
+                <div class="form-actions">
+                  <button id="btn-test-config" class="test-btn">测试连接</button>
+                  <button id="btn-save-config" class="save-btn">保存配置</button>
+                </div>
+                <div class="form-actions" style="margin-top:12px;">
+                  <button id="btn-export-config" class="test-btn">📤 导出配置</button>
+                  <button id="btn-import-config" class="test-btn">📥 导入配置</button>
+                </div>
+                <div id="cfg-status" class="cfg-status"></div>
+              </div>
+            </div>
+            <div id="settings-changelog" class="settings-tab-content hidden">
+              <div class="changelog-header">
+                <h4>🐅 虎猫 TCIDE 版本记录</h4>
+                <p class="changelog-subtitle">从第一版至今的完整迭代历程</p>
+              </div>
+              <div class="changelog-timeline" id="changelog-timeline">
+                <div class="changelog-loading">加载中...</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </aside>
+  </div>
+
+  <!-- ═══ 底部状态栏 ═══ -->
+  <footer id="status-bar" class="status-bar">
+    <span id="status-git" class="status-item" style="display:none">🔀 main</span>
+    <span id="status-dirty" class="status-item" style="display:none" title="已自动保存">● 已修改</span>
+    <span id="status-encoding" class="status-item">UTF-8</span>
+    <span id="status-language" class="status-item">Kotlin</span>
+    <span id="status-gradle" class="status-item gradle-badges" style="display:none">
+      <button class="gradle-badge" data-gradle="assembleDebug">Debug</button>
+      <button class="gradle-badge" data-gradle="test">Test</button>
+      <button class="gradle-badge" data-gradle="clean">Clean</button>
+    </span>
+    <span class="status-spacer"></span>
+    <span id="status-usage" class="status-item status-usage" title="今日 token 用量 / 费用">-- tokens / -- 元</span>
+    <span id="status-position" class="status-item">行 1, 列 1</span>
+    <span id="status-model" class="status-item">DeepSeek</span>
+    <span id="status-panel-toggle" class="status-item status-terminal" title="切换面板 (Ctrl+J)">▸_</span>
+    <span id="status-help" class="status-item status-help" title="帮助与快捷键">?</span>
+  </footer>
+
+  <!-- ═══ Zen Mode 迷你状态栏 ═══ -->
+  <footer id="zen-status-bar" class="zen-status-bar hidden">
+    <span id="zen-language" class="status-item">Kotlin</span>
+    <span class="status-spacer"></span>
+    <span id="zen-position" class="status-item">行 1, 列 1</span>
+    <span class="zen-hint">Zen Mode · Ctrl+Shift+M 退出</span>
+  </footer>
+
+  <!-- ═══ 标签页上下文菜单 ═══ -->
+  <div id="tab-context-menu" class="context-menu hidden">
+    <div class="ctx-item" data-action="tab-close">✕ 关闭</div>
+    <div class="ctx-item" data-action="tab-close-others">⊟ 关闭其他</div>
+    <div class="ctx-item" data-action="tab-close-right">→ 关闭右侧</div>
+    <div class="ctx-item" data-action="tab-close-all">⊠ 关闭全部</div>
+    <div class="ctx-divider"></div>
+    <div class="ctx-item" data-action="tab-copy-path">📋 复制路径</div>
+    <div class="ctx-item" data-action="tab-reveal">📂 在文件夹中显示</div>
+    <div class="ctx-divider"></div>
+    <div class="ctx-item" data-action="tab-split-right">◫ 向右拆分</div>
+  </div>
+
+  <!-- ═══ 文件树上下文菜单 ═══ -->
+  <div id="context-menu" class="context-menu hidden">
+    <div class="ctx-item" data-action="new-file">📄 新建文件</div>
+    <div class="ctx-item" data-action="new-folder">📁 新建文件夹</div>
+    <div class="ctx-divider"></div>
+    <div class="ctx-item" data-action="rename">✏️ 重命名</div>
+    <div class="ctx-item" data-action="delete">🗑️ 删除</div>
+    <div class="ctx-divider"></div>
+    <div class="ctx-item" data-action="copy-path">📋 复制路径</div>
+    <div class="ctx-item" data-action="show-in-folder">📂 在文件夹中显示</div>
+    <div class="ctx-divider"></div>
+    <div class="ctx-item warning" data-action="restore-snapshot">⏪ 恢复上次 AI 修改前</div>
+  </div>
+
+  <!-- ═══ 命令面板 ═══ -->
+  <div id="command-palette" class="command-palette hidden">
+    <div class="cmd-palette-backdrop" id="cmd-palette-backdrop"></div>
+    <div class="cmd-palette-panel">
+      <div class="cmd-palette-input-wrap">
+        <span class="cmd-palette-prefix">▸</span>
+        <input id="cmd-palette-input" type="text" placeholder="输入命令..." autocomplete="off" />
+      </div>
+      <div id="cmd-palette-results" class="cmd-palette-results"></div>
+    </div>
+  </div>
+
+  <!-- ═══ 帮助/快捷键弹窗 ═══ -->
+  <div id="help-dialog" class="help-dialog hidden">
+    <div class="help-content">
+      <h3>⌨ 快捷键速查表</h3>
+      <table>
+        <tr><td><kbd>Ctrl+O</kbd></td><td>打开项目</td></tr>
+        <tr><td><kbd>Ctrl+N</kbd></td><td>新建文件</td></tr>
+        <tr><td><kbd>Ctrl+S</kbd></td><td>保存文件</td></tr>
+        <tr><td><kbd>Ctrl+W</kbd></td><td>关闭标签</td></tr>
+        <tr><td><kbd>Ctrl+\\</kbd></td><td>切换 AI 面板</td></tr>
+        <tr><td><kbd>Ctrl+Shift+M</kbd></td><td>Zen 专注模式</td></tr>
+        <tr><td><kbd>Ctrl+Shift+B</kbd></td><td>Builder 架构模式</td></tr>
+        <tr><td><kbd>Ctrl+Shift+C</kbd></td><td>Coder 编程模式</td></tr>
+        <tr><td><kbd>Ctrl+Shift+X</kbd></td><td>终止 AI 任务</td></tr>
+        <tr><td><kbd>Ctrl+Shift+I</kbd></td><td>AI 生成/改进代码</td></tr>
+        <tr><td><kbd>Ctrl+Shift+E</kbd></td><td>AI 解释代码</td></tr>
+        <tr><td><kbd>Ctrl+Enter</kbd></td><td>发送 AI 消息</td></tr>
+        <tr><td><kbd>Esc</kbd></td><td>停止流式输出</td></tr>
+        <tr><td><kbd>Ctrl+,</kbd></td><td>打开设置</td></tr>
+      </table>
+      <button class="help-close" onclick="document.getElementById('help-dialog').classList.add('hidden')">关闭</button>
+    </div>
+  </div>
+
+  <!-- ═══ 关于对话框 ═══ -->
+  <div id="about-dialog" class="about-dialog hidden">
+    <div class="about-content">
+      <div class="about-header">
+        <img src="icons/brand/mascot-happy.png" alt="虎猫" class="about-logo-img" />
+        <h2>虎猫 TCIDE</h2>
+        <p class="about-version" id="about-version">版本 1.1.0</p>
+      </div>
+      <div class="about-body">
+        <p class="about-desc">个人专属 AI 编程助手</p>
+        <div class="about-features">
+          <h3>核心特性</h3>
+          <ul>
+            <li><img src="tcide://icon-16.png" alt="" class="about-li-icon" /> <strong>双智能体架构</strong> - Builder 负责任务规划，Coder 负责代码执行</li>
+            <li><img src="tcide://icon-16.png" alt="" class="about-li-icon" /> <strong>完全私有化</strong> - 所有数据本地存储，支持本地模型</li>
+            <li><img src="tcide://icon-16.png" alt="" class="about-li-icon" /> <strong>项目级理解</strong> - 索引整个项目，精准理解上下文</li>
+            <li><img src="tcide://icon-16.png" alt="" class="about-li-icon" /> <strong>多模型支持</strong> - DeepSeek、Ollama、火山方舟灵活切换</li>
+            <li><img src="tcide://icon-16.png" alt="" class="about-li-icon" /> <strong>任务闭环</strong> - 自动分解、执行、验证、修复</li>
+            <li><img src="tcide://icon-16.png" alt="" class="about-li-icon" /> <strong>界面优化</strong> - 暗色主题、虎猫配色、流畅动画</li>
+          </ul>
+        </div>
+        <div class="about-tech">
+          <h3>技术栈</h3>
+          <p>Electron · Monaco Editor · xterm.js · SQLite · Tree-sitter</p>
+        </div>
+        <div class="about-footer">
+          <p>作者：文森特骆</p>
+          <p>公众号：文森特骆 | PyClaw作者骆戡的爸爸</p>
+          <p>© 2026 Guanist, Inc. 保留所有权利。</p>
+        </div>
+      </div>
+      <button class="about-close" onclick="document.getElementById('about-dialog').classList.add('hidden')">关闭</button>
+    </div>
+  </div>
+
+  <!-- ═══ 余额不足弹窗 ═══ -->
+  <div id="balance-warning-dialog" class="balance-warning-dialog hidden">
+    <div class="balance-warning-content">
+      <div class="balance-warning-icon">⚠️</div>
+      <h3>API 余额不足</h3>
+      <p class="balance-warning-msg" id="balance-warning-msg">您的 API 余额不足，请充值后继续使用。</p>
+      <div class="balance-warning-actions">
+        <button class="balance-warning-btn" id="btn-dismiss-warning">我知道了</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ Diff 预览弹窗 ═══ -->
+  <div id="diff-modal" class="diff-modal" style="display:none;">
+    <div class="diff-backdrop" onclick="closeDiffModal()"></div>
+    <div class="diff-panel">
+      <div class="diff-panel-header">
+        <span>🔄 AI 代码变更预览</span>
+        <div>
+          <button id="diff-accept" class="diff-btn-accept" onclick="acceptDiff()">✓ 接受 (Enter)</button>
+          <button id="diff-reject" class="diff-btn-reject" onclick="closeDiffModal()">✗ 拒绝 (Esc)</button>
+        </div>
+      </div>
+      <div class="diff-panel-body">
+        <div class="diff-column">
+          <div class="diff-col-header diff-col-orig">— 原始代码</div>
+          <div id="diff-original-content" class="diff-code"></div>
+        </div>
+        <div class="diff-column">
+          <div class="diff-col-header diff-col-mod">+ AI 建议</div>
+          <div id="diff-modified-content" class="diff-code"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ Toast 通知容器 ═══ -->
+  <div id="toast-container" class="toast-container"></div>
+
+  <script type="module" src="./main.ts"></script>
+</body>
+</html>
