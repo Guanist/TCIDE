@@ -170,7 +170,7 @@ function showAboutDialog() {
     electron_1.dialog.showMessageBox(mainWindow, {
         type: 'info',
         title: '关于 虎猫 TCIDE',
-        message: '虎猫 TCIDE v1.0.0',
+        message: '虎猫 TCIDE v1.3.0',
         detail: '作者：文森特骆\n公众号：文森特骆\n备注：PyClaw 作者骆戡的爸爸\n\n个人专属超级 AI 编程 IDE',
         icon: electron_1.nativeImage.createFromPath(aboutIconPath),
     });
@@ -181,11 +181,13 @@ function createAppMenu() {
             label: '文件',
             submenu: [
                 { label: '打开项目...', accelerator: 'CmdOrCtrl+O', click: () => openProjectDialog() },
+                { label: '新建项目...', accelerator: 'CmdOrCtrl+Shift+N', click: () => mainWindow?.webContents.send('menu-action', 'new-project') },
                 { type: 'separator' },
                 { label: '新建文件', accelerator: 'CmdOrCtrl+N', click: () => mainWindow?.webContents.send('menu-action', 'new-file') },
-                { label: '新建文件夹', accelerator: 'CmdOrCtrl+Shift+N', click: () => mainWindow?.webContents.send('menu-action', 'new-folder') },
+                { label: '新建文件夹', click: () => mainWindow?.webContents.send('menu-action', 'new-folder') },
                 { type: 'separator' },
                 { label: '保存', accelerator: 'CmdOrCtrl+S', click: () => mainWindow?.webContents.send('menu-action', 'save') },
+                { label: '全部保存', accelerator: 'CmdOrCtrl+Shift+S', click: () => mainWindow?.webContents.send('menu-action', 'save-all') },
                 { type: 'separator' },
                 { label: '退出', accelerator: 'CmdOrCtrl+Q', click: () => { isQuitting = true; electron_1.app.quit(); } },
             ],
@@ -210,9 +212,10 @@ function createAppMenu() {
             label: '视图',
             submenu: [
                 { label: '切换 AI 面板', accelerator: 'CmdOrCtrl+\\', click: () => mainWindow?.webContents.send('menu-action', 'toggle-ai-panel') },
-                { label: 'Zen Mode', accelerator: 'CmdOrCtrl+Shift+M', click: () => mainWindow?.webContents.send('menu-action', 'zen-mode') },
+                { label: 'Zen 专注模式', accelerator: 'CmdOrCtrl+Shift+M', click: () => mainWindow?.webContents.send('menu-action', 'zen-mode') },
                 { type: 'separator' },
-                { label: '终端', accelerator: 'Ctrl+`', click: () => mainWindow?.webContents.send('menu-action', 'toggle-terminal') },
+                { label: '终端面板', accelerator: 'Ctrl+`', click: () => mainWindow?.webContents.send('menu-action', 'toggle-terminal') },
+                { label: '面包屑导航', accelerator: 'CmdOrCtrl+Shift+B', click: () => mainWindow?.webContents.send('menu-action', 'toggle-breadcrumb') },
                 { type: 'separator' },
                 { label: '重新加载', accelerator: 'CmdOrCtrl+R', role: 'reload' },
                 { label: '开发者工具', accelerator: 'F12', role: 'toggleDevTools' },
@@ -231,7 +234,11 @@ function createAppMenu() {
         },
         {
             label: '帮助',
-            submenu: [{ label: '关于', click: () => showAboutDialog() }],
+            submenu: [
+                { label: '快捷键速查', accelerator: 'F1', click: () => mainWindow?.webContents.send('menu-action', 'show-shortcuts') },
+                { type: 'separator' },
+                { label: '关于虎猫 TCIDE', click: () => showAboutDialog() },
+            ],
         },
     ];
     electron_1.Menu.setApplicationMenu(electron_1.Menu.buildFromTemplate(template));

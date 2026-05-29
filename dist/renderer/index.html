@@ -155,6 +155,190 @@
     .welcome-recent-item .recent-path { color:#6e6e6e; font-size:10px; }
     </style>
 
+
+    <!-- ═══════════ P1 CSS ═══════════ -->
+    <style id="p1-css">
+    /* Zen Mode */
+    body.tc-zen-mode #sidebar {
+      transform: translateX(-100%);
+      opacity: 0;
+      pointer-events: none;
+      transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.25s ease;
+    }
+    body.tc-zen-mode #ai-panel {
+      transform: translateX(100%);
+      opacity: 0;
+      pointer-events: none;
+      transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.25s ease;
+    }
+    body.tc-zen-mode #sidebar-resizer,
+    body.tc-zen-mode #ai-panel-resizer { display: none; }
+    body.tc-zen-mode #panel-area,
+    body.tc-zen-mode #panel-resizer { display: none !important; }
+    body.tc-zen-mode #status-bar { display: none; }
+    body.tc-zen-mode #zen-status-bar { display: flex !important; }
+    body.tc-zen-mode #activity-bar { opacity: 0; pointer-events: none; transition: opacity 0.25s ease; }
+    #editor-area.zen-centered {
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 0 24px;
+      transition: max-width 0.3s ease, margin 0.3s ease, padding 0.3s ease;
+    }
+    #zen-status-bar {
+      display: none;
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      height: 24px;
+      background: var(--tc-bg-primary, #1e1e1e);
+      border-top: 1px solid var(--tc-border, #3c3c3c);
+      color: var(--tc-text-muted, #6e6e6e);
+      font-size: 11px;
+      align-items: center;
+      padding: 0 16px;
+      gap: 16px;
+      z-index: 100;
+    }
+    #zen-status-bar .zen-hint { margin-left: auto; color: var(--tc-orange, #ff8c00); opacity: 0.7; }
+
+    /* 标签页增强 */
+    .editor-tab {
+      position: relative;
+      user-select: none;
+    }
+    .tab-close-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 18px;
+      height: 18px;
+      margin-left: 4px;
+      font-size: 14px;
+      line-height: 1;
+      color: var(--tc-text-muted, #6e6e6e);
+      border-radius: 3px;
+      opacity: 0;
+      transition: opacity 0.15s ease, background-color 0.15s ease;
+    }
+    .editor-tab:hover .tab-close-btn { opacity: 1; }
+    .tab-close-btn:hover {
+      background: rgba(255,255,255,0.1);
+      color: var(--tc-text-primary, #cccccc);
+    }
+    .tab-dirty-dot {
+      color: var(--tc-orange, #ff8c00);
+      font-size: 14px;
+      margin-right: 3px;
+      line-height: 1;
+    }
+
+    /* 右键菜单 */
+    .tab-context-menu {
+      display: none;
+      position: fixed;
+      z-index: 10001;
+      background: var(--tc-bg-secondary, #252526);
+      border: 1px solid var(--tc-border, #3c3c3c);
+      border-radius: var(--tc-radius, 4px);
+      min-width: 180px;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.5);
+      padding: 4px 0;
+    }
+    .tab-context-menu.visible { display: block; }
+    .tab-menu-item {
+      padding: 6px 16px;
+      font-size: 12px;
+      color: var(--tc-text-primary, #cccccc);
+      cursor: pointer;
+      transition: background-color 0.1s ease;
+    }
+    .tab-menu-item:hover { background: var(--tc-accent, #007acc); color: #fff; }
+    .tab-menu-sep { height: 1px; background: var(--tc-border, #3c3c3c); margin: 4px 8px; }
+
+    /* 面包屑导航 */
+    #breadcrumb-bar {
+      display: flex;
+      align-items: center;
+      padding: 3px 12px;
+      background: var(--tc-bg-primary, #1e1e1e);
+      border-bottom: 1px solid var(--tc-border, #3c3c3c);
+      font-size: 11px;
+      min-height: 22px;
+      gap: 4px;
+      flex-wrap: wrap;
+    }
+    #breadcrumb-bar.hidden { display: none; }
+    #breadcrumb-path { display: flex; align-items: center; gap: 2px; flex-wrap: wrap; }
+    .bc-sep, .bc-arrow { color: var(--tc-text-muted, #6e6e6e); }
+    .bc-segment {
+      color: var(--tc-text-secondary, #969696);
+      cursor: pointer;
+      padding: 1px 4px;
+      border-radius: 3px;
+      transition: background-color 0.15s ease, color 0.15s ease;
+    }
+    .bc-segment:hover { background: var(--tc-bg-hover, #2a2d2e); color: var(--tc-text-primary, #cccccc); }
+    .bc-file { color: var(--tc-text-primary, #cccccc); font-weight: 500; }
+    #breadcrumb-symbol {
+      color: var(--tc-accent, #007acc);
+      margin-left: 8px;
+      font-weight: 500;
+    }
+    .bc-empty { color: var(--tc-text-muted, #6e6e6e); font-style: italic; }
+
+    /* 空状态 */
+    .empty-state {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 32px 16px;
+      color: var(--tc-text-muted, #6e6e6e);
+      text-align: center;
+    }
+    .empty-state-icon { font-size: 32px; margin-bottom: 8px; opacity: 0.5; }
+    .empty-state-title { font-size: 13px; font-weight: 500; color: var(--tc-text-secondary, #969696); margin-bottom: 4px; }
+    .empty-state-desc { font-size: 11px; color: var(--tc-text-muted, #6e6e6e); }
+
+    /* 新建项目向导 */
+    .np-modal { min-width: 480px; max-width: 560px; }
+    .np-location-row { display: flex; gap: 6px; }
+    .np-location-row input { flex: 1; }
+    .btn-browse {
+      background: var(--tc-bg-tertiary, #2d2d2d);
+      border: 1px solid var(--tc-border, #3c3c3c);
+      color: var(--tc-text-primary, #cccccc);
+      padding: 4px 12px;
+      font-size: 12px;
+      border-radius: var(--tc-radius, 4px);
+      cursor: pointer;
+      white-space: nowrap;
+      transition: background-color 0.15s ease;
+    }
+    .btn-browse:hover { background: var(--tc-bg-hover, #2a2d2e); }
+    .np-templates { display: flex; flex-direction: column; gap: 4px; margin-bottom: 8px; max-height: 200px; overflow-y: auto; }
+    .np-template-card {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 8px 10px;
+      border: 1px solid var(--tc-border, #3c3c3c);
+      border-radius: var(--tc-radius, 4px);
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+    .np-template-card:hover { background: var(--tc-bg-hover, #2a2d2e); }
+    .np-template-card.selected {
+      border-color: var(--tc-accent, #007acc);
+      background: rgba(0, 122, 204, 0.1);
+    }
+    .np-template-icon { font-size: 20px; width: 28px; text-align: center; flex-shrink: 0; }
+    .np-template-info { flex: 1; min-width: 0; }
+    .np-template-name { font-size: 12px; color: var(--tc-text-primary, #cccccc); font-weight: 500; }
+    .np-template-desc { font-size: 10px; color: var(--tc-text-muted, #6e6e6e); }
+    </style>
+
   </head>
 <body>
   <div id="app">
@@ -1452,5 +1636,6 @@
     </div>
 
     <script src="./assets/p0-modules.js"></script>
+    <script src="./assets/p1-modules.js"></script>
   </body>
 </html>
