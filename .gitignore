@@ -1,0 +1,8 @@
+node_modules/
+release/
+_*/
+_*
+*.zip
+*.bak
+task-artifacts/
+package-lock.json
