@@ -365,6 +365,12 @@ electron_1.app.whenReady().then(async () => {
     dlog('[Main] __dirname=' + __dirname);
     dlog('[Main] STEP: setupIpcHandlers');
     (0, ipc_handlers_1.setupIpcHandlers)();
+    // 模板系统 IPC
+    try {
+      const templateIpc = require('./template-ipc');
+      templateIpc.setupTemplateIpc();
+      dlog('[Main] Template IPC loaded');
+    } catch (e) { dlog('[Main] Template IPC failed: ' + e); }
     dlog('[Main] STEP: createAppMenu');
     createAppMenu();
     dlog('[Main] STEP: createWindow');

@@ -152,5 +152,12 @@ const api = {
     // ── 最近项目 ──
     getRecentProjects: () => electron_1.ipcRenderer.invoke('project:getRecent'),
     addRecentProject: (projectPath) => electron_1.ipcRenderer.invoke('project:addRecent', projectPath),
+    // ── 模板系统 ──
+    templateList: () => electron_1.ipcRenderer.invoke('template:list'),
+    templateGet: (id) => electron_1.ipcRenderer.invoke('template:get', id),
+    templateCreate: (template) => electron_1.ipcRenderer.invoke('template:create', template),
+    templateUpdate: (id, updates) => electron_1.ipcRenderer.invoke('template:update', id, updates),
+    templateDelete: (id) => electron_1.ipcRenderer.invoke('template:delete', id),
+    templateResetDefaults: () => electron_1.ipcRenderer.invoke('template:resetDefaults'),
 };
 electron_1.contextBridge.exposeInMainWorld('api', api);
