@@ -1,4 +1,4 @@
-"use strict";
+﻿"use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 /**
  * PersonalIDE - Preload Script
@@ -152,6 +152,14 @@ const api = {
     // ── 最近项目 ──
     getRecentProjects: () => electron_1.ipcRenderer.invoke('project:getRecent'),
     addRecentProject: (projectPath) => electron_1.ipcRenderer.invoke('project:addRecent', projectPath),
+    // ── AI 角色系统 ──
+    roleList: () => electron_1.ipcRenderer.invoke("role:list"),
+    roleGetActive: () => electron_1.ipcRenderer.invoke("role:getActive"),
+    roleSetActive: (id) => electron_1.ipcRenderer.invoke("role:setActive", id),
+    roleCreate: (role) => electron_1.ipcRenderer.invoke("role:create", role),
+    roleUpdate: (id, updates) => electron_1.ipcRenderer.invoke("role:update", id, updates),
+    roleDelete: (id) => electron_1.ipcRenderer.invoke("role:delete", id),
+    roleResetDefaults: () => electron_1.ipcRenderer.invoke("role:resetDefaults"),
     // ── 模板系统 ──
     templateList: () => electron_1.ipcRenderer.invoke('template:list'),
     templateGet: (id) => electron_1.ipcRenderer.invoke('template:get', id),

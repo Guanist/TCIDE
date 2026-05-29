@@ -1,4 +1,4 @@
-"use strict";
+﻿"use strict";
 var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
     if (k2 === undefined) k2 = k;
     var desc = Object.getOwnPropertyDescriptor(m, k);
@@ -1125,3 +1125,102 @@ function extractTextFromDocxXml(xml) {
     }
     return lines.join('\n\n').replace(/\n{3,}/g, '\n\n') || '（文档为空）';
 }
+
+
+
+// === 项目级搜索 ===
+ipcMain.handle("search:project", async (_e, projectPath, query) => {
+  const fs = require("fs");
+  const path = require("path");
+  const results = [];
+  function walk(dir) {
+    let entries;
+    try { entries = fs.readdirSync(dir, { withFileTypes: true }); } catch { return; }
+    for (const entry of entries) {
+      const full = path.join(dir, entry.name);
+      if (entry.isDirectory()) {
+        if (entry.name.startsWith(".") || entry.name === "node_modules" || entry.name === "build" || entry.name === "dist") continue;
+        walk(full);
+      } else if (entry.isFile()) {
+        if (full.endsWith(".exe") || full.endsWith(".dll") || full.endsWith(".so") || full.endsWith(".class")) continue;
+        try {
+          const content = fs.readFileSync(full, "utf-8");
+          const lines = content.split("\n");
+          lines.forEach((line, idx) => {
+            if (line.toLowerCase().includes(query.toLowerCase())) {
+              results.push({ file: entry.name, path: full.replace(projectPath, "").replace(/^[\/\\]/, ""), line: idx, snippet: line.trim().substring(0, 200) });
+            }
+          });
+        } catch { }
+      }
+    }
+  }
+  walk(projectPath);
+  return results.slice(0, 500);
+});
+
+// === 最近项目 ===
+const RECENT_FILE = require("path").join(app.getPath("appData"), "TCIDE", "recent-projects.json");
+const _fs = require("fs");
+const _path = require("path");
+
+function _ensureRecent() {
+  const dir = _path.dirname(RECENT_FILE);
+  if (!_fs.existsSync(dir)) _fs.mkdirSync(dir, { recursive: true });
+  if (!_fs.existsSync(RECENT_FILE)) _fs.writeFileSync(RECENT_FILE, "[]", "utf-8");
+}
+
+ipcMain.handle("project:getRecent", async () => {
+  _ensureRecent();
+  try { return JSON.parse(_fs.readFileSync(RECENT_FILE, "utf-8")); } catch { return []; }
+});
+
+ipcMain.handle("project:addRecent", async (_e, projectPath) => {
+  _ensureRecent();
+  let list = [];
+  try { list = JSON.parse(_fs.readFileSync(RECENT_FILE, "utf-8")); } catch {}
+  list = list.filter(p => p.path !== projectPath);
+  list.unshift({ name: _path.basename(projectPath), path: projectPath, lastOpen: new Date().toISOString() });
+  list = list.slice(0, 20);
+  _fs.writeFileSync(RECENT_FILE, JSON.stringify(list, null, 2), "utf-8");
+  return list;
+});
+
+
+// === 项目级搜索（供渲染进程调用） ===
+ipcMain.handle('search:project', async (_e, projectPath, query) => {
+  const fs = require('fs');
+  const path = require('path');
+  const results = [];
+  function walk(dir) {
+    let entries;
+    try { entries = fs.readdirSync(dir, { withFileTypes: true }); } catch { return; }
+    for (const entry of entries) {
+      const full = path.join(dir, entry.name);
+      if (entry.isDirectory()) {
+        if (entry.name.startsWith('.') || entry.name === 'node_modules' || entry.name === 'build' || entry.name === 'dist') continue;
+        walk(full);
+      } else if (entry.isFile()) {
+        if (full.endsWith('.exe') || full.endsWith('.dll') || full.endsWith('.so') || full.endsWith('.class')) continue;
+        try {
+          const content = fs.readFileSync(full, 'utf-8');
+          const lines = content.split('\n');
+          lines.forEach((line, idx) => {
+            if (line.toLowerCase().includes(query.toLowerCase())) {
+              results.push({
+                file: entry.name,
+                path: full.replace(projectPath, '').replace(/^[\/\\]/, ''),
+                line: idx,
+                snippet: line.trim().substring(0, 200)
+              });
+            }
+          });
+        } catch {}
+      }
+    }
+  }
+  walk(projectPath);
+  return results.slice(0, 500);
+});
+
+// === 最近项目 ===

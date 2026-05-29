@@ -371,6 +371,13 @@ electron_1.app.whenReady().then(async () => {
       templateIpc.setupTemplateIpc();
       dlog('[Main] Template IPC loaded');
     } catch (e) { dlog('[Main] Template IPC failed: ' + e); }
+    // AI 角色系统 IPC
+    try {
+      const roleIpc = require('./ai-role-ipc');
+      const rolesFile = require('path').join(app.getPath('appData'), 'TCIDE', 'ai-roles.json');
+      roleIpc.setupRoleIpc(require('electron').ipcMain, rolesFile);
+      dlog('[Main] Role IPC loaded');
+    } catch (e) { dlog('[Main] Role IPC failed: ' + e); }
     dlog('[Main] STEP: createAppMenu');
     createAppMenu();
     dlog('[Main] STEP: createWindow');

@@ -56,7 +56,106 @@
 .modal-box .modal-actions .btn-ok { background:#0e639c; border:none; color:#fff; }
 .modal-box .modal-actions .btn-ok:hover { background:#1177bb; }
 </style>
-</head>
+
+    <style id="outline-css">
+    #outline-panel { padding:0; display:flex; flex-direction:column; height:100%; }
+    #outline-panel .panel-header { padding:8px 12px; border-bottom:1px solid #2d2d2d; display:flex; align-items:center; gap:6px; }
+    #outline-panel .panel-header input { flex:1; background:#1e1e1e; border:1px solid #3c3c3c; color:#cccccc; padding:3px 6px; font-size:11px; border-radius:2px; outline:none; }
+    #outline-list { flex:1; overflow-y:auto; padding:4px 0; }
+    .outline-item { padding:3px 12px 3px 20px; font-size:12px; cursor:pointer; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; color:#cccccc; }
+    .outline-item:hover { background:#2a2d2e; }
+    .outline-item.depth-1 { padding-left:28px; }
+    .outline-item.depth-2 { padding-left:36px; }
+    .outline-item.depth-3 { padding-left:44px; }
+    .outline-item .sym-icon { margin-right:6px; font-size:11px; }
+    .outline-item .sym-name { color:#9cdcfe; }
+    .outline-item .sym-type { color:#6e6e6e; font-size:10px; margin-left:4px; }
+    #outline-empty { padding:20px; text-align:center; color:#6e6e6e; font-size:12px; }
+    </style>
+
+    <style id="search-panel-css">
+    #search-panel { background:#1e1e1e; border-bottom:1px solid #2d2d2d; display:none; flex-direction:column; padding:0; }
+    #search-panel.visible { display:flex; }
+    .search-bar { display:flex; align-items:center; padding:4px 8px; gap:4px; border-bottom:1px solid #2d2d2d; }
+    .search-bar input { flex:1; background:#1e1e1e; border:1px solid #3c3c3c; color:#cccccc; padding:4px 8px; font-size:12px; outline:none; border-radius:2px; }
+    .search-bar input:focus { border-color:#007acc; }
+    .search-bar .search-actions { display:flex; gap:2px; }
+    .search-bar .search-actions button { background:none; border:none; color:#6e6e6e; cursor:pointer; padding:2px 4px; font-size:12px; border-radius:2px; }
+    .search-bar .search-actions button:hover { color:#cccccc; background:#2a2d2e; }
+    #search-results { max-height:200px; overflow-y:auto; }
+    .search-result-item { padding:4px 12px; font-size:12px; cursor:pointer; display:flex; align-items:center; gap:8px; }
+    .search-result-item:hover { background:#2a2d2e; }
+    .search-result-item .result-file { color:#4ec9b0; flex-shrink:0; }
+    .search-result-item .result-line { color:#6e6e6e; width:40px; text-align:right; flex-shrink:0; }
+    .search-result-item .result-snippet { color:#cccccc; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; flex:1; }
+    .search-result-item .result-snippet mark { background:#514a00; color:#ffcc00; border-radius:1px; padding:0 1px; }
+    #search-status { padding:2px 12px; font-size:10px; color:#6e6e6e; border-top:1px solid #2d2d2d; }
+    </style>
+
+    <style id="filetree-search-css">
+    #filetree-search-bar { display:flex; align-items:center; padding:4px 8px; gap:4px; border-bottom:1px solid #2d2d2d; display:none; }
+    #filetree-search-bar.visible { display:flex; }
+    #filetree-search-bar input { flex:1; background:#1e1e1e; border:1px solid #3c3c3c; color:#cccccc; padding:3px 6px; font-size:11px; outline:none; border-radius:2px; }
+    #filetree-search-bar input:focus { border-color:#007acc; }
+    #filetree-search-bar button { background:none; border:none; color:#6e6e6e; cursor:pointer; font-size:12px; }
+    </style>
+
+    <style id="command-palette-css">
+    #command-palette-overlay { display:none; position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.5); z-index:9999; justify-content:center; padding-top:120px; }
+    #command-palette-overlay.visible { display:flex; }
+    #command-palette { background:#252526; border:1px solid #3c3c3c; border-radius:8px; width:600px; max-height:400px; overflow:hidden; box-shadow:0 8px 32px rgba(0,0,0,0.5); }
+    #command-palette input { width:100%; background:#1e1e1e; border:none; border-bottom:1px solid #3c3c3c; color:#cccccc; padding:12px 16px; font-size:14px; outline:none; }
+    #command-palette .cmd-list { max-height:350px; overflow-y:auto; }
+    .cmd-item { padding:8px 16px; cursor:pointer; display:flex; align-items:center; gap:10px; font-size:13px; }
+    .cmd-item:hover, .cmd-item.selected { background:#2a2d2e; }
+    .cmd-item .cmd-icon { font-size:14px; width:20px; text-align:center; }
+    .cmd-item .cmd-label { flex:1; color:#cccccc; }
+    .cmd-item .cmd-category { font-size:10px; color:#6e6e6e; margin-right:8px; }
+    .cmd-item .cmd-shortcut { font-size:11px; color:#6e6e6e; }
+    #cmd-empty { padding:20px; text-align:center; color:#6e6e6e; font-size:12px; }
+    </style>
+
+    <style id="toast-css">
+    #toast-container { position:fixed; bottom:40px; right:20px; z-index:10000; display:flex; flex-direction:column-reverse; gap:8px; pointer-events:none; }
+    .toast { background:#252526; border:1px solid #3c3c3c; border-radius:4px; padding:10px 16px; font-size:12px; color:#cccccc; box-shadow:0 4px 12px rgba(0,0,0,0.4); min-width:200px; max-width:400px; animation:toastIn 0.2s ease; pointer-events:auto; display:flex; align-items:center; gap:8px; }
+    .toast.toast-success { border-left:3px solid #4ec9b0; }
+    .toast.toast-error { border-left:3px solid #f44747; }
+    .toast.toast-warning { border-left:3px solid #ffcc00; }
+    .toast.toast-info { border-left:3px solid #007acc; }
+    .toast .toast-msg { flex:1; }
+    .toast .toast-close { background:none; border:none; color:#6e6e6e; cursor:pointer; font-size:14px; padding:0; }
+    .toast .toast-close:hover { color:#cccccc; }
+    @keyframes toastIn { from{opacity:0;transform:translateY(10px);} to{opacity:1;transform:translateY(0);} }
+    @keyframes toastOut { from{opacity:1;} to{opacity:0;transform:translateY(10px);} }
+    </style>
+
+    <style id="loading-css">
+    #loading-overlay { display:none; position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.4); z-index:9998; justify-content:center; align-items:center; }
+    #loading-overlay.visible { display:flex; }
+    .loading-spinner { background:#252526; border:1px solid #3c3c3c; border-radius:8px; padding:24px 32px; display:flex; flex-direction:column; align-items:center; gap:12px; }
+    .loading-spinner .spinner { width:32px; height:32px; border:3px solid #3c3c3c; border-top-color:#007acc; border-radius:50%; animation:spin 0.8s linear infinite; }
+    @keyframes spin { to{transform:rotate(360deg);} }
+    .loading-spinner .loading-text { color:#cccccc; font-size:12px; }
+    </style>
+
+    <style id="welcome-css">
+    #welcome-panel { display:none; flex-direction:column; align-items:center; justify-content:center; height:100%; background:#1e1e1e; color:#cccccc; }
+    #welcome-panel.visible { display:flex; }
+    .welcome-logo { font-size:48px; margin-bottom:8px; }
+    .welcome-title { font-size:20px; font-weight:600; margin-bottom:4px; }
+    .welcome-subtitle { font-size:13px; color:#6e6e6e; margin-bottom:24px; }
+    .welcome-actions { display:flex; gap:12px; margin-bottom:32px; }
+    .welcome-actions button { background:#0e639c; border:none; color:#fff; padding:8px 20px; border-radius:4px; cursor:pointer; font-size:13px; }
+    .welcome-actions button:hover { background:#1177bb; }
+    .welcome-recent { width:400px; }
+    .welcome-recent h4 { font-size:12px; color:#6e6e6e; margin-bottom:8px; text-transform:uppercase; letter-spacing:1px; }
+    .welcome-recent-item { padding:6px 10px; cursor:pointer; border-radius:4px; display:flex; align-items:center; gap:8px; font-size:12px; }
+    .welcome-recent-item:hover { background:#2a2d2e; }
+    .welcome-recent-item .recent-icon { font-size:16px; }
+    .welcome-recent-item .recent-path { color:#6e6e6e; font-size:10px; }
+    </style>
+
+  </head>
 <body>
   <div id="app">
 
@@ -84,7 +183,11 @@
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
         </button>
       </div>
-    </nav>
+    
+        <button class="activity-btn" data-view="outline" title="代码大纲 Ctrl+Shift+O">
+          <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor"><rect x="2" y="2" width="7" height="3" rx="1"/><rect x="11" y="2" width="7" height="3" rx="1"/><rect x="2" y="8" width="7" height="3" rx="1"/><rect x="11" y="8" width="7" height="3" rx="1"/><rect x="2" y="14" width="16" height="3" rx="1"/></svg>
+        </button>
+      </nav>
 
     <!-- ═══ 左侧：文件树 / 搜索 ═══ -->
     <aside id="sidebar" class="sidebar">
@@ -146,7 +249,16 @@
           <div id="arch-smell-list" class="arch-smell-list"></div>
         </div>
       </div>
-    </aside>
+    
+            <!-- 代码大纲面板 -->
+            <div id="outline-panel" class="sidebar-panel hidden">
+              <div class="panel-header">
+                <span class="panel-icon">☰</span>
+                <input id="outline-search" placeholder="搜索符号...">
+              </div>
+              <div id="outline-list"><div id="outline-empty">打开文件后显示大纲</div></div>
+            </div>
+      </aside>
 
 
     <!-- 代码模板面板 -->
@@ -548,7 +660,16 @@
           </div>
         </div>
       </div>
-    </aside>
+    
+            <!-- 代码大纲面板 -->
+            <div id="outline-panel" class="sidebar-panel hidden">
+              <div class="panel-header">
+                <span class="panel-icon">☰</span>
+                <input id="outline-search" placeholder="搜索符号...">
+              </div>
+              <div id="outline-list"><div id="outline-empty">打开文件后显示大纲</div></div>
+            </div>
+      </aside>
   </div>
 
   <!-- ═══ 底部状态栏 ═══ -->
@@ -1315,5 +1436,21 @@
 })();
 </script>
 
-</body>
+
+    <!-- Toast 通知容器 -->
+    <div id="toast-container"></div>
+
+    <!-- Loading 遮罩 -->
+    <div id="loading-overlay"><div class="loading-spinner"><div class="spinner"></div><div class="loading-text" id="loading-text">加载中...</div></div></div>
+
+    <!-- 命令面板 -->
+    <div id="command-palette-overlay">
+      <div id="command-palette">
+        <input id="command-palette-input" placeholder="输入命令..." autocomplete="off">
+        <div class="cmd-list" id="command-palette-list"><div id="cmd-empty">输入关键词搜索命令</div></div>
+      </div>
+    </div>
+
+    <script src="./assets/p0-modules.js"></script>
+  </body>
 </html>
