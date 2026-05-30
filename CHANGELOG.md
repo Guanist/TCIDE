@@ -1,103 +1,79 @@
-# 虎猫 TCIDE v1.3.0 更新说明
+# 虎猫 TCIDE v1.4.0 更新说明
 
 **发布日期**: 2026-05-30
 
 ## 新增功能
 
-### 模板系统
-- 5 个内置代码模板（React组件/Express路由/Python脚本/Go服务/Kotlin类）
-- 模板卡片列表展示，支持搜索过滤
-- 新建/编辑/删除自定义模板
-- 双击模板或点击「使用」插入到编辑器
+### LSP 语言服务集成（Phase 2 — 外部服务器支持）
+- **Python**: 集成 pyright 语言服务器，自动补全/悬停提示/跳转定义/查找引用/实时诊断
+- **多语言检测**: Go (gopls)、Rust (rust-analyzer)、C++ (clangd)、Java、Bash
+- **安装指引**: 语言服务器未安装时自动提示安装命令
+- **架构**: 主进程管理语言服务器生命周期，渲染进程通过 IPC 桥接 JSON-RPC
 
-### AI 角色系统
-- 4 个内置角色（开发助手/代码审查/架构师/测试工程师）
-- 自定义角色创建与编辑
-- 角色切换，切换后 AI 对话使用对应 system prompt
-- 温度、MaxTokens 等参数可调
+### LSP 语言服务集成（Phase 1 — TypeScript/JavaScript）
+- Monaco 内置 TypeScript 编译器，提供 Go to Definition / Find References / Rename / Quick Fix
+- Bracket Pair Colorization、Parameter Hints、Quick Suggestions
 
-### 项目级搜索 (Ctrl+Shift+F)
-- 跨文件文本搜索，支持正则
-- 搜索结果行号定位
-- 文件类型过滤
+### Problems 面板
+- 活动栏 ⚠️ 按钮 + 独立面板，实时诊断列表
+- 按严重度排序、点击跳转、Badge 显示错误+警告数
+- 快捷键: Ctrl+Shift+M 打开面板
 
-### 文件树搜索
-- Ctrl+F 在文件树中快速过滤
-- Escape 键清除过滤
+### 编辑器增强
+- **Emmet 展开**: Tab 键触发，HTML/CSS/JSX 内建解析器
+- **Snippets 代码片段**: 50+ 预置片段（HTML/CSS/TS/JS/Python/Go/Rust），设置面板查看
+- **分屏编辑器**: 双 Monaco 实例，Ctrl+\ 垂直 / Alt+2 水平
 
-### 欢迎页
-- 首次启动/无项目时显示欢迎页
-- 最近项目列表，一键打开
-- 新建/打开项目快捷入口
+### Git 增强
+- **分支切换**: Git 面板下拉选择分支，切换后自动刷新文件树
+- **Git Blame**: 行内作者标注，悬停详情
 
-### Toast 通知系统
-- 成功/错误/警告/信息四种类型
-- 右下角弹出，自动消失
-- 可手动关闭
+### MCP 工具集成
+- **9 个内置工具**: read_file / write_file / list_files / search_code / run_command / git_status / git_diff / get_diagnostics / get_open_files
+- **AI Function Calling**: 聊天中 AI 可自动调用工具读写文件、执行命令
+- **工具调用显示**: 聊天气泡中显示工具执行状态（⏳/✅/❌）
 
-### 加载状态指示器
-- 全局 loading 遮罩
-- 旋转动画 + 加载文字
+### AI 聊天增强
+- **消息操作按钮**: hover 显示复制/编辑/删除/分享
+- **右键菜单**: 右键消息弹出操作菜单
+- **多选删除**: ☑ 按钮进入多选模式，批量删除消息
+- **可折叠思考过程**: `[reasoning]...[/reasoning]` 自动折叠展示
+- **代码块全链路**: 📂打开/👁预览/▶运行/💾保存到项目/📋复制
+- **编辑用户消息**: ✏️ 回填到输入框修改后重发
+- **对话内联重命名**: 双击标题编辑，Enter 保存 / Escape 取消
 
-## 改进
+### 多格式预览
+- 🖼️ **图片**: PNG/JPG/GIF/WebP/BMP/ICO
+- 🎬 **视频**: MP4/WebM/OGG/MOV/AVI/MKV
+- 🎵 **音频**: MP3/WAV/FLAC/AAC/M4A
+- 📄 **PDF**: 调用系统默认阅读器打开
+- 📝 **DOCX**: 文本提取渲染
+- 🖼️ **SVG**: 预览/源码双模式
 
-### 代码大纲
-- 大纲面板移至活动栏独立按钮
-- 符号搜索过滤
+### API 配置管理
+- **已保存的 API 配置列表**: 显示所有已配置的 API Key（掩码保护）
+- **一键切换**: 点击切换使用的 API
+- **删除配置**: ✕ 按钮删除不再使用的 Key
 
-### 命令面板
-- 新增模板和角色相关命令
-- 新增文件树搜索命令
+### 版本记录
+- 设置 → 📋 版本记录：v1.0 ~ v1.4 完整迭代时间线
 
----
+## 修复
 
-# 虎猫 TCIDE v1.2.0 更新说明
-
-**发布日期**: 2026-05-30
-
-## 新增功能
-
-### 代码大纲面板 (Ctrl+Shift+O)
-- 支持 6 种语言符号提取（JS/TS/Python/Go/Rust/Java）
-- 树形结构渲染，分类展示（函数、类、变量、接口等）
-- 点击符号跳转到对应代码位置
-- 关键字过滤搜索
-
-### 命令面板 (Ctrl+Shift+P)
-- 21 个内置命令，覆盖文件操作、编辑、视图、AI、终端
-- 模糊搜索匹配
-- 键盘导航（上下箭头 + Enter）
-- 快捷键提示
-
-### Zen Mode (Ctrl+Shift+Z)
-- 一键进入专注模式
-- GPU 加速动画过渡
-- 自动收缩侧边栏、隐藏面板
-- 居中编辑器，迷你状态栏
-
-### 终端流式输出
-- 终端命令输出实时推送（spawn 替代 exec）
-- Coder Agent 执行过程流式显示
-- xterm.js 增量渲染
-
-### 上下文管理器
-- `CLAUDE.md` 编码规范与 Token 管控规则
-- `contextManager.ts` 自动读取上下文规则
-- 静态记忆文件 `.tcide/context/static.md`
-- 3 文件上限、3 轮对话窗口、50K 单文件截断
+- 修复图片/PDF 在编辑区打开乱码问题
+- 修复 SVG 源码模式不显示代码
+- 修复文件标签栏和预览/源码按钮消失
+- 修复 `renderTabs` 未定义导致标签栏不渲染
+- 修复附件上传时非 txt 文件 AI 无法识别
+- 修复图片附件无法多模态发送给 AI
+- 修复对话重命名后仍显示旧名称
+- 修复对话列表重复显示
+- 修复聊天消息重复渲染
+- 修复 `renderChatSessions` 拼写错误导致会话恢复失败
 
 ## 技术改进
 
-- 内置 HTTP 渲染服务器（兼容性增强）
-- 构建管线重建（package.json / tsconfig.json / vite.config.ts）
-- IPC 通信流式改造
-- 依赖锁定（electron-store 8.2 / sql.js 1.14 / monaco 0.52 / xterm 5.3）
-
-## 已知限制
-
-- 托盘图标在部分系统不可见（不影响功能）
-- file:// 协议加载在部分 Windows 版本不兼容（已通过内置 HTTP 服务器绕过）
-
----
-
-**原始版本**: 虎猫 TCIDE v1.1.0
+- Model Adapter 升级支持 OpenAI Vision 多模态格式
+- `readFileAsDataURL` MIME 映射扩展（PDF/视频/音频）
+- 文件大小限制从 5MB 提升至 50MB
+- 构建脚本 `dist` 自动执行 tsc + vite build

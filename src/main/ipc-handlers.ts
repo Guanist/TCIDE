@@ -3,7 +3,7 @@
  */
 import { ipcMain, dialog, safeStorage, BrowserWindow } from 'electron';
 import { FileService } from './file-service';
-import { ModelAdapter, ModelConfig } from '../core/model/adapter';
+import { ModelAdapter, ModelConfig, ChatMessage } from '../core/model/adapter';
 import { modelRegistry } from '../core/model/model-meta';
 import { BuilderAgent } from '../core/agent/builder-agent';
 import { CoderAgent } from '../core/agent/coder-agent';
@@ -15,6 +15,8 @@ import { queryDb, runDb, insertUsage, queryUsage } from './db/sqlite';
 import { getStore } from './store';
 import * as zlib from 'zlib';
 import * as path from 'path';
+import { lspManager, LspLanguage } from './lsp-manager';
+import { listTools, executeTool, ToolCall } from './mcp-tools';
 
 let currentAbortController: AbortController | null = null;
 let currentProjectPath: string | null = null;
@@ -145,7 +147,7 @@ export function setupIpcHandlers(): void {
   ipcMain.handle('project:getPath', async () => currentProjectPath);
 
   // AI 发送（非流式）
-  ipcMain.handle('ai:send', async (_e, messages, options) => {
+  ipcMain.handle('ai:send', async (_e, messages: ChatMessage[], options) => {
     const config = getModelConfig();
     const adapter = createAdapterWithUsage(config);
     adapter.setSystemRules(projectRules);
@@ -657,6 +659,36 @@ export function setupSnapshotIpc(): void {
     }
   });
 
+  // ── Git 分支列表 ──
+  ipcMain.handle('git:listBranches', async (_e, projectPath: string) => {
+    try {
+      const { execSync } = require('child_process');
+      const output = execSync('git branch -a --sort=-committerdate', { cwd: projectPath, timeout: 5000 }).toString();
+      const current = output.match(/\*\s+(\S+)/)?.[1] || '';
+      const branches: Array<{ name: string; current: boolean; remote: boolean }> = [];
+      for (const line of output.split('\n')) {
+        const name = line.replace(/^[* ]\s*/, '').trim();
+        if (!name || name.startsWith('remotes/')) continue;
+        const isCurrent = line.startsWith('*');
+        branches.push({ name, current: isCurrent, remote: false });
+      }
+      return { success: true, branches, currentBranch: current };
+    } catch (err: unknown) {
+      return { success: false, branches: [], currentBranch: '', error: (err as Error).message };
+    }
+  });
+
+  // ── Git 切换分支 ──
+  ipcMain.handle('git:checkout', async (_e, branch: string, projectPath: string) => {
+    try {
+      const { execSync } = require('child_process');
+      const output = execSync(`git checkout "${branch}"`, { cwd: projectPath, timeout: 10000 }).toString().trim();
+      return { success: true, output };
+    } catch (err: unknown) {
+      return { success: false, error: (err as Error).message };
+    }
+  });
+
   // ── Git Diff（返回文件改动行号）──
   ipcMain.handle('git:diff', async (_e, filePath: string, projectPath: string) => {
     try {
@@ -780,13 +812,18 @@ export function setupSnapshotIpc(): void {
     const pathMod = await import('path');
     if (!fs.existsSync(filePath)) throw new Error('文件不存在');
     const stat = fs.statSync(filePath);
-    if (stat.size > 5 * 1024 * 1024) throw new Error('文件过大（最大 5MB）');
+    if (stat.size > 50 * 1024 * 1024) throw new Error('文件过大（最大 50MB）');
     const buffer = fs.readFileSync(filePath);
     const ext = pathMod.extname(filePath).toLowerCase();
     const mimeMap: Record<string, string> = {
       '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg',
       '.gif': 'image/gif', '.webp': 'image/webp', '.bmp': 'image/bmp',
       '.svg': 'image/svg+xml', '.ico': 'image/x-icon',
+      '.pdf': 'application/pdf',
+      '.mp4': 'video/mp4', '.webm': 'video/webm', '.ogg': 'video/ogg',
+      '.mov': 'video/quicktime', '.mkv': 'video/x-matroska', '.avi': 'video/x-msvideo',
+      '.mp3': 'audio/mpeg', '.wav': 'audio/wav', '.flac': 'audio/flac',
+      '.aac': 'audio/aac', '.m4a': 'audio/mp4',
     };
     const mime = mimeMap[ext] || 'application/octet-stream';
     return `data:${mime};base64,${buffer.toString('base64')}`;
@@ -1129,3 +1166,214 @@ function extractTextFromDocxXml(xml: string): string {
 
   return lines.join('\n\n').replace(/\n{3,}/g, '\n\n') || '（文档为空）';
 }
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// LSP 语言服务器 IPC 处理
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+// 启动语言服务器
+ipcMain.handle('lsp:start', async (_e, language: string, projectPath: string) => {
+  try {
+    await lspManager.startServer(language as LspLanguage, projectPath);
+    return { success: true };
+  } catch (err: any) {
+    return { success: false, error: err.message };
+  }
+});
+
+// 停止语言服务器
+ipcMain.handle('lsp:stop', async (_e, language: string, projectPath?: string) => {
+  await lspManager.stopServer(language, projectPath);
+  return { success: true };
+});
+
+// 检查服务器状态
+ipcMain.handle('lsp:status', async (_e, language: string, projectPath?: string) => {
+  return lspManager.getStatus(language, projectPath);
+});
+
+// 发送 LSP 请求
+ipcMain.handle('lsp:request', async (_e, language: string, method: string, params: unknown, projectPath?: string) => {
+  try {
+    const result = await lspManager.sendLspRequest(language, method, params, projectPath);
+    return { success: true, result };
+  } catch (err: any) {
+    return { success: false, error: err.message };
+  }
+});
+
+// 发送 LSP 通知
+ipcMain.handle('lsp:notify', async (_e, language: string, method: string, params: unknown, projectPath?: string) => {
+  lspManager.sendLspNotification(language, method, params, projectPath);
+  return { success: true };
+});
+
+// 检查语言服务器是否可用 (系统中有无安装)
+ipcMain.handle('lsp:available', async (_e, language: string) => {
+  return lspManager.isAvailable(language as LspLanguage);
+});
+
+// 获取安装指引
+ipcMain.handle('lsp:installGuide', async (_e, language: string) => {
+  return lspManager.getInstallGuide(language as LspLanguage);
+});
+
+// 设置LSP消息回调 — 将服务器消息转发给渲染进程
+let lspMessageCallback: ((event: any, data: any) => void) | null = null;
+lspManager.onServerMessage = (language: string, message: unknown) => {
+  if (lspMessageCallback) {
+    // 通过 webContents.send 发送到渲染进程
+    const win = BrowserWindow.getAllWindows()[0];
+    if (win && !win.isDestroyed()) {
+      win.webContents.send('lsp:message', { language, message });
+    }
+  }
+};
+
+// 应用退出时清理所有服务器
+process.on('before-quit', () => {
+  lspManager.shutdownAll();
+});
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// MCP 工具 IPC 处理
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+ipcMain.handle('mcp:listTools', async () => {
+  return listTools();
+});
+
+ipcMain.handle('mcp:callTool', async (_e, call: ToolCall, projectPath: string, extraContext?: { openFiles?: Array<{ path: string; name: string; language: string }> }) => {
+  return executeTool(call, projectPath, extraContext);
+});
+
+// ── AI Chat with Tools (function calling) ──
+ipcMain.handle('ai:send-with-tools', async (event, messages: Array<{ role: string; content: string | null; tool_calls?: Array<{ id: string; type: string; function: { name: string; arguments: string } }>; tool_call_id?: string; name?: string }>, options?: { model?: string }) => {
+  const config = getModelConfig();
+  const adapter = createAdapterWithUsage(config);
+  adapter.setSystemRules(projectRules);
+  const window = BrowserWindow.fromWebContents(event.sender)!;
+  const MAX_TOOL_ROUNDS = 3;
+
+  // Add tools to the request
+  const tools = listTools().map(t => ({ type: 'function' as const, function: { name: t.name, description: t.description, parameters: t.parameters } }));
+
+  let conversation = [...messages];
+
+  for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
+    // Build request body
+    const body = JSON.stringify({
+      model: options?.model || config.model || 'deepseek-v4-pro',
+      messages: conversation.filter(m => m.role !== 'system'),
+      tools,
+      tool_choice: 'auto',
+      stream: false,
+    });
+
+    const response = await fetch(`${(config.baseUrl || 'https://api.deepseek.com/v1').replace(/\/$/, '')}/chat/completions`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${config.apiKey}` },
+      body,
+    });
+
+    if (!response.ok) {
+      const errText = await response.text().catch(() => 'Unknown error');
+      throw new Error(`AI API error (${response.status}): ${errText.slice(0, 200)}`);
+    }
+
+    const json = await response.json() as any;
+    const choice = json.choices?.[0];
+    if (!choice || !choice.message) throw new Error('No response from AI');
+
+    const msg = choice.message;
+
+    // Check for tool_calls
+    if (msg.tool_calls && msg.tool_calls.length > 0) {
+      // Add assistant message with tool_calls to conversation
+      conversation.push({ role: 'assistant', content: msg.content, tool_calls: msg.tool_calls });
+
+      // Execute each tool call
+      for (const tc of msg.tool_calls) {
+        const toolCall: ToolCall = {
+          id: tc.id,
+          name: tc.function.name,
+          arguments: JSON.parse(tc.function.arguments || '{}'),
+        };
+
+        // Notify renderer about tool call
+        if (!window.isDestroyed()) {
+          window.webContents.send('ai-stream-chunk', JSON.stringify({ type: 'tool_call', name: toolCall.name, args: toolCall.arguments, id: toolCall.id }));
+        }
+
+        // Execute
+        const result = await executeTool(toolCall, currentProjectPath || process.cwd());
+
+        // Notify renderer about tool result
+        if (!window.isDestroyed()) {
+          window.webContents.send('ai-stream-chunk', JSON.stringify({ type: 'tool_result', id: toolCall.id, result: result.result.slice(0, 1000), error: result.error }));
+        }
+
+        // Add tool result to conversation
+        conversation.push({
+          role: 'tool',
+          tool_call_id: tc.id,
+          name: tc.function.name,
+          content: result.error || result.result,
+        });
+      }
+
+      continue; // Another round to get final response
+    }
+
+    // Final response (no more tool calls)
+    const finalContent = msg.content || '';
+    if (!window.isDestroyed()) {
+      window.webContents.send('ai-stream-chunk', finalContent);
+      window.webContents.send('ai-stream-end', '');
+    }
+    return finalContent;
+  }
+
+  // Max rounds reached
+  throw new Error('AI 工具调用超过最大轮数');
+});
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// Git Blame
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ipcMain.handle('git:blame', async (_e, filePath: string, projectPath: string) => {
+  try {
+    const { execSync } = require('child_process');
+    const result = execSync(`git blame --date=short -l "${filePath}"`, {
+      cwd: projectPath,
+      timeout: 10000,
+      encoding: 'utf-8',
+    });
+    // Parse: ^abc1234 (Author Name 2024-01-15 42) code
+    const lines = result.split('\n').filter((l: string) => l.trim());
+    const blames: Array<{ hash: string; author: string; date: string; line: number; code: string }> = [];
+    for (let i = 0; i < lines.length; i++) {
+      const m = lines[i].match(/^([0-9a-f^]+)\s+\(([^)]+)\s+(\d{4}-\d{2}-\d{2})\s+(\d+)\)\s*(.*)$/);
+      if (m) {
+        blames.push({ hash: m[1], author: m[2].trim(), date: m[3], line: i + 1, code: m[5] });
+      }
+    }
+    return { success: true, blames };
+  } catch (err: any) {
+    return { success: false, error: err.message };
+  }
+});
+
+// ── API 配置管理 ──
+ipcMain.handle('apiConfigs:get', async () => {
+  return {
+    configs: store.get('apiConfigs', []) as any[],
+    activeId: store.get('activeApiConfigId', '') as string,
+  };
+});
+
+ipcMain.handle('apiConfigs:save', async (_e, data: { configs: any[]; activeId: string }) => {
+  store.set('apiConfigs', data.configs);
+  store.set('activeApiConfigId', data.activeId);
+  return { success: true };
+});

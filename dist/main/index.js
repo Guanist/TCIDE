@@ -51,24 +51,6 @@ let isQuitting = false;
 // 窗口创建
 // ─────────────────────────────────────────
 function createWindow() {
-    // 开发模式下启动内置静态文件服务器
-    if (isDev) {
-        try {
-            const http = require('http');
-            const serveRoot = path.join(__dirname, '..', 'renderer');
-            const mime = { '.html': 'text/html; charset=utf-8', '.js': 'application/javascript', '.css': 'text/css', '.png': 'image/png', '.jpg': 'image/jpeg', '.svg': 'image/svg+xml', '.ttf': 'font/ttf', '.ico': 'image/x-icon', '.json': 'application/json' };
-            const srv = http.createServer((req, res) => {
-                const url = req.url === '/' ? '/index.html' : req.url.split('?')[0];
-                try {
-                    const data = fs.readFileSync(path.join(serveRoot, url));
-                    const ext = path.extname(url);
-                    res.writeHead(200, { 'Content-Type': mime[ext] || 'application/octet-stream', 'Access-Control-Allow-Origin': '*' });
-                    res.end(data);
-                } catch { res.writeHead(404); res.end('Not Found'); }
-            });
-            srv.listen(5173, '127.0.0.1', () => console.log('[Main] Dev server on http://127.0.0.1:5173'));
-        } catch (e) { console.log('[Main] Dev server init failed:', e.message); }
-    }
     // 加载窗口图标
     const iconPath = isDev
         ? path.join(__dirname, '..', '..', 'resources', 'icon.png')
@@ -97,43 +79,13 @@ function createWindow() {
             mainWindow?.webContents.openDevTools({ mode: 'detach' });
         }
     });
-    // Use built-in HTTP server to serve renderer (avoids file:// protocol issues)
-    try {
-        const http = require('http');
-        const serveRoot = path.join(__dirname, '..', 'renderer');
-        const mimeTypes = {
-            '.html': 'text/html; charset=utf-8',
-            '.js': 'application/javascript',
-            '.css': 'text/css',
-            '.png': 'image/png',
-            '.jpg': 'image/jpeg',
-            '.svg': 'image/svg+xml',
-            '.ttf': 'font/ttf',
-            '.ico': 'image/x-icon',
-            '.json': 'application/json'
-        };
-        const srv = http.createServer((req, res) => {
-            const url = req.url === '/' ? '/index.html' : req.url.split('?')[0];
-            try {
-                const data = fs.readFileSync(path.join(serveRoot, url));
-                const ext = path.extname(url);
-                res.writeHead(200, {
-                    'Content-Type': mimeTypes[ext] || 'application/octet-stream',
-                    'Access-Control-Allow-Origin': '*'
-                });
-                res.end(data);
-            } catch { res.writeHead(404); res.end('Not Found'); }
-        });
-        srv.listen(5173, '127.0.0.1', () => {
-            dlog('[Main] Loading via http://127.0.0.1:5173/');
-            mainWindow.loadURL('http://127.0.0.1:5173/');
-        });
-    } catch (e) {
-        dlog('[Main] HTTP server failed: ' + e.message);
-        // Fallback to loadFile
+    if (isDev) {
+        mainWindow.loadURL('http://localhost:5173/');
+    }
+    else {
         const loadPath = path.join(__dirname, '..', 'renderer', 'index.html');
-        dlog('[Main] Falling back to loadFile:', loadPath);
-        mainWindow.loadFile(loadPath).catch((err) => console.error('[Main] loadFile error:', err));
+        console.log('[Main] Loading:', loadPath);
+        mainWindow.loadFile(loadPath).then(() => console.log('[Main] loadFile resolved')).catch((err) => console.error('[Main] loadFile error:', err));
     }
     mainWindow.webContents.on('did-start-loading', () => console.log('[Main] did-start-loading'));
     mainWindow.webContents.on('did-finish-load', () => console.log('[Main] did-finish-load'));
@@ -170,7 +122,7 @@ function showAboutDialog() {
     electron_1.dialog.showMessageBox(mainWindow, {
         type: 'info',
         title: '关于 虎猫 TCIDE',
-        message: '虎猫 TCIDE v1.3.0',
+        message: '虎猫 TCIDE v1.0.0',
         detail: '作者：文森特骆\n公众号：文森特骆\n备注：PyClaw 作者骆戡的爸爸\n\n个人专属超级 AI 编程 IDE',
         icon: electron_1.nativeImage.createFromPath(aboutIconPath),
     });
@@ -181,13 +133,11 @@ function createAppMenu() {
             label: '文件',
             submenu: [
                 { label: '打开项目...', accelerator: 'CmdOrCtrl+O', click: () => openProjectDialog() },
-                { label: '新建项目...', accelerator: 'CmdOrCtrl+Shift+N', click: () => mainWindow?.webContents.send('menu-action', 'new-project') },
                 { type: 'separator' },
                 { label: '新建文件', accelerator: 'CmdOrCtrl+N', click: () => mainWindow?.webContents.send('menu-action', 'new-file') },
-                { label: '新建文件夹', click: () => mainWindow?.webContents.send('menu-action', 'new-folder') },
+                { label: '新建文件夹', accelerator: 'CmdOrCtrl+Shift+N', click: () => mainWindow?.webContents.send('menu-action', 'new-folder') },
                 { type: 'separator' },
                 { label: '保存', accelerator: 'CmdOrCtrl+S', click: () => mainWindow?.webContents.send('menu-action', 'save') },
-                { label: '全部保存', accelerator: 'CmdOrCtrl+Shift+S', click: () => mainWindow?.webContents.send('menu-action', 'save-all') },
                 { type: 'separator' },
                 { label: '退出', accelerator: 'CmdOrCtrl+Q', click: () => { isQuitting = true; electron_1.app.quit(); } },
             ],
@@ -212,10 +162,9 @@ function createAppMenu() {
             label: '视图',
             submenu: [
                 { label: '切换 AI 面板', accelerator: 'CmdOrCtrl+\\', click: () => mainWindow?.webContents.send('menu-action', 'toggle-ai-panel') },
-                { label: 'Zen 专注模式', accelerator: 'CmdOrCtrl+Shift+M', click: () => mainWindow?.webContents.send('menu-action', 'zen-mode') },
+                { label: 'Zen Mode', accelerator: 'CmdOrCtrl+Shift+M', click: () => mainWindow?.webContents.send('menu-action', 'zen-mode') },
                 { type: 'separator' },
-                { label: '终端面板', accelerator: 'Ctrl+`', click: () => mainWindow?.webContents.send('menu-action', 'toggle-terminal') },
-                { label: '面包屑导航', accelerator: 'CmdOrCtrl+Shift+B', click: () => mainWindow?.webContents.send('menu-action', 'toggle-breadcrumb') },
+                { label: '终端', accelerator: 'Ctrl+`', click: () => mainWindow?.webContents.send('menu-action', 'toggle-terminal') },
                 { type: 'separator' },
                 { label: '重新加载', accelerator: 'CmdOrCtrl+R', role: 'reload' },
                 { label: '开发者工具', accelerator: 'F12', role: 'toggleDevTools' },
@@ -234,11 +183,7 @@ function createAppMenu() {
         },
         {
             label: '帮助',
-            submenu: [
-                { label: '快捷键速查', accelerator: 'F1', click: () => mainWindow?.webContents.send('menu-action', 'show-shortcuts') },
-                { type: 'separator' },
-                { label: '关于虎猫 TCIDE', click: () => showAboutDialog() },
-            ],
+            submenu: [{ label: '关于', click: () => showAboutDialog() }],
         },
     ];
     electron_1.Menu.setApplicationMenu(electron_1.Menu.buildFromTemplate(template));
@@ -372,19 +317,6 @@ electron_1.app.whenReady().then(async () => {
     dlog('[Main] __dirname=' + __dirname);
     dlog('[Main] STEP: setupIpcHandlers');
     (0, ipc_handlers_1.setupIpcHandlers)();
-    // 模板系统 IPC
-    try {
-      const templateIpc = require('./template-ipc');
-      templateIpc.setupTemplateIpc();
-      dlog('[Main] Template IPC loaded');
-    } catch (e) { dlog('[Main] Template IPC failed: ' + e); }
-    // AI 角色系统 IPC
-    try {
-      const roleIpc = require('./ai-role-ipc');
-      const rolesFile = require('path').join(app.getPath('appData'), 'TCIDE', 'ai-roles.json');
-      roleIpc.setupRoleIpc(require('electron').ipcMain, rolesFile);
-      dlog('[Main] Role IPC loaded');
-    } catch (e) { dlog('[Main] Role IPC failed: ' + e); }
     dlog('[Main] STEP: createAppMenu');
     createAppMenu();
     dlog('[Main] STEP: createWindow');

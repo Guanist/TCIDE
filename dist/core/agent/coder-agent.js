@@ -37,7 +37,6 @@ exports.CoderAgent = void 0;
 const path = __importStar(require("path"));
 const fs = __importStar(require("fs"));
 const sqlite_1 = require("../../main/db/sqlite");
-const { ContextManager } = require("./contextManager");
 const CODER_SYSTEM_PROMPT = `你是虎猫 TCIDE 的 AI 程序员，运行在用户的本地开发环境中。你拥有对项目文件的完整读写权限和终端执行能力。你可以直接读取、修改、创建项目中的任何文件，也可以执行 gradle、npm、终端命令。
 
 你会收到一个 JSON 任务描述，请根据项目现有代码和任务描述，直接生成或修改相应文件。
@@ -64,21 +63,15 @@ const CODER_SYSTEM_PROMPT = `你是虎猫 TCIDE 的 AI 程序员，运行在用�
 class CoderAgent {
     model;
     fileService;
-    ctxManager;
-    onTerminalOutput;
-    constructor(model, fileService, projectRoot, onTerminalOutput) {
+    constructor(model, fileService) {
         this.model = model;
         this.fileService = fileService;
-        this.ctxManager = new ContextManager(projectRoot || process.cwd());
-        this.onTerminalOutput = onTerminalOutput || null;
     }
     async run(task, projectRoot) {
-        const staticContext = this.ctxManager.getFullStaticContext();
         const taskPrompt = this.buildTaskPrompt(task, projectRoot);
         const contextFiles = await this.readContextFiles(task.files, projectRoot);
         const messages = [
             { role: 'system', content: CODER_SYSTEM_PROMPT },
-            { role: 'system', content: staticContext },
             { role: 'user', content: taskPrompt + '\n\n相关文件上下文：\n' + contextFiles },
         ];
         const options = {
@@ -110,14 +103,14 @@ class CoderAgent {
         if (!files || files.length === 0)
             return '（无相关文件，需新建）';
         const contents = [];
-        for (const file of files.slice(0, 3)) { // 最多读取 3 个文件（Token 节流）
+        for (const file of files.slice(0, 10)) { // 最多读取 10 个文件
             const fullPath = path.isAbsolute(file) ? file : path.join(projectRoot, file);
             try {
                 if (fs.existsSync(fullPath) && fs.statSync(fullPath).isFile()) {
                     const stat = fs.statSync(fullPath);
-                    if (stat.size < 100 * 1024) { // 单文件 < 100KB
+                    if (stat.size < 200 * 1024) { // 单文件 < 200KB
                         const content = fs.readFileSync(fullPath, 'utf-8');
-                        contents.push(`=== ${file} ===\n${content.slice(0, 3000)}`);
+                        contents.push(`=== ${file} ===\n${content.slice(0, 5000)}`);
                     }
                 }
             }
@@ -171,54 +164,25 @@ class CoderAgent {
         let buildSucceeded = false;
         for (const action of actions) {
             if (action.type === 'run' && action.command) {
-                const cwd = action.cwd || projectRoot;
-                // 通过回调通知渲染进程终端面板
-                if (this.onTerminalOutput) {
-                    this.onTerminalOutput({ type: 'command', text: action.command, cwd });
-                }
+                const { exec } = await Promise.resolve().then(() => __importStar(require('child_process')));
+                const { promisify } = await Promise.resolve().then(() => __importStar(require('util')));
+                const execAsync = promisify(exec);
                 try {
-                    const { spawn } = require('child_process');
-                    const shell = process.platform === 'win32' ? 'cmd.exe' : '/bin/sh';
-                    const shellArgs = process.platform === 'win32' ? ['/c', action.command] : ['-c', action.command];
-                    const child = spawn(shell, shellArgs, { cwd, windowsHide: true });
-                    let stdout = '';
-                    let stderr = '';
-                    child.stdout.on('data', (data) => {
-                        const text = data.toString();
-                        stdout += text;
-                        if (this.onTerminalOutput) {
-                            this.onTerminalOutput({ type: 'stdout', text });
-                        }
-                    });
-                    child.stderr.on('data', (data) => {
-                        const text = data.toString();
-                        stderr += text;
-                        if (this.onTerminalOutput) {
-                            this.onTerminalOutput({ type: 'stderr', text });
-                        }
-                    });
-                    await new Promise((resolve, reject) => {
-                        const timer = setTimeout(() => { child.kill(); reject(new Error('timeout')); }, 120000);
-                        child.on('close', (code) => {
-                            clearTimeout(timer);
-                            if (this.onTerminalOutput) {
-                                this.onTerminalOutput({ type: 'exit', code });
-                            }
-                            resolve(code);
-                        });
-                        child.on('error', (err) => { clearTimeout(timer); reject(err); });
+                    const { stdout, stderr } = await execAsync(action.command, {
+                        cwd: action.cwd || projectRoot,
+                        timeout: 120000,
+                        maxBuffer: 5 * 1024 * 1024,
+                        windowsHide: true,
                     });
                     terminalOutputs.push(`[TERM] ${action.command}\nstdout: ${stdout.slice(0, 2000)}\nstderr: ${stderr.slice(0, 1000)}`);
+                    // 检测是否为构建命令且成功
                     if (/gradle|assemble|build|compile/i.test(action.command) && !stderr.includes('FAILED') && !stderr.includes('BUILD FAILED')) {
                         buildSucceeded = true;
                     }
                 }
                 catch (err) {
-                    const msg = err instanceof Error ? err.message : String(err);
-                    terminalOutputs.push(`[TERM] ${action.command} FAILED\n${msg}`);
-                    if (this.onTerminalOutput) {
-                        this.onTerminalOutput({ type: 'stderr', text: `\nError: ${msg}\n` });
-                    }
+                    const error = err;
+                    terminalOutputs.push(`[TERM] ${action.command} FAILED\n${error.stderr || ''}`);
                 }
             }
         }

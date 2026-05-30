@@ -1,4 +1,4 @@
-﻿"use strict";
+"use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 /**
  * PersonalIDE - Preload Script
@@ -32,6 +32,8 @@ const api = {
     abortAI: () => electron_1.ipcRenderer.send('ai:abort'),
     getModelConfig: () => electron_1.ipcRenderer.invoke('model:getConfig'),
     saveModelConfig: (config) => electron_1.ipcRenderer.invoke('model:saveConfig', config),
+    getApiConfigs: () => electron_1.ipcRenderer.invoke('apiConfigs:get'),
+    saveApiConfigs: (data) => electron_1.ipcRenderer.invoke('apiConfigs:save', data),
     testModelConnection: (params) => electron_1.ipcRenderer.invoke('model:testConnection', params),
     // ── 模型元数据 ──
     listModelMeta: (provider) => electron_1.ipcRenderer.invoke('model:listMeta', provider),
@@ -44,12 +46,6 @@ const api = {
     abortTaskLoop: () => electron_1.ipcRenderer.send('task:abortLoop'),
     // ── 终端 ──
     execCommand: (command, cwd) => electron_1.ipcRenderer.invoke('terminal:exec', command, cwd),
-    onTerminalOutput: (callback) => {
-        const listener = (_event, data) => callback(data);
-        electron_1.ipcRenderer.on('terminal:output', listener);
-        return () => electron_1.ipcRenderer.removeListener('terminal:output', listener);
-    },
-    writeToTerminal: (text) => electron_1.ipcRenderer.invoke('terminal:write', text),
     // ── 数据库（项目记忆） ──
     dbQuery: (sql, params) => electron_1.ipcRenderer.invoke('db:query', sql, params),
     dbRun: (sql, params) => electron_1.ipcRenderer.invoke('db:run', sql, params),
@@ -152,20 +148,27 @@ const api = {
     // ── 最近项目 ──
     getRecentProjects: () => electron_1.ipcRenderer.invoke('project:getRecent'),
     addRecentProject: (projectPath) => electron_1.ipcRenderer.invoke('project:addRecent', projectPath),
-    // ── AI 角色系统 ──
-    roleList: () => electron_1.ipcRenderer.invoke("role:list"),
-    roleGetActive: () => electron_1.ipcRenderer.invoke("role:getActive"),
-    roleSetActive: (id) => electron_1.ipcRenderer.invoke("role:setActive", id),
-    roleCreate: (role) => electron_1.ipcRenderer.invoke("role:create", role),
-    roleUpdate: (id, updates) => electron_1.ipcRenderer.invoke("role:update", id, updates),
-    roleDelete: (id) => electron_1.ipcRenderer.invoke("role:delete", id),
-    roleResetDefaults: () => electron_1.ipcRenderer.invoke("role:resetDefaults"),
-    // ── 模板系统 ──
-    templateList: () => electron_1.ipcRenderer.invoke('template:list'),
-    templateGet: (id) => electron_1.ipcRenderer.invoke('template:get', id),
-    templateCreate: (template) => electron_1.ipcRenderer.invoke('template:create', template),
-    templateUpdate: (id, updates) => electron_1.ipcRenderer.invoke('template:update', id, updates),
-    templateDelete: (id) => electron_1.ipcRenderer.invoke('template:delete', id),
-    templateResetDefaults: () => electron_1.ipcRenderer.invoke('template:resetDefaults'),
+    // ── LSP 语言服务 ──
+    lspStart: (language, projectPath) => electron_1.ipcRenderer.invoke('lsp:start', language, projectPath),
+    lspStop: (language, projectPath) => electron_1.ipcRenderer.invoke('lsp:stop', language, projectPath),
+    lspStatus: (language, projectPath) => electron_1.ipcRenderer.invoke('lsp:status', language, projectPath),
+    lspRequest: (language, method, params, projectPath) => electron_1.ipcRenderer.invoke('lsp:request', language, method, params, projectPath),
+    lspNotify: (language, method, params, projectPath) => electron_1.ipcRenderer.invoke('lsp:notify', language, method, params, projectPath),
+    lspAvailable: (language) => electron_1.ipcRenderer.invoke('lsp:available', language),
+    lspInstallGuide: (language) => electron_1.ipcRenderer.invoke('lsp:installGuide', language),
+    onLspMessage: (callback) => {
+        electron_1.ipcRenderer.on('lsp:message', (_e, data) => callback(data));
+    },
+    offLspMessage: () => {
+        electron_1.ipcRenderer.removeAllListeners('lsp:message');
+    },
+    // ── Git Blame ──
+    gitBlame: (filePath, projectPath) => electron_1.ipcRenderer.invoke('git:blame', filePath, projectPath),
+    gitListBranches: (projectPath) => electron_1.ipcRenderer.invoke('git:listBranches', projectPath),
+    gitCheckout: (branch, projectPath) => electron_1.ipcRenderer.invoke('git:checkout', branch, projectPath),
+    // ── MCP 工具 ──
+    mcpListTools: () => electron_1.ipcRenderer.invoke('mcp:listTools'),
+    mcpCallTool: (call, projectPath, extraContext) => electron_1.ipcRenderer.invoke('mcp:callTool', call, projectPath, extraContext),
+    sendToAIWithTools: (messages, options) => electron_1.ipcRenderer.invoke('ai:send-with-tools', messages, options),
 };
 electron_1.contextBridge.exposeInMainWorld('api', api);

@@ -118,7 +118,8 @@ class ModelAdapter {
         const rulesBlock = '\n---\n**项目规则（CLAUDE.md）：**\n' + this.systemRules + '\n---\n';
         const first = messages[0];
         if (first && first.role === 'system') {
-            return [{ ...first, content: rulesBlock + '\n' + first.content }, ...messages.slice(1)];
+            const existingContent = typeof first.content === 'string' ? first.content : first.content.map(c => c.type === 'text' ? c.text : '').join('');
+            return [{ ...first, content: rulesBlock + '\n' + existingContent }, ...messages.slice(1)];
         }
         else {
             return [{ role: 'system', content: rulesBlock }, ...messages];

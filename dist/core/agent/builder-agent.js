@@ -1,9 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.BuilderAgent = void 0;
-const path = require("path");
-const fs = require("fs");
-const { ContextManager } = require("./contextManager");
 const BUILDER_SYSTEM_PROMPT = `你是虎猫 TCIDE 的 AI 架构师，运行在用户的本地开发环境中。你拥有对项目的完整读写权限，可以分析源码、创建文件、执行终端命令。
 
 你需要将用户需求拆分为具体的开发任务，以 JSON 数组格式输出。
@@ -35,19 +32,16 @@ const BUILDER_REASONING_PROMPT = `请按以下分层步骤思考：
 4. 【风险评估】：这个方案可能引入哪些副作用？需要额外测试吗？`;
 class BuilderAgent {
     model;
-    ctxManager;
-    constructor(model, projectRoot) {
+    constructor(model) {
         this.model = model;
-        this.ctxManager = new ContextManager(projectRoot || process.cwd());
     }
     async run(requirement, projectContext) {
-        const staticContext = this.ctxManager.getFullStaticContext();
+        // 构造四层上下文 Prompt
         const contextText = this.buildContextPrompt(projectContext);
-        const promptText = `项目上下文：\n${contextText}\n\n用户需求：${requirement}`;
         const messages = [
             { role: 'system', content: BUILDER_SYSTEM_PROMPT },
-            { role: 'system', content: `${BUILDER_REASONING_PROMPT}\n\n${staticContext}` },
-            { role: 'user', content: promptText },
+            { role: 'system', content: BUILDER_REASONING_PROMPT },
+            { role: 'user', content: `项目上下文：\n${contextText}\n\n用户需求：${requirement}` },
         ];
         const options = {
             stream: false,

@@ -1,345 +1,16 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; font-src 'self' data:; img-src 'self' data: blob:; frame-src data: blob:; connect-src 'self' localhost:* 127.0.0.1:* https://api.deepseek.com https://api.openai.com https://*.volces.com;">
-  <title>虎猫 TCIDE</title>
-  <script type="module" crossorigin src="./assets/index-VfHxx2AG.js"></script>
-  <link rel="modulepreload" crossorigin href="./assets/vendor-monaco-core-DYIOuWRx.js">
-  <link rel="modulepreload" crossorigin href="./assets/vendor-xterm-iYPhf4_W.js">
-  <link rel="stylesheet" crossorigin href="./assets/vendor-monaco-core-GL-q52Lm.css">
-  <link rel="stylesheet" crossorigin href="./assets/vendor-xterm-Dieqgwuu.css">
-  <link rel="stylesheet" crossorigin href="./assets/index-Db9qPvEZ.css">
-<style id="templates-css">
-.templates-panel-header { display:flex; align-items:center; justify-content:space-between; padding:4px 8px; font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:0.5px; color:#969696; }
-.templates-actions { display:flex; gap:2px; }
-.templates-search { padding:4px 8px; }
-.templates-search input { width:100%; background:#1e1e1e; border:1px solid #3c3c3c; color:#cccccc; padding:3px 6px; font-size:11px; border-radius:2px; outline:none; }
-.templates-search input:focus { border-color:#007acc; }
-.templates-category-filter { display:flex; flex-wrap:wrap; gap:3px; padding:4px 8px; border-bottom:1px solid #2d2d2d; }
-.templates-category-filter .cat-btn { background:none; border:1px solid #3c3c3c; color:#969696; font-size:10px; padding:1px 6px; border-radius:2px; cursor:pointer; }
-.templates-category-filter .cat-btn.active { background:#007acc; color:#fff; border-color:#007acc; }
-.templates-list { flex:1; overflow-y:auto; padding:4px 0; }
-.template-item { display:flex; align-items:center; padding:4px 8px; cursor:pointer; font-size:12px; color:#cccccc; gap:6px; }
-.template-item:hover { background:#2a2d2e; }
-.template-item.selected { background:#37373d; }
-.template-item .tpl-icon { font-size:14px; flex-shrink:0; }
-.template-item .tpl-name { flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-.template-item .tpl-cat { font-size:9px; color:#969696; background:#2d2d2d; padding:0 4px; border-radius:2px; flex-shrink:0; }
-.template-item .tpl-actions { display:none; gap:2px; flex-shrink:0; }
-.template-item:hover .tpl-actions { display:flex; }
-.template-item .tpl-actions button { background:none; border:none; color:#969696; cursor:pointer; font-size:11px; padding:0 2px; }
-.template-item .tpl-actions button:hover { color:#cccccc; }
-.templates-empty { padding:20px; text-align:center; color:#969696; font-size:12px; }
-.template-detail { padding:8px; color:#cccccc; }
-.template-detail h4 { margin:0 0 6px; font-size:13px; color:#ffffff; }
-.template-detail .tpl-meta { font-size:10px; color:#969696; margin-bottom:6px; }
-.template-detail .tpl-desc { font-size:11px; color:#969696; margin-bottom:8px; font-style:italic; }
-.template-detail .tpl-code { background:#1e1e1e; border:1px solid #3c3c3c; padding:8px; font-size:11px; font-family:Consolas,monospace; white-space:pre-wrap; max-height:200px; overflow:auto; border-radius:2px; }
-.template-detail .tpl-actions-bar { display:flex; gap:4px; margin-top:8px; }
-.template-detail .tpl-actions-bar button { background:#0e639c; border:none; color:#fff; padding:3px 10px; font-size:11px; border-radius:2px; cursor:pointer; }
-.template-detail .tpl-actions-bar button:hover { background:#1177bb; }
-.template-detail .tpl-actions-bar .btn-delete { background:#c42b2b; }
-.template-detail .tpl-actions-bar .btn-delete:hover { background:#e51400; }
-.modal-overlay { position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.5); display:flex; align-items:center; justify-content:center; z-index:9999; }
-.modal-box { background:#252526; border:1px solid #3c3c3c; border-radius:4px; padding:16px; min-width:400px; max-width:500px; }
-.modal-box h3 { margin:0 0 12px; color:#cccccc; font-size:14px; }
-.modal-box .form-group { margin-bottom:8px; }
-.modal-box .form-group label { display:block; font-size:11px; color:#969696; margin-bottom:2px; }
-.modal-box .form-group input, .modal-box .form-group textarea, .modal-box .form-group select { width:100%; background:#1e1e1e; border:1px solid #3c3c3c; color:#cccccc; padding:4px 6px; font-size:12px; border-radius:2px; outline:none; box-sizing:border-box; }
-.modal-box .form-group textarea { min-height:100px; font-family:Consolas,monospace; resize:vertical; }
-.modal-box .form-group input:focus, .modal-box .form-group textarea:focus, .modal-box .form-group select:focus { border-color:#007acc; }
-.modal-box .modal-actions { display:flex; justify-content:flex-end; gap:6px; margin-top:12px; }
-.modal-box .modal-actions button { padding:4px 14px; font-size:12px; border-radius:2px; cursor:pointer; }
-.modal-box .modal-actions .btn-cancel { background:none; border:1px solid #3c3c3c; color:#cccccc; }
-.modal-box .modal-actions .btn-ok { background:#0e639c; border:none; color:#fff; }
-.modal-box .modal-actions .btn-ok:hover { background:#1177bb; }
-</style>
-
-    <style id="outline-css">
-    #outline-panel { padding:0; display:flex; flex-direction:column; height:100%; }
-    #outline-panel .panel-header { padding:8px 12px; border-bottom:1px solid #2d2d2d; display:flex; align-items:center; gap:6px; }
-    #outline-panel .panel-header input { flex:1; background:#1e1e1e; border:1px solid #3c3c3c; color:#cccccc; padding:3px 6px; font-size:11px; border-radius:2px; outline:none; }
-    #outline-list { flex:1; overflow-y:auto; padding:4px 0; }
-    .outline-item { padding:3px 12px 3px 20px; font-size:12px; cursor:pointer; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; color:#cccccc; }
-    .outline-item:hover { background:#2a2d2e; }
-    .outline-item.depth-1 { padding-left:28px; }
-    .outline-item.depth-2 { padding-left:36px; }
-    .outline-item.depth-3 { padding-left:44px; }
-    .outline-item .sym-icon { margin-right:6px; font-size:11px; }
-    .outline-item .sym-name { color:#9cdcfe; }
-    .outline-item .sym-type { color:#6e6e6e; font-size:10px; margin-left:4px; }
-    #outline-empty { padding:20px; text-align:center; color:#6e6e6e; font-size:12px; }
-    </style>
-
-    <style id="search-panel-css">
-    #search-panel { background:#1e1e1e; border-bottom:1px solid #2d2d2d; display:none; flex-direction:column; padding:0; }
-    #search-panel.visible { display:flex; }
-    .search-bar { display:flex; align-items:center; padding:4px 8px; gap:4px; border-bottom:1px solid #2d2d2d; }
-    .search-bar input { flex:1; background:#1e1e1e; border:1px solid #3c3c3c; color:#cccccc; padding:4px 8px; font-size:12px; outline:none; border-radius:2px; }
-    .search-bar input:focus { border-color:#007acc; }
-    .search-bar .search-actions { display:flex; gap:2px; }
-    .search-bar .search-actions button { background:none; border:none; color:#6e6e6e; cursor:pointer; padding:2px 4px; font-size:12px; border-radius:2px; }
-    .search-bar .search-actions button:hover { color:#cccccc; background:#2a2d2e; }
-    #search-results { max-height:200px; overflow-y:auto; }
-    .search-result-item { padding:4px 12px; font-size:12px; cursor:pointer; display:flex; align-items:center; gap:8px; }
-    .search-result-item:hover { background:#2a2d2e; }
-    .search-result-item .result-file { color:#4ec9b0; flex-shrink:0; }
-    .search-result-item .result-line { color:#6e6e6e; width:40px; text-align:right; flex-shrink:0; }
-    .search-result-item .result-snippet { color:#cccccc; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; flex:1; }
-    .search-result-item .result-snippet mark { background:#514a00; color:#ffcc00; border-radius:1px; padding:0 1px; }
-    #search-status { padding:2px 12px; font-size:10px; color:#6e6e6e; border-top:1px solid #2d2d2d; }
-    </style>
-
-    <style id="filetree-search-css">
-    #filetree-search-bar { display:flex; align-items:center; padding:4px 8px; gap:4px; border-bottom:1px solid #2d2d2d; display:none; }
-    #filetree-search-bar.visible { display:flex; }
-    #filetree-search-bar input { flex:1; background:#1e1e1e; border:1px solid #3c3c3c; color:#cccccc; padding:3px 6px; font-size:11px; outline:none; border-radius:2px; }
-    #filetree-search-bar input:focus { border-color:#007acc; }
-    #filetree-search-bar button { background:none; border:none; color:#6e6e6e; cursor:pointer; font-size:12px; }
-    </style>
-
-    <style id="command-palette-css">
-    #command-palette-overlay { display:none; position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.5); z-index:9999; justify-content:center; padding-top:120px; }
-    #command-palette-overlay.visible { display:flex; }
-    #command-palette { background:#252526; border:1px solid #3c3c3c; border-radius:8px; width:600px; max-height:400px; overflow:hidden; box-shadow:0 8px 32px rgba(0,0,0,0.5); }
-    #command-palette input { width:100%; background:#1e1e1e; border:none; border-bottom:1px solid #3c3c3c; color:#cccccc; padding:12px 16px; font-size:14px; outline:none; }
-    #command-palette .cmd-list { max-height:350px; overflow-y:auto; }
-    .cmd-item { padding:8px 16px; cursor:pointer; display:flex; align-items:center; gap:10px; font-size:13px; }
-    .cmd-item:hover, .cmd-item.selected { background:#2a2d2e; }
-    .cmd-item .cmd-icon { font-size:14px; width:20px; text-align:center; }
-    .cmd-item .cmd-label { flex:1; color:#cccccc; }
-    .cmd-item .cmd-category { font-size:10px; color:#6e6e6e; margin-right:8px; }
-    .cmd-item .cmd-shortcut { font-size:11px; color:#6e6e6e; }
-    #cmd-empty { padding:20px; text-align:center; color:#6e6e6e; font-size:12px; }
-    </style>
-
-    <style id="toast-css">
-    #toast-container { position:fixed; bottom:40px; right:20px; z-index:10000; display:flex; flex-direction:column-reverse; gap:8px; pointer-events:none; }
-    .toast { background:#252526; border:1px solid #3c3c3c; border-radius:4px; padding:10px 16px; font-size:12px; color:#cccccc; box-shadow:0 4px 12px rgba(0,0,0,0.4); min-width:200px; max-width:400px; animation:toastIn 0.2s ease; pointer-events:auto; display:flex; align-items:center; gap:8px; }
-    .toast.toast-success { border-left:3px solid #4ec9b0; }
-    .toast.toast-error { border-left:3px solid #f44747; }
-    .toast.toast-warning { border-left:3px solid #ffcc00; }
-    .toast.toast-info { border-left:3px solid #007acc; }
-    .toast .toast-msg { flex:1; }
-    .toast .toast-close { background:none; border:none; color:#6e6e6e; cursor:pointer; font-size:14px; padding:0; }
-    .toast .toast-close:hover { color:#cccccc; }
-    @keyframes toastIn { from{opacity:0;transform:translateY(10px);} to{opacity:1;transform:translateY(0);} }
-    @keyframes toastOut { from{opacity:1;} to{opacity:0;transform:translateY(10px);} }
-    </style>
-
-    <style id="loading-css">
-    #loading-overlay { display:none; position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.4); z-index:9998; justify-content:center; align-items:center; }
-    #loading-overlay.visible { display:flex; }
-    .loading-spinner { background:#252526; border:1px solid #3c3c3c; border-radius:8px; padding:24px 32px; display:flex; flex-direction:column; align-items:center; gap:12px; }
-    .loading-spinner .spinner { width:32px; height:32px; border:3px solid #3c3c3c; border-top-color:#007acc; border-radius:50%; animation:spin 0.8s linear infinite; }
-    @keyframes spin { to{transform:rotate(360deg);} }
-    .loading-spinner .loading-text { color:#cccccc; font-size:12px; }
-    </style>
-
-    <style id="welcome-css">
-    #welcome-panel { display:none; flex-direction:column; align-items:center; justify-content:center; height:100%; background:#1e1e1e; color:#cccccc; }
-    #welcome-panel.visible { display:flex; }
-    .welcome-logo { font-size:48px; margin-bottom:8px; }
-    .welcome-title { font-size:20px; font-weight:600; margin-bottom:4px; }
-    .welcome-subtitle { font-size:13px; color:#6e6e6e; margin-bottom:24px; }
-    .welcome-actions { display:flex; gap:12px; margin-bottom:32px; }
-    .welcome-actions button { background:#0e639c; border:none; color:#fff; padding:8px 20px; border-radius:4px; cursor:pointer; font-size:13px; }
-    .welcome-actions button:hover { background:#1177bb; }
-    .welcome-recent { width:400px; }
-    .welcome-recent h4 { font-size:12px; color:#6e6e6e; margin-bottom:8px; text-transform:uppercase; letter-spacing:1px; }
-    .welcome-recent-item { padding:6px 10px; cursor:pointer; border-radius:4px; display:flex; align-items:center; gap:8px; font-size:12px; }
-    .welcome-recent-item:hover { background:#2a2d2e; }
-    .welcome-recent-item .recent-icon { font-size:16px; }
-    .welcome-recent-item .recent-path { color:#6e6e6e; font-size:10px; }
-    </style>
-
-
-    <!-- ═══════════ P1 CSS ═══════════ -->
-    <style id="p1-css">
-    /* Zen Mode */
-    body.tc-zen-mode #sidebar {
-      transform: translateX(-100%);
-      opacity: 0;
-      pointer-events: none;
-      transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.25s ease;
-    }
-    body.tc-zen-mode #ai-panel {
-      transform: translateX(100%);
-      opacity: 0;
-      pointer-events: none;
-      transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.25s ease;
-    }
-    body.tc-zen-mode #sidebar-resizer,
-    body.tc-zen-mode #ai-panel-resizer { display: none; }
-    body.tc-zen-mode #panel-area,
-    body.tc-zen-mode #panel-resizer { display: none !important; }
-    body.tc-zen-mode #status-bar { display: none; }
-    body.tc-zen-mode #zen-status-bar { display: flex !important; }
-    body.tc-zen-mode #activity-bar { opacity: 0; pointer-events: none; transition: opacity 0.25s ease; }
-    #editor-area.zen-centered {
-      max-width: 900px;
-      margin: 0 auto;
-      padding: 0 24px;
-      transition: max-width 0.3s ease, margin 0.3s ease, padding 0.3s ease;
-    }
-    #zen-status-bar {
-      display: none;
-      position: fixed;
-      bottom: 0;
-      left: 0;
-      right: 0;
-      height: 24px;
-      background: var(--tc-bg-primary, #1e1e1e);
-      border-top: 1px solid var(--tc-border, #3c3c3c);
-      color: var(--tc-text-muted, #6e6e6e);
-      font-size: 11px;
-      align-items: center;
-      padding: 0 16px;
-      gap: 16px;
-      z-index: 100;
-    }
-    #zen-status-bar .zen-hint { margin-left: auto; color: var(--tc-orange, #ff8c00); opacity: 0.7; }
-
-    /* 标签页增强 */
-    .editor-tab {
-      position: relative;
-      user-select: none;
-    }
-    .tab-close-btn {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      width: 18px;
-      height: 18px;
-      margin-left: 4px;
-      font-size: 14px;
-      line-height: 1;
-      color: var(--tc-text-muted, #6e6e6e);
-      border-radius: 3px;
-      opacity: 0;
-      transition: opacity 0.15s ease, background-color 0.15s ease;
-    }
-    .editor-tab:hover .tab-close-btn { opacity: 1; }
-    .tab-close-btn:hover {
-      background: rgba(255,255,255,0.1);
-      color: var(--tc-text-primary, #cccccc);
-    }
-    .tab-dirty-dot {
-      color: var(--tc-orange, #ff8c00);
-      font-size: 14px;
-      margin-right: 3px;
-      line-height: 1;
-    }
-
-    /* 右键菜单 */
-    .tab-context-menu {
-      display: none;
-      position: fixed;
-      z-index: 10001;
-      background: var(--tc-bg-secondary, #252526);
-      border: 1px solid var(--tc-border, #3c3c3c);
-      border-radius: var(--tc-radius, 4px);
-      min-width: 180px;
-      box-shadow: 0 4px 16px rgba(0,0,0,0.5);
-      padding: 4px 0;
-    }
-    .tab-context-menu.visible { display: block; }
-    .tab-menu-item {
-      padding: 6px 16px;
-      font-size: 12px;
-      color: var(--tc-text-primary, #cccccc);
-      cursor: pointer;
-      transition: background-color 0.1s ease;
-    }
-    .tab-menu-item:hover { background: var(--tc-accent, #007acc); color: #fff; }
-    .tab-menu-sep { height: 1px; background: var(--tc-border, #3c3c3c); margin: 4px 8px; }
-
-    /* 面包屑导航 */
-    #breadcrumb-bar {
-      display: flex;
-      align-items: center;
-      padding: 3px 12px;
-      background: var(--tc-bg-primary, #1e1e1e);
-      border-bottom: 1px solid var(--tc-border, #3c3c3c);
-      font-size: 11px;
-      min-height: 22px;
-      gap: 4px;
-      flex-wrap: wrap;
-    }
-    #breadcrumb-bar.hidden { display: none; }
-    #breadcrumb-path { display: flex; align-items: center; gap: 2px; flex-wrap: wrap; }
-    .bc-sep, .bc-arrow { color: var(--tc-text-muted, #6e6e6e); }
-    .bc-segment {
-      color: var(--tc-text-secondary, #969696);
-      cursor: pointer;
-      padding: 1px 4px;
-      border-radius: 3px;
-      transition: background-color 0.15s ease, color 0.15s ease;
-    }
-    .bc-segment:hover { background: var(--tc-bg-hover, #2a2d2e); color: var(--tc-text-primary, #cccccc); }
-    .bc-file { color: var(--tc-text-primary, #cccccc); font-weight: 500; }
-    #breadcrumb-symbol {
-      color: var(--tc-accent, #007acc);
-      margin-left: 8px;
-      font-weight: 500;
-    }
-    .bc-empty { color: var(--tc-text-muted, #6e6e6e); font-style: italic; }
-
-    /* 空状态 */
-    .empty-state {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      padding: 32px 16px;
-      color: var(--tc-text-muted, #6e6e6e);
-      text-align: center;
-    }
-    .empty-state-icon { font-size: 32px; margin-bottom: 8px; opacity: 0.5; }
-    .empty-state-title { font-size: 13px; font-weight: 500; color: var(--tc-text-secondary, #969696); margin-bottom: 4px; }
-    .empty-state-desc { font-size: 11px; color: var(--tc-text-muted, #6e6e6e); }
-
-    /* 新建项目向导 */
-    .np-modal { min-width: 480px; max-width: 560px; }
-    .np-location-row { display: flex; gap: 6px; }
-    .np-location-row input { flex: 1; }
-    .btn-browse {
-      background: var(--tc-bg-tertiary, #2d2d2d);
-      border: 1px solid var(--tc-border, #3c3c3c);
-      color: var(--tc-text-primary, #cccccc);
-      padding: 4px 12px;
-      font-size: 12px;
-      border-radius: var(--tc-radius, 4px);
-      cursor: pointer;
-      white-space: nowrap;
-      transition: background-color 0.15s ease;
-    }
-    .btn-browse:hover { background: var(--tc-bg-hover, #2a2d2e); }
-    .np-templates { display: flex; flex-direction: column; gap: 4px; margin-bottom: 8px; max-height: 200px; overflow-y: auto; }
-    .np-template-card {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      padding: 8px 10px;
-      border: 1px solid var(--tc-border, #3c3c3c);
-      border-radius: var(--tc-radius, 4px);
-      cursor: pointer;
-      transition: all 0.15s ease;
-    }
-    .np-template-card:hover { background: var(--tc-bg-hover, #2a2d2e); }
-    .np-template-card.selected {
-      border-color: var(--tc-accent, #007acc);
-      background: rgba(0, 122, 204, 0.1);
-    }
-    .np-template-icon { font-size: 20px; width: 28px; text-align: center; flex-shrink: 0; }
-    .np-template-info { flex: 1; min-width: 0; }
-    .np-template-name { font-size: 12px; color: var(--tc-text-primary, #cccccc); font-weight: 500; }
-    .np-template-desc { font-size: 10px; color: var(--tc-text-muted, #6e6e6e); }
-    </style>
-
-  </head>
+  <title>虎猫 TCIDE</title>
+  <script type="module" crossorigin src="./assets/index-CG1t_kq1.js"></script>
+  <link rel="modulepreload" crossorigin href="./assets/vendor-monaco-core-DxxFViFA.js">
+  <link rel="modulepreload" crossorigin href="./assets/vendor-xterm-BGR9Rpur.js">
+  <link rel="stylesheet" crossorigin href="./assets/vendor-monaco-core-D4zjdeIP.css">
+  <link rel="stylesheet" crossorigin href="./assets/index-DI_MNZtD.css">
+</head>
 <body>
   <div id="app">
 
@@ -358,8 +29,9 @@
         <button class="activity-btn" data-view="arch" title="架构分析">
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><line x1="6.5" y1="10" x2="6.5" y2="14"/><line x1="17.5" y1="10" x2="17.5" y2="14"/><line x1="10" y1="6.5" x2="14" y2="6.5"/><line x1="10" y1="17.5" x2="14" y2="17.5"/></svg>
         </button>
-        <button class="activity-btn" data-view="templates" title="代码模板 (Ctrl+Shift+T)">
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+        <button class="activity-btn" data-view="problems" title="问题面板 (Ctrl+Shift+D)">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="m21.7 18.3-9.2-16a1 1 0 0 0-1.7 0l-9.3 16a1 1 0 0 0 .8 1.5h18.6a1 1 0 0 0 .8-1.5Z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+          <span id="problems-badge" class="activity-badge hidden">0</span>
         </button>
       </div>
       <div class="activity-bottom">
@@ -367,11 +39,7 @@
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
         </button>
       </div>
-    
-        <button class="activity-btn" data-view="outline" title="代码大纲 Ctrl+Shift+O">
-          <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor"><rect x="2" y="2" width="7" height="3" rx="1"/><rect x="11" y="2" width="7" height="3" rx="1"/><rect x="2" y="8" width="7" height="3" rx="1"/><rect x="11" y="8" width="7" height="3" rx="1"/><rect x="2" y="14" width="16" height="3" rx="1"/></svg>
-        </button>
-      </nav>
+    </nav>
 
     <!-- ═══ 左侧：文件树 / 搜索 ═══ -->
     <aside id="sidebar" class="sidebar">
@@ -400,7 +68,8 @@
       <!-- Git 面板 -->
       <div id="git-panel" class="view-panel hidden">
         <div class="git-panel-header">
-          <span id="git-branch-name" class="git-branch">main</span>
+          <span id="git-branch-name" class="git-branch" title="点击切换分支">main</span>
+          <select id="git-branch-select" class="git-branch-select hidden" title="切换分支"></select>
           <div class="git-actions">
             <button id="btn-git-pull" class="icon-btn" title="拉取 (Pull)">↓</button>
             <button id="btn-git-commit" class="icon-btn primary" title="提交 (Commit)">✓</button>
@@ -433,35 +102,21 @@
           <div id="arch-smell-list" class="arch-smell-list"></div>
         </div>
       </div>
-    
-            <!-- 代码大纲面板 -->
-            <div id="outline-panel" class="sidebar-panel hidden">
-              <div class="panel-header">
-                <span class="panel-icon">☰</span>
-                <input id="outline-search" placeholder="搜索符号...">
-              </div>
-              <div id="outline-list"><div id="outline-empty">打开文件后显示大纲</div></div>
-            </div>
-      </aside>
 
-
-    <!-- 代码模板面板 -->
-    <div id="templates-panel" class="view-panel hidden">
-      <div class="templates-panel-header">
-        <span class="templates-panel-title">代码模板</span>
-        <div class="templates-actions">
-          <button id="btn-new-template" class="icon-btn" title="新建模板">+</button>
-          <button id="btn-refresh-templates" class="icon-btn" title="刷新">↻</button>
+      <!-- Problems 面板：LSP 诊断 -->
+      <div id="problems-panel" class="view-panel hidden">
+        <div class="problems-panel-header">
+          <span class="problems-panel-title">🔍 问题</span>
+          <div class="problems-actions">
+            <button id="btn-problems-collapse" class="icon-btn" title="全部折叠">⊟</button>
+            <button id="btn-problems-refresh" class="icon-btn" title="刷新">↻</button>
+          </div>
+        </div>
+        <div id="problems-list" class="problems-list">
+          <div class="problems-empty">未打开文件或无问题</div>
         </div>
       </div>
-      <div class="templates-search">
-        <input id="template-search" type="text" placeholder="搜索模板..." />
-      </div>
-      <div id="templates-category-filter" class="templates-category-filter"></div>
-      <div id="templates-list" class="templates-list">
-        <div class="templates-empty">加载中...</div>
-      </div>
-    </div>
+    </aside>
 
     <!-- 拖拽调整器 -->
     <div id="sidebar-resizer" class="resizer"></div>
@@ -502,11 +157,12 @@
         <div class="welcome-hero">
           <img src="icons/brand/welcome-illustration.png" alt="虎猫" class="welcome-illustration" />
           <h1 class="welcome-title">虎猫 TCIDE</h1>
-          <p class="welcome-subtitle">个人专属 AI 编程 IDE</p>
+          <p class="welcome-subtitle" id="welcome-subtitle">个人专属 AI 编程 IDE · v1.1.0</p>
         </div>
         <div class="welcome-actions">
           <button id="welcome-open-project" class="welcome-btn primary">📂 打开项目</button>
           <button id="welcome-new-project" class="welcome-btn">🆕 新建项目</button>
+          <button id="welcome-snake-demo" class="welcome-btn demo">🐍 贪吃蛇 Demo</button>
         </div>
         <div id="welcome-recent" class="welcome-recent hidden">
           <h3 class="welcome-section-title">最近项目</h3>
@@ -527,9 +183,18 @@
       <!-- Monaco 编辑器 -->
       <div id="monaco-container" class="monaco-container"></div>
       <!-- PDF 预览 -->
-      <iframe id="pdf-preview" class="pdf-preview hidden" sandbox="allow-scripts allow-same-origin"></iframe>
+      <embed id="pdf-preview" class="pdf-preview hidden" type="application/pdf" />
       <!-- HTML 预览（srcdoc 内嵌，自带隔离）-->
       <iframe id="html-preview" class="html-preview hidden"></iframe>
+      <!-- 图片预览 -->
+      <div id="image-preview-container" class="image-preview-container hidden">
+        <img id="image-preview-img" class="image-preview-img" src="" alt="" />
+      </div>
+      <!-- 视频/音频预览 -->
+      <div id="media-preview-container" class="media-preview-container hidden">
+        <video id="media-video-preview" class="media-video-preview hidden" controls></video>
+        <audio id="media-audio-preview" class="media-audio-preview hidden" controls></audio>
+      </div>
       <div id="html-toolbar" class="html-toolbar" style="display:none">
         <button id="html-mode-toggle" class="html-mode-btn">📝 源码</button>
         <span id="html-error-indicator" class="html-error-indicator hidden" title="预览中有错误">⚠️ 错误</span>
@@ -605,9 +270,6 @@
       <!-- AI 标签栏 -->
       <div class="ai-tabs-bar">
         <button class="ai-tab active" data-tab="chat">💬 对话</button>
-        <button class="ai-tab" data-tab="tasks">📋 任务</button>
-        <button class="ai-tab" data-tab="outline">🗂 大纲</button>
-        <button class="ai-tab" data-tab="usage">📊 用量</button>
         <button class="ai-tab" data-tab="settings">⚙ 设置</button>
       </div>
 
@@ -627,6 +289,12 @@
         <!-- 对话 Tab -->
         <div id="tab-chat" class="ai-tab-content active">
           <div id="chat-messages" class="chat-messages">
+            <!-- 多选工具栏 -->
+            <div id="chat-select-bar" class="chat-select-bar hidden">
+              <span class="select-count">已选 0 条</span>
+              <button id="btn-delete-selected" class="select-action-btn">🗑 删除</button>
+              <button id="btn-clear-select" class="select-action-btn">✕ 取消</button>
+            </div>
             <div id="ai-welcome" class="ai-welcome-section">
               <div class="ai-welcome-icon">
                 <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="var(--tc-orange)" stroke-width="1" stroke-linecap="round" stroke-linejoin="round">
@@ -660,6 +328,8 @@
                 <button id="btn-attach" class="chat-tool-btn" title="添加附件 / 图片">
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
                 </button>
+                <button id="btn-tools-toggle" class="chat-tool-btn" title="MCP 工具: 开启时 AI 可读写文件/执行命令">🔧</button>
+                <button id="btn-chat-select" class="chat-tool-btn" title="多选消息删除">☑</button>
               </div>
               <textarea id="chat-input" placeholder="输入消息，Shift+Enter 换行，Enter 发送..." rows="3"></textarea>
               <button id="btn-send" class="send-btn" title="发送 (Enter)">
@@ -743,6 +413,7 @@
             <div class="settings-tabs">
               <button class="settings-tab active" data-settings-tab="providers">模型服务商</button>
               <button class="settings-tab" data-settings-tab="custom">自定义配置</button>
+              <button class="settings-tab" data-settings-tab="changelog">📋 版本记录</button>
             </div>
             <div id="settings-providers" class="settings-tab-content active">
               <div class="provider-list" id="provider-list">
@@ -834,26 +505,35 @@
                   <button id="btn-test-config" class="test-btn">测试连接</button>
                   <button id="btn-save-config" class="save-btn">保存配置</button>
                 </div>
+                <!-- 已保存的 API 配置 -->
+                <div class="saved-configs-section" style="margin-top:16px">
+                  <label style="color:var(--text-secondary);font-size:12px;margin-bottom:6px;display:block">💾 已保存的 API 配置</label>
+                  <div id="saved-configs-list" class="saved-configs-list">
+                    <div class="saved-configs-empty">暂无已保存的配置</div>
+                  </div>
+                </div>
                 <div class="form-actions" style="margin-top:12px;">
                   <button id="btn-export-config" class="test-btn">📤 导出配置</button>
                   <button id="btn-import-config" class="test-btn">📥 导入配置</button>
+                  <button id="btn-shortcuts-editor" class="test-btn">⌨ 快捷键</button>
+                  <button id="btn-snippets-viewer" class="test-btn">📋 代码片段</button>
                 </div>
                 <div id="cfg-status" class="cfg-status"></div>
+              </div>
+            </div>
+            <div id="settings-changelog" class="settings-tab-content hidden">
+              <div class="changelog-header">
+                <h4>🐅 虎猫 TCIDE 版本记录</h4>
+                <p class="changelog-subtitle">从第一版至今的完整迭代历程</p>
+              </div>
+              <div class="changelog-timeline" id="changelog-timeline">
+                <div class="changelog-loading">加载中...</div>
               </div>
             </div>
           </div>
         </div>
       </div>
-    
-            <!-- 代码大纲面板 -->
-            <div id="outline-panel" class="sidebar-panel hidden">
-              <div class="panel-header">
-                <span class="panel-icon">☰</span>
-                <input id="outline-search" placeholder="搜索符号...">
-              </div>
-              <div id="outline-list"><div id="outline-empty">打开文件后显示大纲</div></div>
-            </div>
-      </aside>
+    </aside>
   </div>
 
   <!-- ═══ 底部状态栏 ═══ -->
@@ -952,7 +632,7 @@
       <div class="about-header">
         <img src="icons/brand/mascot-happy.png" alt="虎猫" class="about-logo-img" />
         <h2>虎猫 TCIDE</h2>
-        <p class="about-version">版本 1.0.0</p>
+        <p class="about-version" id="about-version">版本 1.1.0</p>
       </div>
       <div class="about-body">
         <p class="about-desc">个人专属 AI 编程助手</p>
@@ -1020,622 +700,40 @@
   <!-- ═══ Toast 通知容器 ═══ -->
   <div id="toast-container" class="toast-container"></div>
 
-  <!-- ═══ 补充样式：大纲行号 + 类型图标 + 命令面板增强 ═══ -->
-  <style>
-    .outline-line { margin-left: auto; color: var(--text-secondary); font-size: 11px; opacity: 0.6; font-family: 'Cascadia Code', monospace; }
-    .outline-icon-C { color: #d4a574; }
-    .outline-icon-f, .outline-icon-m { color: #dcdcaa; }
-    .outline-icon-I, .outline-icon-T { color: #4ec9b0; }
-    .outline-icon-E { color: #b8d7a3; }
-    .outline-icon-S { color: #86c6ff; }
-    .outline-icon-v { color: #9cdcfe; }
-    .outline-icon-M { color: #c586c0; }
-    .outline-icon-O, .outline-icon-★ { color: #f0c040; }
-    .cmd-palette-empty { padding: 32px; text-align: center; color: var(--text-secondary); font-size: 13px; }
-  </style>
+  <script src="./assets/p0-modules.js"></script>
+  <script src="./assets/p1-modules.js"></script>
+  <script src="./assets/p2-modules.js"></script>
 
-  <!-- ═══ 大纲面板 + 命令面板 逻辑 ═══ -->
-  <script>
-    (function () {
-      'use strict';
-
-      // ═══════════════════════════════════════
-      // 1. 代码大纲面板 (Outline)
-      // ═══════════════════════════════════════
-
-      const SYMBOL_PATTERNS = {
-        kotlin: [
-          { type: 'class', re: /^\s*(?:data\s+)?(?:sealed\s+)?(?:abstract\s+)?(?:open\s+)?class\s+(\w+)/m, icon: 'C' },
-          { type: 'object', re: /^\s*object\s+(\w+)/m, icon: 'O' },
-          { type: 'interface', re: /^\s*interface\s+(\w+)/m, icon: 'I' },
-          { type: 'fun', re: /^\s*(?:suspend\s+)?(?:override\s+)?fun\s+(\w+)/m, icon: 'f' },
-          { type: 'val', re: /^\s*(?:const\s+)?val\s+(\w+)/m, icon: 'v' },
-          { type: 'var', re: /^\s*var\s+(\w+)/m, icon: 'v' },
-          { type: 'enum', re: /^\s*enum\s+class\s+(\w+)/m, icon: 'E' },
-          { type: 'companion', re: /^\s*companion\s+object/m, icon: '★' },
-        ],
-        java: [
-          { type: 'class', re: /^\s*(?:public\s+)?(?:abstract\s+)?(?:final\s+)?class\s+(\w+)/m, icon: 'C' },
-          { type: 'interface', re: /^\s*(?:public\s+)?interface\s+(\w+)/m, icon: 'I' },
-          { type: 'enum', re: /^\s*(?:public\s+)?enum\s+(\w+)/m, icon: 'E' },
-          { type: 'method', re: /^\s*(?:public|protected|private|static|final|synchronized|abstract|native|\s)+[\w<>[\],\s]+\s+(\w+)\s*\(/m, icon: 'm' },
-          { type: 'field', re: /^\s*(?:public|protected|private|static|final|\s)+[\w<>[\],\s]+\s+(\w+)\s*[=;]/m, icon: 'v' },
-        ],
-        typescript: [
-          { type: 'class', re: /^\s*(?:export\s+)?(?:abstract\s+)?class\s+(\w+)/m, icon: 'C' },
-          { type: 'interface', re: /^\s*(?:export\s+)?interface\s+(\w+)/m, icon: 'I' },
-          { type: 'type', re: /^\s*(?:export\s+)?type\s+(\w+)/m, icon: 'T' },
-          { type: 'function', re: /^\s*(?:export\s+)?(?:async\s+)?function\s+(\w+)/m, icon: 'f' },
-          { type: 'const', re: /^\s*(?:export\s+)?const\s+(\w+)/m, icon: 'v' },
-          { type: 'enum', re: /^\s*(?:export\s+)?enum\s+(\w+)/m, icon: 'E' },
-          { type: 'method', re: /^\s+(?:public|private|protected|async|static|\s)+(\w+)\s*\(/m, icon: 'm' },
-        ],
-        javascript: [
-          { type: 'class', re: /^\s*class\s+(\w+)/m, icon: 'C' },
-          { type: 'function', re: /^\s*(?:async\s+)?function\s+(\w+)/m, icon: 'f' },
-          { type: 'const', re: /^\s*const\s+(\w+)/m, icon: 'v' },
-          { type: 'method', re: /^\s+(\w+)\s*\(/m, icon: 'm' },
-        ],
-        python: [
-          { type: 'class', re: /^class\s+(\w+)/m, icon: 'C' },
-          { type: 'def', re: /^\s*def\s+(\w+)/m, icon: 'f' },
-          { type: 'async_def', re: /^\s*async\s+def\s+(\w+)/m, icon: 'f' },
-        ],
-        go: [
-          { type: 'struct', re: /^type\s+(\w+)\s+struct/m, icon: 'S' },
-          { type: 'interface', re: /^type\s+(\w+)\s+interface/m, icon: 'I' },
-          { type: 'func', re: /^func\s+(?:\(\w+\s+\*?\w+\)\s+)?(\w+)/m, icon: 'f' },
-          { type: 'var', re: /^var\s+(\w+)/m, icon: 'v' },
-          { type: 'const', re: /^const\s+(\w+)/m, icon: 'v' },
-        ],
-        rust: [
-          { type: 'struct', re: /^\s*(?:pub\s+)?struct\s+(\w+)/m, icon: 'S' },
-          { type: 'enum', re: /^\s*(?:pub\s+)?enum\s+(\w+)/m, icon: 'E' },
-          { type: 'trait', re: /^\s*(?:pub\s+)?trait\s+(\w+)/m, icon: 'T' },
-          { type: 'impl', re: /^\s*impl\s+(?:\w+\s+)?(?:for\s+)?(\w+)/m, icon: 'I' },
-          { type: 'fn', re: /^\s*(?:pub\s+)?(?:async\s+)?fn\s+(\w+)/m, icon: 'f' },
-          { type: 'mod', re: /^\s*(?:pub\s+)?mod\s+(\w+)/m, icon: 'M' },
-        ],
-      };
-
-      const LANG_EXT_MAP = {
-        kt: 'kotlin', kts: 'kotlin', java: 'java',
-        ts: 'typescript', tsx: 'typescript', js: 'javascript', jsx: 'javascript',
-        py: 'python', go: 'go', rs: 'rust',
-      };
-
-      function getLangFromPath(filePath) {
-        if (!filePath) return 'kotlin';
-        const ext = filePath.split('.').pop().toLowerCase();
-        return LANG_EXT_MAP[ext] || 'kotlin';
-      }
-
-      function parseSymbols(text, language) {
-        const patterns = SYMBOL_PATTERNS[language] || SYMBOL_PATTERNS.kotlin;
-        const lines = text.split('\n');
-        const symbols = [];
-        for (let i = 0; i < lines.length; i++) {
-          const line = lines[i];
-          for (const pat of patterns) {
-            const m = pat.re.exec(line);
-            if (m) {
-              const name = m[1] || ('object');
-              symbols.push({ name, type: pat.type, icon: pat.icon, line: i + 1 });
-              break;
-            }
-          }
-        }
-        return symbols;
-      }
-
-      function buildOutlineTree(symbols) {
-        const tree = { children: [] };
-        const stack = [tree];
-        for (const sym of symbols) {
-          const node = { ...sym, children: [] };
-          if (['class', 'struct', 'interface', 'trait', 'enum', 'object', 'impl', 'mod'].includes(sym.type)) {
-            while (stack.length > 1 && ['method', 'fun', 'def', 'fn', 'val', 'var', 'const', 'field', 'function'].includes(stack[stack.length - 1].type || '')) {
-              stack.pop();
-            }
-            stack[stack.length - 1].children.push(node);
-            stack.push(node);
-          } else {
-            stack[stack.length - 1].children.push(node);
-          }
-        }
-        return tree.children;
-      }
-
-      function renderOutlineNode(node, depth) {
-        const typeClass = node.type ? 'outline-icon-' + node.type : '';
-        return `<div class="outline-item" data-line="${node.line}" style="padding-left:${12 + depth * 16}px">
-          <span class="outline-icon ${typeClass}">${node.icon}</span>
-          <span class="outline-name">${escapeHtml(node.name)}</span>
-          <span class="outline-line">:${node.line}</span>
-        </div>${node.children.map(c => renderOutlineNode(c, depth + 1)).join('')}`;
-      }
-
-      function escapeHtml(str) {
-        const d = document.createElement('div');
-        d.textContent = str;
-        return d.innerHTML;
-      }
-
-      function refreshOutline() {
-        const tree = document.getElementById('outline-tree');
-        if (!tree) return;
-        try {
-          const editors = monaco.editor.getEditors();
-          if (!editors || editors.length === 0) {
-            tree.innerHTML = '<div class="outline-empty"><img src="icons/brand/empty-files.png" alt="空" class="empty-illustration" /><p>打开文件以查看大纲</p></div>';
-            return;
-          }
-          const editor = editors[0];
-          const model = editor.getModel();
-          if (!model) {
-            tree.innerHTML = '<div class="outline-empty"><p>打开文件以查看大纲</p></div>';
-            return;
-          }
-          const text = model.getValue();
-          const lang = getLangFromPath(model.uri?.path || '');
-          const symbols = parseSymbols(text, lang);
-          if (symbols.length === 0) {
-            tree.innerHTML = '<div class="outline-empty"><img src="icons/brand/empty-search.png" alt="空" class="empty-illustration" /><p>未找到符号</p></div>';
-            return;
-          }
-          const outline = buildOutlineTree(symbols);
-          const html = outline.map(n => renderOutlineNode(n, 0)).join('');
-          tree.innerHTML = html || '<div class="outline-empty"><p>未找到结构化符号</p></div>';
-          tree.querySelectorAll('.outline-item').forEach(el => {
-            el.addEventListener('click', function () {
-              const line = parseInt(this.dataset.line, 10);
-              if (line > 0) {
-                const editors = monaco.editor.getEditors();
-                if (editors.length > 0) {
-                  editors[0].revealLineInCenter(line);
-                  editors[0].setPosition({ lineNumber: line, column: 1 });
-                  editors[0].focus();
-                }
-              }
-            });
-          });
-        } catch (e) {
-          tree.innerHTML = '<div class="outline-empty"><p>解析失败: ' + escapeHtml(String(e)) + '</p></div>';
-        }
-      }
-
-      function filterOutline(query) {
-        const items = document.querySelectorAll('#outline-tree .outline-item');
-        const q = query.toLowerCase();
-        items.forEach(el => {
-          const name = el.querySelector('.outline-name');
-          if (name && name.textContent.toLowerCase().includes(q)) {
-            el.style.display = '';
-          } else {
-            el.style.display = 'none';
-          }
-        });
-      }
-
-      const outlineFilter = document.getElementById('outline-filter');
-      if (outlineFilter) {
-        outlineFilter.addEventListener('input', function () {
-          filterOutline(this.value);
-        });
-      }
-
-      // ═══════════════════════════════════════
-      // 2. 命令面板 (Command Palette)
-      // ═══════════════════════════════════════
-
-      const COMMANDS = [
-        { id: 'file-new', label: '新建文件', category: '文件', keys: 'Ctrl+N', action: () => document.getElementById('btn-new-file')?.click() },
-        { id: 'file-new-folder', label: '新建文件夹', category: '文件', action: () => document.getElementById('btn-new-folder')?.click() },
-        { id: 'file-save', label: '保存文件', category: '文件', keys: 'Ctrl+S', action: () => document.dispatchEvent(new KeyboardEvent('keydown', { key: 's', ctrlKey: true })) },
-        { id: 'file-open', label: '打开项目', category: '文件', keys: 'Ctrl+O', action: () => window.tcide?.openProject() },
-        { id: 'edit-undo', label: '撤销', category: '编辑', keys: 'Ctrl+Z', action: () => document.execCommand('undo') },
-        { id: 'edit-redo', label: '重做', category: '编辑', keys: 'Ctrl+Y', action: () => document.execCommand('redo') },
-        { id: 'edit-find', label: '查找', category: '编辑', keys: 'Ctrl+F', action: () => document.dispatchEvent(new KeyboardEvent('keydown', { key: 'f', ctrlKey: true })) },
-        { id: 'search-global', label: '全局搜索', category: '搜索', keys: 'Ctrl+Shift+F', action: () => document.getElementById('search-panel')?.classList.remove('hidden') },
-        { id: 'goto-line', label: '跳转到行...', category: '导航', keys: 'Ctrl+G', action: () => { const ln = prompt('跳转到行:'); if (ln) { const eds = monaco.editor.getEditors(); if (eds[0]) { eds[0].revealLineInCenter(parseInt(ln, 10)); eds[0].setPosition({ lineNumber: parseInt(ln, 10), column: 1 }); } } } },
-        { id: 'view-ai-panel', label: '切换 AI 面板', category: '视图', keys: 'Ctrl+\\', action: () => document.getElementById('ai-panel')?.classList.toggle('hidden') },
-        { id: 'view-zen', label: 'Zen 专注模式', category: '视图', keys: 'Ctrl+Shift+M', action: toggleZenMode },
-        { id: 'view-terminal', label: '切换终端面板', category: '视图', keys: 'Ctrl+J', action: () => document.getElementById('btn-panel-close')?.click() },
-        { id: 'view-outline', label: '显示大纲', category: '视图', action: () => { document.querySelector('.ai-tab[data-tab="outline"]')?.click(); } },
-        { id: 'ai-chat', label: 'AI 对话', category: 'AI', action: () => { document.querySelector('.ai-tab[data-tab="chat"]')?.click(); document.getElementById('chat-input')?.focus(); } },
-        { id: 'ai-builder', label: 'Builder 架构模式', category: 'AI', keys: 'Ctrl+Shift+B', action: () => { } },
-        { id: 'ai-coder', label: 'Coder 编程模式', category: 'AI', keys: 'Ctrl+Shift+C', action: () => { } },
-        { id: 'ai-generate', label: 'AI 生成/改进代码', category: 'AI', keys: 'Ctrl+Shift+I', action: () => { } },
-        { id: 'ai-explain', label: 'AI 解释代码', category: 'AI', keys: 'Ctrl+Shift+E', action: () => { } },
-        { id: 'settings-open', label: '打开设置', category: '设置', keys: 'Ctrl+,', action: () => document.querySelector('.ai-tab[data-tab="settings"]')?.click() },
-        { id: 'help-shortcuts', label: '快捷键速查', category: '帮助', keys: 'F1', action: () => document.getElementById('help-dialog')?.classList.remove('hidden') },
-        { id: 'help-about', label: '关于虎猫 TCIDE', category: '帮助', action: () => document.getElementById('about-dialog')?.classList.remove('hidden') },
-      ];
-
-      function fuzzyMatch(query, text) {
-        if (!query) return true;
-        const q = query.toLowerCase();
-        const t = text.toLowerCase();
-        if (t.includes(q)) return true;
-        let qi = 0;
-        for (let i = 0; i < t.length && qi < q.length; i++) {
-          if (t[i] === q[qi]) qi++;
-        }
-        return qi === q.length;
-      }
-
-      function openCommandPalette() {
-        const cp = document.getElementById('command-palette');
-        const input = document.getElementById('cmd-palette-input');
-        if (!cp || !input) return;
-        cp.classList.remove('hidden');
-        input.value = '';
-        input.focus();
-        renderCommandResults('');
-        setTimeout(() => input.focus(), 50);
-      }
-
-      function closeCommandPalette() {
-        const cp = document.getElementById('command-palette');
-        if (cp) cp.classList.add('hidden');
-      }
-
-      function renderCommandResults(query) {
-        const container = document.getElementById('cmd-palette-results');
-        if (!container) return;
-        let filtered = COMMANDS;
-        if (query) {
-          filtered = COMMANDS.filter(c => fuzzyMatch(query, c.label) || fuzzyMatch(query, c.category) || (c.keys && fuzzyMatch(query, c.keys)));
-        }
-        if (filtered.length === 0) {
-          container.innerHTML = '<div class="cmd-palette-empty">未找到匹配命令</div>';
-          return;
-        }
-        const grouped = {};
-        filtered.forEach(c => {
-          if (!grouped[c.category]) grouped[c.category] = [];
-          grouped[c.category].push(c);
-        });
-        let html = '';
-        Object.keys(grouped).forEach(cat => {
-          html += `<div class="cmd-palette-category">${cat}</div>`;
-          grouped[cat].forEach(c => {
-            html += `<div class="cmd-palette-item" data-cmd-id="${c.id}">
-              <span class="cmd-label">${escapeHtml(c.label)}</span>
-              ${c.keys ? '<span class="cmd-shortcut">' + c.keys.split('+').map(k => '<kbd>' + escapeHtml(k.trim()) + '</kbd>').join('+') + '</span>' : ''}
-            </div>`;
-          });
-        });
-        container.innerHTML = html;
-        container.querySelectorAll('.cmd-palette-item').forEach(el => {
-          el.addEventListener('click', function () {
-            executeCommand(this.dataset.cmdId);
-          });
-        });
-      }
-
-      function executeCommand(cmdId) {
-        const cmd = COMMANDS.find(c => c.id === cmdId);
-        if (cmd) {
-          closeCommandPalette();
-          try { cmd.action(); } catch (e) { console.error('Command failed:', cmdId, e); }
-        }
-      }
-
-      function navigateCommandPalette(direction) {
-        const items = document.querySelectorAll('#cmd-palette-results .cmd-palette-item');
-        if (items.length === 0) return;
-        let idx = -1;
-        items.forEach((el, i) => { if (el.classList.contains('selected')) idx = i; });
-        items.forEach(el => el.classList.remove('selected'));
-        idx = (idx + direction + items.length) % items.length;
-        items[idx].classList.add('selected');
-        items[idx].scrollIntoView({ block: 'nearest' });
-      }
-
-      const cmdInput = document.getElementById('cmd-palette-input');
-      if (cmdInput) {
-        cmdInput.addEventListener('input', function () {
-          renderCommandResults(this.value);
-        });
-        cmdInput.addEventListener('keydown', function (e) {
-          if (e.key === 'ArrowDown') { e.preventDefault(); navigateCommandPalette(1); }
-          else if (e.key === 'ArrowUp') { e.preventDefault(); navigateCommandPalette(-1); }
-          else if (e.key === 'Enter') {
-            e.preventDefault();
-            const active = document.querySelector('#cmd-palette-results .cmd-palette-item.selected');
-            if (active) executeCommand(active.dataset.cmdId);
-            else { const first = document.querySelector('#cmd-palette-results .cmd-palette-item'); if (first) executeCommand(first.dataset.cmdId); }
-          }
-          else if (e.key === 'Escape') { closeCommandPalette(); }
-        });
-      }
-
-      const backdrop = document.getElementById('cmd-palette-backdrop');
-      if (backdrop) backdrop.addEventListener('click', closeCommandPalette);
-
-      document.addEventListener('keydown', function (e) {
-        if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'P') {
-          e.preventDefault();
-          openCommandPalette();
-        }
-      });
-
-      // ═══════════════════════════════════════
-      // 3. Zen Mode 完善
-      // ═══════════════════════════════════════
-
-      let zenActive = false;
-
-      function toggleZenMode() {
-        zenActive = !zenActive;
-        const sidebar = document.getElementById('sidebar');
-        const aiPanel = document.getElementById('ai-panel');
-        const statusBar = document.getElementById('status-bar');
-        const zenStatusBar = document.getElementById('zen-status-bar');
-        const panelArea = document.getElementById('panel-area');
-        const panelResizer = document.getElementById('panel-resizer');
-        const editorArea = document.getElementById('editor-area');
-
-        if (zenActive) {
-          if (sidebar) { sidebar.style.transition = 'transform 0.25s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.25s ease'; sidebar.style.transform = 'translateX(-100%)'; sidebar.style.opacity = '0'; }
-          if (aiPanel) { aiPanel.style.transition = 'transform 0.25s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.25s ease'; aiPanel.style.transform = 'translateX(100%)'; aiPanel.style.opacity = '0'; }
-          if (statusBar) statusBar.classList.add('hidden');
-          if (zenStatusBar) zenStatusBar.classList.remove('hidden');
-          if (panelArea) { panelArea.style.transition = 'opacity 0.2s ease'; panelArea.style.opacity = '0'; setTimeout(() => { panelArea.classList.add('hidden'); }, 250); }
-          if (panelResizer) panelResizer.classList.add('hidden');
-          if (editorArea) editorArea.style.maxWidth = '900px';
-        } else {
-          if (sidebar) { sidebar.style.transform = ''; sidebar.style.opacity = ''; }
-          if (aiPanel) { aiPanel.style.transform = ''; aiPanel.style.opacity = ''; }
-          if (statusBar) statusBar.classList.remove('hidden');
-          if (zenStatusBar) zenStatusBar.classList.add('hidden');
-          if (panelArea) { panelArea.classList.remove('hidden'); panelArea.style.opacity = ''; }
-          if (panelResizer) panelResizer.classList.remove('hidden');
-          if (editorArea) editorArea.style.maxWidth = '';
-        }
-      }
-
-      document.addEventListener('keydown', function (e) {
-        if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'M') {
-          e.preventDefault();
-          toggleZenMode();
-        }
-      });
-
-      // ═══════════════════════════════════════
-      // 4. 大纲刷新触发器
-      // ═══════════════════════════════════════
-
-      document.addEventListener('click', function (e) {
-        const outlineTab = document.getElementById('tab-outline');
-        if (!outlineTab) return;
-        if (!outlineTab.classList.contains('hidden')) {
-          refreshOutline();
-        }
-      });
-
-      // 监听 Tab 切换以刷新大纲
-      const aiTabs = document.querySelectorAll('.ai-tab');
-      aiTabs.forEach(tab => {
-        tab.addEventListener('click', function () {
-          if (this.dataset.tab === 'outline') {
-            setTimeout(refreshOutline, 100);
-          }
-        });
-      });
-
-      // 尝试监听 Monaco 模型变化
-      const origRefresh = refreshOutline;
-      try {
-        const checkMonaco = setInterval(function () {
-          if (typeof monaco !== 'undefined' && monaco.editor) {
-            clearInterval(checkMonaco);
-            monaco.editor.onDidCreateModel(function () {
-              const outlineTab = document.getElementById('tab-outline');
-              if (outlineTab && !outlineTab.classList.contains('hidden')) {
-                setTimeout(refreshOutline, 200);
-              }
-            });
-          }
-        }, 500);
-      } catch (_) { /* Monaco 尚未加载 */ }
-
-      console.log('[TCIDE] 大纲面板 + 命令面板 + Zen Mode 已就绪');
-
-      // ═══════════════════════════════════════
-      // 5. 终端输出流监听（Coder → xterm）
-      // ═══════════════════════════════════════
-
-      let terminalOutputCleanup = null;
-
-      function getActiveTerminal() {
-        const terms = window.__tcide_terminals;
-        if (!terms || !Array.isArray(terms) || terms.length === 0) return null;
-        const idx = window.__tcide_activeIdx;
-        if (idx >= 0 && idx < terms.length) return terms[idx];
-        return terms[terms.length - 1];
-      }
-
-      function writeToActiveTerminal(data) {
-        const term = getActiveTerminal();
-        if (!term || !term.terminal) return;
-        const t = term.terminal;
-        switch (data.type) {
-          case 'command':
-            t.writeln(`\x1B[36m${data.text}\x1B[0m`);
-            break;
-          case 'stdout':
-            t.write(data.text);
-            break;
-          case 'stderr':
-            t.write(`\x1B[31m${data.text}\x1B[0m`);
-            break;
-          case 'exit':
-            t.writeln(`\x1B[33m\n[exit code: ${data.code}]\x1B[0m`);
-            break;
-        }
-      }
-
-      function setupTerminalOutputListener() {
-        if (terminalOutputCleanup) return;
-        if (!window.api || !window.api.onTerminalOutput) {
-          setTimeout(setupTerminalOutputListener, 500);
-          return;
-        }
-        terminalOutputCleanup = window.api.onTerminalOutput(function (data) {
-          writeToActiveTerminal(data);
-        });
-        console.log('[TCIDE] 终端输出流监听已就绪');
-      }
-
-      setTimeout(setupTerminalOutputListener, 1000);
-    })();
-  </script>
-
-<script id="templates-js">
-(function() {
-  // ── 模板系统 JS ──
-  const tplState = { list: { defaults: [], user: [] }, activeCat: "all", search: "", selectedId: null };
-  function tplInit() {
-    const btn = document.querySelector(`[data-view="templates"]`);
-    if (btn) btn.addEventListener("click", () => tplShow());
-    const search = document.getElementById("template-search");
-    if (search) search.addEventListener("input", (e) => { tplState.search = e.target.value.toLowerCase(); tplRenderList(); });
-    const btnNew = document.getElementById("btn-new-template");
-    if (btnNew) btnNew.addEventListener("click", () => tplOpenModal());
-    const btnRefresh = document.getElementById("btn-refresh-templates");
-    if (btnRefresh) btnRefresh.addEventListener("click", () => tplLoad());
-  }
-  function tplShow() {
-    document.querySelectorAll(".activity-btn").forEach(b => b.classList.remove("active"));
-    const btn = document.querySelector(`[data-view="templates"]`);
-    if (btn) btn.classList.add("active");
-    document.querySelectorAll(".view-panel").forEach(p => p.classList.add("hidden"));
-    const panel = document.getElementById("templates-panel");
-    if (panel) panel.classList.remove("hidden");
-    document.getElementById("sidebar").classList.remove("hidden");
-    tplLoad();
-  }
-  async function tplLoad() {
-    try {
-      const data = await window.api.templateList();
-      tplState.list = data;
-      tplBuildCategoryFilters();
-      tplRenderList();
-    } catch(e) { console.error("[Templates] Load error:", e); }
-  }
-  function tplBuildCategoryFilters() {
-    const cats = new Set();
-    tplState.list.defaults.forEach(t => cats.add(t.category));
-    tplState.list.user.forEach(t => cats.add(t.category));
-    const container = document.getElementById("templates-category-filter");
-    if (!container) return;
-    container.innerHTML = "";
-    const allBtn = document.createElement("button");
-    allBtn.className = "cat-btn" + (tplState.activeCat === "all" ? " active" : "");
-    allBtn.textContent = "全部";
-    allBtn.onclick = () => { tplState.activeCat = "all"; tplBuildCategoryFilters(); tplRenderList(); };
-    container.appendChild(allBtn);
-    cats.forEach(c => {
-      const b = document.createElement("button");
-      b.className = "cat-btn" + (tplState.activeCat === c ? " active" : "");
-      b.textContent = c;
-      b.onclick = () => { tplState.activeCat = c; tplBuildCategoryFilters(); tplRenderList(); };
-      container.appendChild(b);
-    });
-  }
-  function tplRenderList() {
-    const container = document.getElementById("templates-list");
-    if (!container) return;
-    const q = tplState.search;
-    let all = [...tplState.list.defaults.map(t => ({...t, _src: "default"})), ...tplState.list.user.map(t => ({...t, _src: "user"}))];
-    if (tplState.activeCat !== "all") all = all.filter(t => t.category === tplState.activeCat);
-    if (q) all = all.filter(t => t.name.toLowerCase().includes(q) || (t.tags||[]).some(tag => tag.toLowerCase().includes(q)));
-    if (all.length === 0) { container.innerHTML = `<div class="templates-empty">暂无模板</div>`; return; }
-    container.innerHTML = "";
-    all.forEach(t => {
-      const div = document.createElement("div");
-      div.className = "template-item" + (tplState.selectedId === t.id ? " selected" : "");
-      div.innerHTML = `<span class="tpl-icon">📄</span><span class="tpl-name" title="${t.name}">${t.name}</span>${t._src==="user" ? `<span class="tpl-cat">自定义</span>` : ""}<span class="tpl-cat">${t.category}</span><span class="tpl-actions"><button data-action="insert" title="插入">⤵</button><button data-action="edit" title="编辑">✎</button><button data-action="delete" title="删除">✕</button></span>`;
-      div.onclick = (e) => { if (e.target.closest(".tpl-actions")) return; tplState.selectedId = t.id; tplRenderList(); tplShowDetail(t); };
-      const actionsDiv = div.querySelector(".tpl-actions");
-      if (actionsDiv) actionsDiv.querySelectorAll("button").forEach(btn => {
-        btn.onclick = (e) => { e.stopPropagation(); const action = btn.dataset.action; if (action==="insert") tplInsert(t); if (action==="edit" && t._src==="user") tplOpenModal(t); if (action==="delete" && t._src==="user") tplDelete(t.id); };
-      });
-      container.appendChild(div);
-    });
-  }
-  function tplShowDetail(t) {
-    const container = document.getElementById("templates-list");
-    if (!container) return;
-    let detail = container.querySelector(".template-detail");
-    if (!detail) { detail = document.createElement("div"); detail.className = "template-detail"; container.appendChild(detail); }
-    detail.innerHTML = `<h4>${t.name}</h4><div class="tpl-meta">分类: ${t.category} · 标签: ${(t.tags||[]).join(", ")}</div>${t.description ? `<div class="tpl-desc">${t.description}</div>` : ""}<div class="tpl-code">${t.code.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")}</div><div class="tpl-actions-bar"><button id="btn-insert-tpl">插入到编辑器</button>${t._src==="user" ? `<button id="btn-edit-tpl">编辑</button><button id="btn-delete-tpl" class="btn-delete">删除</button>` : ""}</div>`;
-    detail.querySelector("#btn-insert-tpl").onclick = () => tplInsert(t);
-    if (t._src === "user") {
-      detail.querySelector("#btn-edit-tpl").onclick = () => tplOpenModal(t);
-      detail.querySelector("#btn-delete-tpl").onclick = () => tplDelete(t.id);
-    }
-  }
-  function tplInsert(t) {
-    if (!window.editor) { alert("请先打开编辑器"); return; }
-    const model = window.editor.getModel();
-    if (!model) { alert("请先打开文件"); return; }
-    const selection = window.editor.getSelection();
-    const op = { range: new monaco.Range(selection.selectionStartLineNumber, selection.selectionStartColumn, selection.positionLineNumber, selection.positionColumn), text: t.code, forceMoveMarkers: true };
-    model.pushEditOperations([], [op], () => null);
-  }
-  function tplOpenModal(existing) {
-    let overlay = document.getElementById("tpl-modal");
-    if (!overlay) { overlay = document.createElement("div"); overlay.id = "tpl-modal"; overlay.className = "modal-overlay"; document.body.appendChild(overlay); }
-    overlay.innerHTML = `<div class="modal-box"><h3>${existing ? "编辑模板" : "新建模板"}</h3><div class="form-group"><label>名称</label><input id="tpl-modal-name" type="text" value="${existing ? existing.name.replace(/"/g,"&quot;") : ""}" /></div><div class="form-group"><label>分类</label><input id="tpl-modal-cat" type="text" value="${existing ? existing.category : ""}" placeholder="如: C++ / Python" /></div><div class="form-group"><label>标签（逗号分隔）</label><input id="tpl-modal-tags" type="text" value="${existing ? (existing.tags||[]).join(", ") : ""}" placeholder="如: 基础, 竞赛" /></div><div class="form-group"><label>描述</label><input id="tpl-modal-desc" type="text" value="${existing ? (existing.description||"").replace(/"/g,"&quot;") : ""}" /></div><div class="form-group"><label>代码</label><textarea id="tpl-modal-code">${existing ? tplEscapeAttr(t.code) : ""}</textarea></div><div class="modal-actions"><button class="btn-cancel">取消</button><button class="btn-ok">${existing ? "保存" : "创建"}</button></div></div>`;
-    overlay.style.display = "flex";
-    overlay.querySelector(".btn-cancel").onclick = () => overlay.style.display = "none";
-    overlay.querySelector(".btn-ok").onclick = async () => {
-      const name = document.getElementById("tpl-modal-name").value.trim();
-      const category = document.getElementById("tpl-modal-cat").value.trim() || "未分类";
-      const tags = document.getElementById("tpl-modal-tags").value.split(",").map(s=>s.trim()).filter(Boolean);
-      const description = document.getElementById("tpl-modal-desc").value.trim();
-      const code = document.getElementById("tpl-modal-code").value;
-      if (!name) { alert("请输入模板名称"); return; }
-      if (!code) { alert("请输入模板代码"); return; }
-      try {
-        if (existing) { await window.api.templateUpdate(existing.id, { name, category, tags, description, code }); }
-        else { await window.api.templateCreate({ name, category, tags, description, code }); }
-        overlay.style.display = "none"; tplLoad();
-      } catch(e) { alert("操作失败: " + e.message); }
-    };
-  }
-  async function tplDelete(id) {
-    if (!confirm("确定删除该模板？")) return;
-    try { await window.api.templateDelete(id); tplState.selectedId = null; tplLoad(); } catch(e) { alert("删除失败: " + e.message); }
-  }
-  function tplEscapeAttr(s) { return (s||"").replace(/&/g,"&amp;").replace(/"/g,"&quot;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
-  // 键盘快捷键 Ctrl+Shift+T 打开模板面板
-  document.addEventListener("keydown", (e) => { if (e.ctrlKey && e.shiftKey && e.key === "T") { e.preventDefault(); tplShow(); } });
-  // 在 DOMContentLoaded 中初始化
-  if (document.readyState === "loading") { document.addEventListener("DOMContentLoaded", tplInit); }
-  else { tplInit(); }
-})();
-</script>
-
-
-    <!-- Toast 通知容器 -->
-    <div id="toast-container"></div>
-
-    <!-- Loading 遮罩 -->
-    <div id="loading-overlay"><div class="loading-spinner"><div class="spinner"></div><div class="loading-text" id="loading-text">加载中...</div></div></div>
-
-    <!-- 命令面板 -->
-    <div id="command-palette-overlay">
-      <div id="command-palette">
-        <input id="command-palette-input" placeholder="输入命令..." autocomplete="off">
-        <div class="cmd-list" id="command-palette-list"><div id="cmd-empty">输入关键词搜索命令</div></div>
+  <!-- 快捷键编辑器弹窗 -->
+  <div id="shortcuts-modal" class="modal-overlay hidden">
+    <div class="modal-content" style="max-width:560px;max-height:80vh">
+      <div class="modal-header">
+        <h3>⌨ 快捷键设置</h3>
+        <button class="modal-close" onclick="$id('shortcuts-modal').classList.add('hidden')">✕</button>
+      </div>
+      <div class="modal-body" style="max-height:55vh;overflow-y:auto">
+        <table class="shortcuts-table" id="shortcuts-table">
+          <thead><tr><th>操作</th><th>快捷键</th><th>操作</th></tr></thead>
+          <tbody id="shortcuts-tbody"></tbody>
+        </table>
+        <div style="margin-top:8px;text-align:right">
+          <button id="btn-shortcuts-reset" class="test-btn" style="font-size:11px">🔄 恢复默认</button>
+        </div>
       </div>
     </div>
+  </div>
 
-    <script src="./assets/p0-modules.js"></script>
-    <script src="./assets/p1-modules.js"></script>
-  </body>
+  <!-- 代码片段查看器 -->
+  <div id="snippets-modal" class="modal-overlay hidden">
+    <div class="modal-content" style="max-width:640px;max-height:80vh">
+      <div class="modal-header">
+        <h3>📋 代码片段</h3>
+        <button class="modal-close" onclick="$id('snippets-modal').classList.add('hidden')">✕</button>
+      </div>
+      <div class="modal-body" style="max-height:55vh;overflow-y:auto">
+        <div id="snippets-content">加载中...</div>
+      </div>
+    </div>
+  </div>
+</body>
 </html>

@@ -2,6 +2,7 @@ import { defineConfig } from 'vite';
 import { resolve } from 'path';
 
 export default defineConfig({
+  optimizeDeps: { include: ['@emmetio/expand-abbreviation'] },
   root: 'src/renderer',
   base: './',
   build: {

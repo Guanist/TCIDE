@@ -1,4 +1,4 @@
-﻿"use strict";
+"use strict";
 var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
     if (k2 === undefined) k2 = k;
     var desc = Object.getOwnPropertyDescriptor(m, k);
@@ -52,6 +52,8 @@ const sqlite_2 = require("./db/sqlite");
 const store_1 = require("./store");
 const zlib = __importStar(require("zlib"));
 const path = __importStar(require("path"));
+const lsp_manager_1 = require("./lsp-manager");
+const mcp_tools_1 = require("./mcp-tools");
 let currentAbortController = null;
 let currentProjectPath = null;
 let projectRules = '';
@@ -249,13 +251,11 @@ function setupIpcHandlers() {
         return builder.run(requirement, projectContext);
     });
     // Coder
-    electron_1.ipcMain.handle('agent:coder', async (event, task, projectRoot) => {
+    electron_1.ipcMain.handle('agent:coder', async (_e, task, projectRoot) => {
         const config = getModelConfig();
         const adapter = createAdapterWithUsage(config);
         adapter.setSystemRules(projectRules);
-        const coder = new coder_agent_1.CoderAgent(adapter, fileService, projectRoot,
-            (data) => { event.sender.send('terminal:output', data); }
-        );
+        const coder = new coder_agent_1.CoderAgent(adapter, fileService);
         return coder.run(task, projectRoot);
     });
     // TaskRunner
@@ -270,45 +270,21 @@ function setupIpcHandlers() {
         });
         return runner.run(tasks, projectRoot);
     });
-    // 终端命令（spawn 流式 + 返回最终结果）
-    electron_1.ipcMain.handle('terminal:exec', async (event, command, cwd) => {
+    // 终端命令
+    electron_1.ipcMain.handle('terminal:exec', async (_e, command, cwd) => {
         if (/rm\s+-rf\s+[\/\*]/.test(command))
             throw new Error('危险命令已拒绝');
-        event.sender.send('terminal:output', { type: 'command', text: command, cwd });
+        const { exec } = await Promise.resolve().then(() => __importStar(require('child_process')));
+        const { promisify } = await Promise.resolve().then(() => __importStar(require('util')));
+        const execAsync = promisify(exec);
         try {
-            const { spawn } = require('child_process');
-            const shell = process.platform === 'win32' ? 'cmd.exe' : '/bin/sh';
-            const shellArgs = process.platform === 'win32' ? ['/c', command] : ['-c', command];
-            const child = spawn(shell, shellArgs, { cwd, windowsHide: true });
-            let stdout = '';
-            let stderr = '';
-            child.stdout.on('data', (data) => {
-                const text = data.toString();
-                stdout += text;
-                event.sender.send('terminal:output', { type: 'stdout', text });
-            });
-            child.stderr.on('data', (data) => {
-                const text = data.toString();
-                stderr += text;
-                event.sender.send('terminal:output', { type: 'stderr', text });
-            });
-            const exitCode = await new Promise((resolve, reject) => {
-                const timer = setTimeout(() => { child.kill(); reject(new Error('timeout')); }, 120000);
-                child.on('close', (code) => { clearTimeout(timer); resolve(code); });
-                child.on('error', (err) => { clearTimeout(timer); reject(err); });
-            });
-            event.sender.send('terminal:output', { type: 'exit', code: exitCode });
-            return { stdout, stderr, exitCode };
+            const { stdout, stderr } = await execAsync(command, { cwd, timeout: 120000, maxBuffer: 10 * 1024 * 1024, windowsHide: true });
+            return { stdout, stderr, exitCode: 0 };
         }
         catch (err) {
-            const msg = err instanceof Error ? err.message : String(err);
-            event.sender.send('terminal:output', { type: 'stderr', text: `Error: ${msg}\n` });
-            return { stdout: '', stderr: msg, exitCode: 1 };
+            const error = err;
+            return { stdout: error.stdout || '', stderr: error.stderr || '', exitCode: error.code || 1 };
         }
-    });
-    // 终端流式输出（主进程 → 渲染进程）
-    electron_1.ipcMain.handle('terminal:write', async (event, text) => {
-        event.sender.send('terminal:output', { type: 'stdout', text });
     });
     // 数据库
     electron_1.ipcMain.handle('db:query', async (_e, sql, params) => {
@@ -649,6 +625,37 @@ function setupSnapshotIpc() {
             return { success: false, error: err.message };
         }
     });
+    // ── Git 分支列表 ──
+    electron_1.ipcMain.handle('git:listBranches', async (_e, projectPath) => {
+        try {
+            const { execSync } = require('child_process');
+            const output = execSync('git branch -a --sort=-committerdate', { cwd: projectPath, timeout: 5000 }).toString();
+            const current = output.match(/\*\s+(\S+)/)?.[1] || '';
+            const branches = [];
+            for (const line of output.split('\n')) {
+                const name = line.replace(/^[* ]\s*/, '').trim();
+                if (!name || name.startsWith('remotes/'))
+                    continue;
+                const isCurrent = line.startsWith('*');
+                branches.push({ name, current: isCurrent, remote: false });
+            }
+            return { success: true, branches, currentBranch: current };
+        }
+        catch (err) {
+            return { success: false, branches: [], currentBranch: '', error: err.message };
+        }
+    });
+    // ── Git 切换分支 ──
+    electron_1.ipcMain.handle('git:checkout', async (_e, branch, projectPath) => {
+        try {
+            const { execSync } = require('child_process');
+            const output = execSync(`git checkout "${branch}"`, { cwd: projectPath, timeout: 10000 }).toString().trim();
+            return { success: true, output };
+        }
+        catch (err) {
+            return { success: false, error: err.message };
+        }
+    });
     // ── Git Diff（返回文件改动行号）──
     electron_1.ipcMain.handle('git:diff', async (_e, filePath, projectPath) => {
         try {
@@ -774,14 +781,19 @@ function setupSnapshotIpc() {
         if (!fs.existsSync(filePath))
             throw new Error('文件不存在');
         const stat = fs.statSync(filePath);
-        if (stat.size > 5 * 1024 * 1024)
-            throw new Error('文件过大（最大 5MB）');
+        if (stat.size > 50 * 1024 * 1024)
+            throw new Error('文件过大（最大 50MB）');
         const buffer = fs.readFileSync(filePath);
         const ext = pathMod.extname(filePath).toLowerCase();
         const mimeMap = {
             '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg',
             '.gif': 'image/gif', '.webp': 'image/webp', '.bmp': 'image/bmp',
             '.svg': 'image/svg+xml', '.ico': 'image/x-icon',
+            '.pdf': 'application/pdf',
+            '.mp4': 'video/mp4', '.webm': 'video/webm', '.ogg': 'video/ogg',
+            '.mov': 'video/quicktime', '.mkv': 'video/x-matroska', '.avi': 'video/x-msvideo',
+            '.mp3': 'audio/mpeg', '.wav': 'audio/wav', '.flac': 'audio/flac',
+            '.aac': 'audio/aac', '.m4a': 'audio/mp4',
         };
         const mime = mimeMap[ext] || 'application/octet-stream';
         return `data:${mime};base64,${buffer.toString('base64')}`;
@@ -1125,63 +1137,185 @@ function extractTextFromDocxXml(xml) {
     }
     return lines.join('\n\n').replace(/\n{3,}/g, '\n\n') || '（文档为空）';
 }
-
-
-
-// === 项目级搜索 ===
-electron_1.ipcMain.handle("search:project", async (_e, projectPath, query) => {
-  const fs = require("fs");
-  const path = require("path");
-  const results = [];
-  function walk(dir) {
-    let entries;
-    try { entries = fs.readdirSync(dir, { withFileTypes: true }); } catch { return; }
-    for (const entry of entries) {
-      const full = path.join(dir, entry.name);
-      if (entry.isDirectory()) {
-        if (entry.name.startsWith(".") || entry.name === "node_modules" || entry.name === "build" || entry.name === "dist") continue;
-        walk(full);
-      } else if (entry.isFile()) {
-        if (full.endsWith(".exe") || full.endsWith(".dll") || full.endsWith(".so") || full.endsWith(".class")) continue;
-        try {
-          const content = fs.readFileSync(full, "utf-8");
-          const lines = content.split("\n");
-          lines.forEach((line, idx) => {
-            if (line.toLowerCase().includes(query.toLowerCase())) {
-              results.push({ file: entry.name, path: full.replace(projectPath, "").replace(/^[\/\\]/, ""), line: idx, snippet: line.trim().substring(0, 200) });
-            }
-          });
-        } catch { }
-      }
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// LSP 语言服务器 IPC 处理
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// 启动语言服务器
+electron_1.ipcMain.handle('lsp:start', async (_e, language, projectPath) => {
+    try {
+        await lsp_manager_1.lspManager.startServer(language, projectPath);
+        return { success: true };
     }
-  }
-  walk(projectPath);
-  return results.slice(0, 500);
+    catch (err) {
+        return { success: false, error: err.message };
+    }
 });
-
-// === 最近项目 ===
-const RECENT_FILE = require("path").join(electron_1.app.getPath("appData"), "TCIDE", "recent-projects.json");
-const _fs = require("fs");
-const _path = require("path");
-
-function _ensureRecent() {
-  const dir = _path.dirname(RECENT_FILE);
-  if (!_fs.existsSync(dir)) _fs.mkdirSync(dir, { recursive: true });
-  if (!_fs.existsSync(RECENT_FILE)) _fs.writeFileSync(RECENT_FILE, "[]", "utf-8");
-}
-
-electron_1.ipcMain.handle("project:getRecent", async () => {
-  _ensureRecent();
-  try { return JSON.parse(_fs.readFileSync(RECENT_FILE, "utf-8")); } catch { return []; }
+// 停止语言服务器
+electron_1.ipcMain.handle('lsp:stop', async (_e, language, projectPath) => {
+    await lsp_manager_1.lspManager.stopServer(language, projectPath);
+    return { success: true };
 });
-
-electron_1.ipcMain.handle("project:addRecent", async (_e, projectPath) => {
-  _ensureRecent();
-  let list = [];
-  try { list = JSON.parse(_fs.readFileSync(RECENT_FILE, "utf-8")); } catch {}
-  list = list.filter(p => p.path !== projectPath);
-  list.unshift({ name: _path.basename(projectPath), path: projectPath, lastOpen: new Date().toISOString() });
-  list = list.slice(0, 20);
-  _fs.writeFileSync(RECENT_FILE, JSON.stringify(list, null, 2), "utf-8");
-  return list;
+// 检查服务器状态
+electron_1.ipcMain.handle('lsp:status', async (_e, language, projectPath) => {
+    return lsp_manager_1.lspManager.getStatus(language, projectPath);
+});
+// 发送 LSP 请求
+electron_1.ipcMain.handle('lsp:request', async (_e, language, method, params, projectPath) => {
+    try {
+        const result = await lsp_manager_1.lspManager.sendLspRequest(language, method, params, projectPath);
+        return { success: true, result };
+    }
+    catch (err) {
+        return { success: false, error: err.message };
+    }
+});
+// 发送 LSP 通知
+electron_1.ipcMain.handle('lsp:notify', async (_e, language, method, params, projectPath) => {
+    lsp_manager_1.lspManager.sendLspNotification(language, method, params, projectPath);
+    return { success: true };
+});
+// 检查语言服务器是否可用 (系统中有无安装)
+electron_1.ipcMain.handle('lsp:available', async (_e, language) => {
+    return lsp_manager_1.lspManager.isAvailable(language);
+});
+// 获取安装指引
+electron_1.ipcMain.handle('lsp:installGuide', async (_e, language) => {
+    return lsp_manager_1.lspManager.getInstallGuide(language);
+});
+// 设置LSP消息回调 — 将服务器消息转发给渲染进程
+let lspMessageCallback = null;
+lsp_manager_1.lspManager.onServerMessage = (language, message) => {
+    if (lspMessageCallback) {
+        // 通过 webContents.send 发送到渲染进程
+        const win = electron_1.BrowserWindow.getAllWindows()[0];
+        if (win && !win.isDestroyed()) {
+            win.webContents.send('lsp:message', { language, message });
+        }
+    }
+};
+// 应用退出时清理所有服务器
+process.on('before-quit', () => {
+    lsp_manager_1.lspManager.shutdownAll();
+});
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// MCP 工具 IPC 处理
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+electron_1.ipcMain.handle('mcp:listTools', async () => {
+    return (0, mcp_tools_1.listTools)();
+});
+electron_1.ipcMain.handle('mcp:callTool', async (_e, call, projectPath, extraContext) => {
+    return (0, mcp_tools_1.executeTool)(call, projectPath, extraContext);
+});
+// ── AI Chat with Tools (function calling) ──
+electron_1.ipcMain.handle('ai:send-with-tools', async (event, messages, options) => {
+    const config = getModelConfig();
+    const adapter = createAdapterWithUsage(config);
+    adapter.setSystemRules(projectRules);
+    const window = electron_1.BrowserWindow.fromWebContents(event.sender);
+    const MAX_TOOL_ROUNDS = 3;
+    // Add tools to the request
+    const tools = (0, mcp_tools_1.listTools)().map(t => ({ type: 'function', function: { name: t.name, description: t.description, parameters: t.parameters } }));
+    let conversation = [...messages];
+    for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
+        // Build request body
+        const body = JSON.stringify({
+            model: options?.model || config.model || 'deepseek-v4-pro',
+            messages: conversation.filter(m => m.role !== 'system'),
+            tools,
+            tool_choice: 'auto',
+            stream: false,
+        });
+        const response = await fetch(`${(config.baseUrl || 'https://api.deepseek.com/v1').replace(/\/$/, '')}/chat/completions`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${config.apiKey}` },
+            body,
+        });
+        if (!response.ok) {
+            const errText = await response.text().catch(() => 'Unknown error');
+            throw new Error(`AI API error (${response.status}): ${errText.slice(0, 200)}`);
+        }
+        const json = await response.json();
+        const choice = json.choices?.[0];
+        if (!choice || !choice.message)
+            throw new Error('No response from AI');
+        const msg = choice.message;
+        // Check for tool_calls
+        if (msg.tool_calls && msg.tool_calls.length > 0) {
+            // Add assistant message with tool_calls to conversation
+            conversation.push({ role: 'assistant', content: msg.content, tool_calls: msg.tool_calls });
+            // Execute each tool call
+            for (const tc of msg.tool_calls) {
+                const toolCall = {
+                    id: tc.id,
+                    name: tc.function.name,
+                    arguments: JSON.parse(tc.function.arguments || '{}'),
+                };
+                // Notify renderer about tool call
+                if (!window.isDestroyed()) {
+                    window.webContents.send('ai-stream-chunk', JSON.stringify({ type: 'tool_call', name: toolCall.name, args: toolCall.arguments, id: toolCall.id }));
+                }
+                // Execute
+                const result = await (0, mcp_tools_1.executeTool)(toolCall, currentProjectPath || process.cwd());
+                // Notify renderer about tool result
+                if (!window.isDestroyed()) {
+                    window.webContents.send('ai-stream-chunk', JSON.stringify({ type: 'tool_result', id: toolCall.id, result: result.result.slice(0, 1000), error: result.error }));
+                }
+                // Add tool result to conversation
+                conversation.push({
+                    role: 'tool',
+                    tool_call_id: tc.id,
+                    name: tc.function.name,
+                    content: result.error || result.result,
+                });
+            }
+            continue; // Another round to get final response
+        }
+        // Final response (no more tool calls)
+        const finalContent = msg.content || '';
+        if (!window.isDestroyed()) {
+            window.webContents.send('ai-stream-chunk', finalContent);
+            window.webContents.send('ai-stream-end', '');
+        }
+        return finalContent;
+    }
+    // Max rounds reached
+    throw new Error('AI 工具调用超过最大轮数');
+});
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// Git Blame
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+electron_1.ipcMain.handle('git:blame', async (_e, filePath, projectPath) => {
+    try {
+        const { execSync } = require('child_process');
+        const result = execSync(`git blame --date=short -l "${filePath}"`, {
+            cwd: projectPath,
+            timeout: 10000,
+            encoding: 'utf-8',
+        });
+        // Parse: ^abc1234 (Author Name 2024-01-15 42) code
+        const lines = result.split('\n').filter((l) => l.trim());
+        const blames = [];
+        for (let i = 0; i < lines.length; i++) {
+            const m = lines[i].match(/^([0-9a-f^]+)\s+\(([^)]+)\s+(\d{4}-\d{2}-\d{2})\s+(\d+)\)\s*(.*)$/);
+            if (m) {
+                blames.push({ hash: m[1], author: m[2].trim(), date: m[3], line: i + 1, code: m[5] });
+            }
+        }
+        return { success: true, blames };
+    }
+    catch (err) {
+        return { success: false, error: err.message };
+    }
+});
+// ── API 配置管理 ──
+electron_1.ipcMain.handle('apiConfigs:get', async () => {
+    return {
+        configs: store.get('apiConfigs', []),
+        activeId: store.get('activeApiConfigId', ''),
+    };
+});
+electron_1.ipcMain.handle('apiConfigs:save', async (_e, data) => {
+    store.set('apiConfigs', data.configs);
+    store.set('activeApiConfigId', data.activeId);
+    return { success: true };
 });

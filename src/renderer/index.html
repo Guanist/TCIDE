@@ -27,6 +27,10 @@
         <button class="activity-btn" data-view="arch" title="架构分析">
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><line x1="6.5" y1="10" x2="6.5" y2="14"/><line x1="17.5" y1="10" x2="17.5" y2="14"/><line x1="10" y1="6.5" x2="14" y2="6.5"/><line x1="10" y1="17.5" x2="14" y2="17.5"/></svg>
         </button>
+        <button class="activity-btn" data-view="problems" title="问题面板 (Ctrl+Shift+D)">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="m21.7 18.3-9.2-16a1 1 0 0 0-1.7 0l-9.3 16a1 1 0 0 0 .8 1.5h18.6a1 1 0 0 0 .8-1.5Z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+          <span id="problems-badge" class="activity-badge hidden">0</span>
+        </button>
       </div>
       <div class="activity-bottom">
         <button class="activity-btn" id="btn-toggle-theme" title="切换主题 (白虎/老虎)">
@@ -62,7 +66,8 @@
       <!-- Git 面板 -->
       <div id="git-panel" class="view-panel hidden">
         <div class="git-panel-header">
-          <span id="git-branch-name" class="git-branch">main</span>
+          <span id="git-branch-name" class="git-branch" title="点击切换分支">main</span>
+          <select id="git-branch-select" class="git-branch-select hidden" title="切换分支"></select>
           <div class="git-actions">
             <button id="btn-git-pull" class="icon-btn" title="拉取 (Pull)">↓</button>
             <button id="btn-git-commit" class="icon-btn primary" title="提交 (Commit)">✓</button>
@@ -93,6 +98,20 @@
         <div id="arch-smells" class="arch-smells hidden">
           <div class="arch-section-title">⚠️ 代码异味</div>
           <div id="arch-smell-list" class="arch-smell-list"></div>
+        </div>
+      </div>
+
+      <!-- Problems 面板：LSP 诊断 -->
+      <div id="problems-panel" class="view-panel hidden">
+        <div class="problems-panel-header">
+          <span class="problems-panel-title">🔍 问题</span>
+          <div class="problems-actions">
+            <button id="btn-problems-collapse" class="icon-btn" title="全部折叠">⊟</button>
+            <button id="btn-problems-refresh" class="icon-btn" title="刷新">↻</button>
+          </div>
+        </div>
+        <div id="problems-list" class="problems-list">
+          <div class="problems-empty">未打开文件或无问题</div>
         </div>
       </div>
     </aside>
@@ -162,9 +181,18 @@
       <!-- Monaco 编辑器 -->
       <div id="monaco-container" class="monaco-container"></div>
       <!-- PDF 预览 -->
-      <iframe id="pdf-preview" class="pdf-preview hidden" sandbox="allow-scripts allow-same-origin"></iframe>
+      <embed id="pdf-preview" class="pdf-preview hidden" type="application/pdf" />
       <!-- HTML 预览（srcdoc 内嵌，自带隔离）-->
       <iframe id="html-preview" class="html-preview hidden"></iframe>
+      <!-- 图片预览 -->
+      <div id="image-preview-container" class="image-preview-container hidden">
+        <img id="image-preview-img" class="image-preview-img" src="" alt="" />
+      </div>
+      <!-- 视频/音频预览 -->
+      <div id="media-preview-container" class="media-preview-container hidden">
+        <video id="media-video-preview" class="media-video-preview hidden" controls></video>
+        <audio id="media-audio-preview" class="media-audio-preview hidden" controls></audio>
+      </div>
       <div id="html-toolbar" class="html-toolbar" style="display:none">
         <button id="html-mode-toggle" class="html-mode-btn">📝 源码</button>
         <span id="html-error-indicator" class="html-error-indicator hidden" title="预览中有错误">⚠️ 错误</span>
@@ -259,6 +287,12 @@
         <!-- 对话 Tab -->
         <div id="tab-chat" class="ai-tab-content active">
           <div id="chat-messages" class="chat-messages">
+            <!-- 多选工具栏 -->
+            <div id="chat-select-bar" class="chat-select-bar hidden">
+              <span class="select-count">已选 0 条</span>
+              <button id="btn-delete-selected" class="select-action-btn">🗑 删除</button>
+              <button id="btn-clear-select" class="select-action-btn">✕ 取消</button>
+            </div>
             <div id="ai-welcome" class="ai-welcome-section">
               <div class="ai-welcome-icon">
                 <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="var(--tc-orange)" stroke-width="1" stroke-linecap="round" stroke-linejoin="round">
@@ -292,6 +326,8 @@
                 <button id="btn-attach" class="chat-tool-btn" title="添加附件 / 图片">
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
                 </button>
+                <button id="btn-tools-toggle" class="chat-tool-btn" title="MCP 工具: 开启时 AI 可读写文件/执行命令">🔧</button>
+                <button id="btn-chat-select" class="chat-tool-btn" title="多选消息删除">☑</button>
               </div>
               <textarea id="chat-input" placeholder="输入消息，Shift+Enter 换行，Enter 发送..." rows="3"></textarea>
               <button id="btn-send" class="send-btn" title="发送 (Enter)">
@@ -467,9 +503,18 @@
                   <button id="btn-test-config" class="test-btn">测试连接</button>
                   <button id="btn-save-config" class="save-btn">保存配置</button>
                 </div>
+                <!-- 已保存的 API 配置 -->
+                <div class="saved-configs-section" style="margin-top:16px">
+                  <label style="color:var(--text-secondary);font-size:12px;margin-bottom:6px;display:block">💾 已保存的 API 配置</label>
+                  <div id="saved-configs-list" class="saved-configs-list">
+                    <div class="saved-configs-empty">暂无已保存的配置</div>
+                  </div>
+                </div>
                 <div class="form-actions" style="margin-top:12px;">
                   <button id="btn-export-config" class="test-btn">📤 导出配置</button>
                   <button id="btn-import-config" class="test-btn">📥 导入配置</button>
+                  <button id="btn-shortcuts-editor" class="test-btn">⌨ 快捷键</button>
+                  <button id="btn-snippets-viewer" class="test-btn">📋 代码片段</button>
                 </div>
                 <div id="cfg-status" class="cfg-status"></div>
               </div>
@@ -653,6 +698,41 @@
   <!-- ═══ Toast 通知容器 ═══ -->
   <div id="toast-container" class="toast-container"></div>
 
+  <script src="./assets/p0-modules.js"></script>
+  <script src="./assets/p1-modules.js"></script>
+  <script src="./assets/p2-modules.js"></script>
   <script type="module" src="./main.ts"></script>
+
+  <!-- 快捷键编辑器弹窗 -->
+  <div id="shortcuts-modal" class="modal-overlay hidden">
+    <div class="modal-content" style="max-width:560px;max-height:80vh">
+      <div class="modal-header">
+        <h3>⌨ 快捷键设置</h3>
+        <button class="modal-close" onclick="$id('shortcuts-modal').classList.add('hidden')">✕</button>
+      </div>
+      <div class="modal-body" style="max-height:55vh;overflow-y:auto">
+        <table class="shortcuts-table" id="shortcuts-table">
+          <thead><tr><th>操作</th><th>快捷键</th><th>操作</th></tr></thead>
+          <tbody id="shortcuts-tbody"></tbody>
+        </table>
+        <div style="margin-top:8px;text-align:right">
+          <button id="btn-shortcuts-reset" class="test-btn" style="font-size:11px">🔄 恢复默认</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 代码片段查看器 -->
+  <div id="snippets-modal" class="modal-overlay hidden">
+    <div class="modal-content" style="max-width:640px;max-height:80vh">
+      <div class="modal-header">
+        <h3>📋 代码片段</h3>
+        <button class="modal-close" onclick="$id('snippets-modal').classList.add('hidden')">✕</button>
+      </div>
+      <div class="modal-body" style="max-height:55vh;overflow-y:auto">
+        <div id="snippets-content">加载中...</div>
+      </div>
+    </div>
+  </div>
 </body>
 </html>
