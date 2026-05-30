@@ -1540,7 +1540,8 @@ function streamToAI(userMsg: string, ctxMsg: string, fileName: string): void {
         { role: 'user' as const, content: userMsg + '\n\n' + ctxMsg },
       ];
       window.api.sendToAIStream(msg, { model: state.config.model });
-      showTypingIndicator();
+      resetAiStats();
+      showTypingIndicator('读取文件并分析中');
       session.updatedAt = Date.now();
     } catch (err) {
       addChatMessage('assistant', `错误: ${(err as Error).message}`);
@@ -1643,6 +1644,7 @@ function appendStreamChunk(chunk: string): void {
   const { contentHtml, thinkingHtml } = parseThinking(state.currentStreamContent);
   const thinkEl = lastMsg.querySelector('.msg-body .thinking-block');
   if (thinkingHtml && !thinkEl) {
+    incrementDeepThinking();
     const body = lastMsg.querySelector('.msg-body')!;
     const header = body.querySelector('.msg-header');
     const temp = document.createElement('div');
@@ -2260,7 +2262,8 @@ async function executeAiRead(start: number, end: number): Promise<void> {
     { role: 'user' as const, content: `已读取 L${sliceStart + 1}-L${sliceEnd},请继续分析。` },
   ];
   window.api.sendToAIStream(msg, { model: state.config.model });
-  showTypingIndicator();
+  resetAiStats();
+  showTypingIndicator('继续分析中');
 }
 
 // ═══ 会话删除 / 重命名(带确认) ═══
@@ -2778,7 +2781,8 @@ ${state.activeFileIndex >= 0 && state.openFiles[state.activeFileIndex] ? `当前
     ];
 
     window.api.sendToAIStream(messages, { model: state.config.model });
-    showTypingIndicator();
+    resetAiStats();
+    showTypingIndicator('分析中');
 
     // 首次对话自动命名为用户第一条消息
     if (session.name.startsWith('对话 ') && session.chatHistory.filter(m => m.role === 'user').length === 1) {
@@ -2981,19 +2985,76 @@ function buildSlidingWindowContext(
 }
 
 // ── 打字指示器(AI 响应时显示动画点)──
-function showTypingIndicator(): void {
+function showTypingIndicator(phase?: string): void {
   hideTypingIndicator();
   const container = document.getElementById('chat-messages')!;
   const indicator = document.createElement('div');
   indicator.id = 'typing-indicator';
   indicator.className = 'typing-indicator';
-  indicator.innerHTML = '<div class="typing-dot"></div><div class="typing-dot"></div><div class="typing-dot"></div>';
+  const phaseText = phase || '思考中';
+  indicator.innerHTML = `
+    <div class="typing-animation">
+      <div class="typing-tiger">🐯</div>
+      <div class="typing-dots"><span>.</span><span>.</span><span>.</span></div>
+    </div>
+    <span class="typing-phase">虎猫 ${phaseText}</span>
+  `;
   container.appendChild(indicator);
   container.scrollTop = container.scrollHeight;
 }
 
+function updateTypingPhase(phase: string): void {
+  const indicator = document.getElementById('typing-indicator');
+  if (!indicator) return;
+  const phaseEl = indicator.querySelector('.typing-phase');
+  if (phaseEl) phaseEl.textContent = `虎猫 ${phase}`;
+}
+
 function hideTypingIndicator(): void {
   document.getElementById('typing-indicator')?.remove();
+}
+
+// ── AI 状态统计（工具调用/深度思考） ──
+let aiStats = { toolCalls: 0, deepThinkings: 0 };
+
+function resetAiStats(): void {
+  aiStats = { toolCalls: 0, deepThinkings: 0 };
+  renderAiStatsBar();
+}
+
+function incrementToolCalls(): void {
+  aiStats.toolCalls++;
+  renderAiStatsBar();
+  updateTypingPhase(`调用工具中 (第${aiStats.toolCalls}次)`);
+}
+
+function incrementDeepThinking(): void {
+  aiStats.deepThinkings++;
+  renderAiStatsBar();
+  updateTypingPhase(`深度思考 #${aiStats.deepThinkings}`);
+}
+
+function renderAiStatsBar(): void {
+  let bar = document.getElementById('ai-stats-bar');
+  const chatMsgs = document.getElementById('chat-messages');
+  if (!chatMsgs) return;
+
+  if (aiStats.toolCalls === 0 && aiStats.deepThinkings === 0) {
+    bar?.remove();
+    return;
+  }
+
+  if (!bar) {
+    bar = document.createElement('div');
+    bar.id = 'ai-stats-bar';
+    bar.className = 'ai-stats-bar';
+    chatMsgs.prepend(bar);
+  }
+
+  const parts: string[] = [];
+  if (aiStats.toolCalls > 0) parts.push(`🔧 工具调用 ${aiStats.toolCalls} 次`);
+  if (aiStats.deepThinkings > 0) parts.push(`🧠 深度思考 ${aiStats.deepThinkings} 次`);
+  bar.textContent = parts.join('  ·  ');
 }
 
 // ── AI 模型状态指示器 ──
@@ -4212,6 +4273,7 @@ function setupEventListeners(): void {
         const toolMsg = JSON.parse(text);
         if (toolMsg.type === 'tool_call') {
           addToolCallMessage(toolMsg.name, toolMsg.args, toolMsg.id);
+          incrementToolCalls();
         } else if (toolMsg.type === 'tool_result') {
           updateToolCallResult(toolMsg.id, toolMsg.result, toolMsg.error);
         }

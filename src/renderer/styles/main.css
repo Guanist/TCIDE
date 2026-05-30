@@ -4494,3 +4494,24 @@ input:focus, button:focus-visible, select:focus, textarea:focus {
 .btn-confirm-ok.primary:hover { background: var(--tc-orange); }
 .btn-confirm-cancel.danger { border-color: var(--error); color: var(--error); }
 .btn-confirm-cancel.danger:hover { background: #f443361a; }
+
+/* ═── Activity Bar with Labels ── */
+.activity-bar { width: 64px; min-width: 64px; }
+.activity-btn { width: 56px; height: 56px; flex-direction: column; gap: 2px; }
+.activity-btn .activity-label { font-size: 9px; line-height: 1; text-align: center; white-space: nowrap; }
+.activity-btn:before { left: 0; width: 2px; }
+
+/* ═── 虎猫思考动画 ── */
+.typing-indicator { display: flex; align-items: center; gap: 12px; padding: 12px 16px; background: linear-gradient(135deg, rgba(255,140,0,.08), rgba(255,140,0,.02)); border: 1px solid rgba(255,140,0,.15); border-radius: var(--radius-lg); margin-bottom: 12px; }
+.typing-animation { display: flex; align-items: center; gap: 4px; }
+.typing-tiger { font-size: 24px; animation: tigerBounce .6s ease-in-out infinite; }
+.typing-dots { display: flex; gap: 2px; }
+.typing-dots span { width: 5px; height: 5px; border-radius: 50%; background: var(--tc-orange); animation: dotPulse 1.2s ease-in-out infinite; }
+.typing-dots span:nth-child(2) { animation-delay: .2s; }
+.typing-dots span:nth-child(3) { animation-delay: .4s; }
+.typing-phase { font-size: 13px; color: var(--tc-orange); font-weight: 500; }
+@keyframes tigerBounce { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-6px)} }
+@keyframes dotPulse { 0%,60%,100%{opacity:.3;transform:scale(.8)} 30%{opacity:1;transform:scale(1.3)} }
+
+/* ═── AI 统计栏 ── */
+.ai-stats-bar { padding: 6px 12px; font-size: 11px; color: var(--tc-orange); background: rgba(255,140,0,.06); border: 1px solid rgba(255,140,0,.12); border-radius: var(--radius-sm); margin-bottom: 8px; text-align: center; font-weight: 500; }
