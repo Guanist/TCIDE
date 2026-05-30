@@ -138,7 +138,7 @@ class ModelAdapter {
             stream,
             ...(model && { model }), // 允许空 model（火山方舟 endpoint key 自带端点）
             ...(temperature !== undefined && { temperature }),
-            ...(maxTokens !== undefined && { max_tokens: maxTokens }),
+            max_tokens: maxTokens || 8192,  // 默认 8192，避免 API 服务商默认值过低导致回复截断
         };
         const response = await fetch(url, {
             method: 'POST',
@@ -220,7 +220,7 @@ class ModelAdapter {
             .map(m => ({ role: m.role, content: m.content }));
         const body = {
             model,
-            max_tokens: maxTokens || 4096,
+            max_tokens: maxTokens || 8192,
             messages: convMessages,
             stream,
             ...(systemParts.length > 0 && { system: systemParts.join('\n\n') }),
