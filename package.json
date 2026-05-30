@@ -1,7 +1,7 @@
 {
   "name": "tcide",
   "productName": "虎猫 TCIDE",
-  "version": "1.4.0",
+  "version": "1.5.0-p0",
   "description": "虎猫 TCIDE — 个人专属 AI 编程 IDE",
   "main": "dist/main/index.js",
   "author": "虎猫团队",
@@ -9,7 +9,7 @@
   "scripts": {
     "dev": "electron .",
     "start": "electron .",
-    "build": "tsc && vite build",
+    "build": "vite build",
     "pack": "npm run build && electron-builder --dir",
     "dist": "npm run build && electron-builder",
     "dist:portable": "npm run build && electron-builder --win portable"

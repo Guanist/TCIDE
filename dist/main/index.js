@@ -119,10 +119,19 @@ function showAboutDialog() {
     const aboutIconPath = isDev
         ? path.join(__dirname, '..', '..', 'resources', 'about-icon.png')
         : path.join(process.resourcesPath, 'about-icon.png');
+    let appVersion = 'v1.5.0-p0';
+    try {
+        const pkgPath = isDev
+            ? path.join(__dirname, '..', '..', 'package.json')
+            : path.join(process.resourcesPath, 'app', 'package.json');
+        if (fs.existsSync(pkgPath)) {
+            appVersion = 'v' + JSON.parse(fs.readFileSync(pkgPath, 'utf-8')).version;
+        }
+    } catch { /* fallback to default */ }
     electron_1.dialog.showMessageBox(mainWindow, {
         type: 'info',
         title: '关于 虎猫 TCIDE',
-        message: '虎猫 TCIDE v1.0.0',
+        message: '虎猫 TCIDE ' + appVersion,
         detail: '作者：文森特骆\n公众号：文森特骆\n备注：PyClaw 作者骆戡的爸爸\n\n个人专属超级 AI 编程 IDE',
         icon: electron_1.nativeImage.createFromPath(aboutIconPath),
     });

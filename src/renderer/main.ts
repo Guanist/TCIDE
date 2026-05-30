@@ -8,6 +8,7 @@ import { FitAddon } from 'xterm-addon-fit';
 import 'xterm/css/xterm.css';
 import { getLspClient, lspDidOpen, lspDidChange, lspDidClose, stopAllLspClients, getAllDiagnostics } from './lsp-client';
 import { initSnippets, registerSnippets, listSnippets } from './snippet-service';
+import { DebugPanel } from './debug-panel';
 
 // ── 轻量 Emmet 解析器 (内联, 避免外部依赖) ──
 function expandEmmet(abbr: string, type: 'markup'|'stylesheet'): string {
@@ -1212,6 +1213,10 @@ function switchToFile(index: number): void {
   updateEditorStatusBar(file.language);
   // 🔀 Git diff 标记
   showGitDiffDecorations(file.path);
+  // P0: 实时 Lint + 大文件分片
+  triggerLintForFile(file.path);
+  triggerChunkerForFile(file.path);
+  updateStatusBarLint();
 
   // 更新文件树选中
   document.querySelectorAll('.tree-item').forEach(el => {
@@ -1279,8 +1284,12 @@ function closeFile(index: number): void {
   renderEditorTabs();
   if (state.openFiles.length === 0) {
     editor?.setModel(null);
+    // 隐藏所有预览容器
     const pdfFrame = document.getElementById('pdf-preview') as HTMLElement;
-    if (pdfFrame) { pdfFrame.style.display = 'none'; pdfFrame.src = ''; }
+    if (pdfFrame) { pdfFrame.classList.add('hidden'); (pdfFrame as any).src = ''; }
+    document.getElementById('image-preview-container')?.classList.add('hidden');
+    document.getElementById('media-preview-container')?.classList.add('hidden');
+    document.getElementById('html-preview')?.classList.add('hidden');
     document.getElementById('monaco-container')!.style.display = 'block';
   } else {
     switchToFile(state.activeFileIndex);
@@ -3226,6 +3235,11 @@ function selectBuiltinModel(provider: string, model: string): void {
 }
 
 function switchSettingsSubTab(tab: string): void {
+  // 如果设置面板未打开，先打开
+  if (document.getElementById('tab-settings')?.classList.contains('hidden')) {
+    switchToSettingsTab();
+  }
+
   document.querySelectorAll('.settings-tab').forEach(t => t.classList.remove('active'));
   document.querySelectorAll('.settings-tab-content').forEach(t => t.classList.add('hidden'));
 
@@ -4137,6 +4151,10 @@ function setupEventListeners(): void {
       </div>
     `;
     container.appendChild(welcome);
+    // P0: 初始化项目服务
+    initP0ProjectServices(projectPath);
+    // P2/P3: 初始化高级服务
+    initP2P3ProjectServices(projectPath);
   });
 
   // AI 流式响应
@@ -4512,6 +4530,21 @@ function setupEventListeners(): void {
         if (searchBar) searchBar.classList.add('hidden');
         document.getElementById('sidebar')?.querySelector('.sidebar-title')?.replaceChildren('ARCH');
         refreshArchPanel();
+      } else if (view === 'debug') {
+        document.getElementById('debug-panel')?.classList.remove('hidden');
+        if (searchBar) searchBar.classList.add('hidden');
+        document.getElementById('sidebar')?.querySelector('.sidebar-title')?.replaceChildren('DEBUG');
+        document.getElementById('file-tree')?.classList.add('hidden');
+        document.getElementById('git-panel')?.classList.add('hidden');
+        document.getElementById('arch-panel')?.classList.add('hidden');
+        if (debugPanelInstance) debugPanelInstance.toggle(true);
+      } else if (view === 'problems') {
+        document.getElementById('problems-panel')?.classList.remove('hidden');
+        if (searchBar) searchBar.classList.add('hidden');
+        document.getElementById('sidebar')?.querySelector('.sidebar-title')?.replaceChildren('问题');
+        document.getElementById('file-tree')?.classList.add('hidden');
+        document.getElementById('git-panel')?.classList.add('hidden');
+        document.getElementById('arch-panel')?.classList.add('hidden');
       } else if (view === 'settings') {
         // settings 打开设置弹窗,保持当前视图
         switchToSettingsTab();
@@ -4609,6 +4642,7 @@ function setupEventListeners(): void {
 
   document.getElementById('btn-git-commit')?.addEventListener('click', () => {
     document.getElementById('git-commit-area')?.classList.toggle('hidden');
+    generateSmartCommitMessage();
   });
 
   document.getElementById('btn-git-do-commit')?.addEventListener('click', async () => {
@@ -5005,6 +5039,9 @@ async function openProjectDialog(): Promise<void> {
         }
       }
     } catch (_) { /* 无会话 */ }
+    // P0: 初始化项目服务
+    initP0ProjectServices(path);
+    initP2P3ProjectServices(path);
   }
 }
 
@@ -5073,6 +5110,14 @@ const commandRegistry: Command[] = [
   { id: 'show-help', label: '快捷键速查', category: '帮助', action: () => document.getElementById('help-dialog')?.classList.remove('hidden') },
   { id: 'show-about', label: '关于 TCIDE', category: '帮助', action: () => document.getElementById('about-dialog')?.classList.toggle('hidden') },
   { id: 'abort-task', label: '终止 AI 任务', category: 'AI', shortcut: 'Esc', action: () => { stopStreaming(); window.api.abortTask?.(); } },
+  { id: 'show-problems', label: '查看代码问题', category: '视图', shortcut: 'Ctrl+Shift+P', action: () => { (document.querySelector('.activity-btn[data-view="problems"]') as HTMLElement)?.click(); } },
+  { id: 'show-debug', label: '调试面板', category: '视图', shortcut: 'Ctrl+Shift+D', action: () => { (document.querySelector('.activity-btn[data-view="debug"]') as HTMLElement)?.click(); } },
+  { id: 'format-file', label: '格式化当前文件', category: '编辑', shortcut: 'Shift+Alt+F', action: async () => { const f = state.openFiles[state.activeFileIndex] as any; if (f && state.projectPath) { try { const r = await (window as any).api.formatFile(f.path, state.projectPath); if (r.success) { f.content = r.formatted; editor?.setValue(r.formatted); showToast('已格式化', 'success'); } else showToast('格式化失败', 'warning'); } catch {} } } },
+  { id: 'batch-search', label: '批量搜索替换', category: '编辑', shortcut: 'Ctrl+Shift+H', action: () => { openSearchPanel(); (document.getElementById('search-replace') as HTMLElement)?.classList.remove('hidden'); } },
+  { id: 'orchestrate', label: 'Orchestrator: 智能拆解需求', category: 'AI', shortcut: 'Ctrl+Shift+O', action: () => { const el = document.getElementById('chat-input') as HTMLTextAreaElement; if (el) { el.value = '/orchestrate '; el.focus(); } } },
+  { id: 'unattended', label: 'Runner: 无人值守执行', category: 'AI', shortcut: 'Ctrl+Shift+R', action: () => { const el = document.getElementById('chat-input') as HTMLTextAreaElement; if (el) { el.value = '/runner '; el.focus(); } } },
+  { id: 'impact', label: '影响分析 (当前文件)', category: '分析', action: () => { const f = state.openFiles[state.activeFileIndex] as any; if (f) showImpactAnalysis(f.path).catch(() => {}); } },
+  { id: 'call-chain', label: '查看调用链', category: '分析', action: () => { const sel = editor?.getModel()?.getWordAtPosition(editor.getPosition()); if (sel) { const f = state.openFiles[state.activeFileIndex] as any; if (f) showCallChain(sel.word, f.path).catch(() => {}); } } },
 ];
 
 let cmdPaletteSelectedIdx = 0;
@@ -6125,6 +6170,424 @@ function showBalanceWarning(detail: string): void {
   if (dialog) dialog.classList.remove('hidden');
 }
 
+
+// ═══════════════════════════════════════════════
+// P0: Lint Integration
+// ═══════════════════════════════════════════════
+const lintDiagnosticsByFile = new Map<string, any[]>();
+function triggerLintForFile(filePath: string): void {
+  if (!state.projectPath) return;
+  const lang = filePath.split('.').pop()?.toLowerCase();
+  if (!lang) return;
+  const supported = ['js','jsx','ts','tsx','mjs','cjs','json','css','scss','less','html','vue','py','go','rs','java','kt','yml','yaml','md','sql'];
+  if (!supported.includes(lang)) return;
+  (window as any).api.lintFile(filePath, state.projectPath).catch(() => {});
+}
+function applyLintDiagnostics(filePath: string, diagnostics: any[]): void {
+  lintDiagnosticsByFile.set(filePath, diagnostics);
+  if (editor) {
+    const model = editor.getModel();
+    if (model && ((model.uri as any).fsPath === filePath || (model.uri as any).path?.replace(/\\/g,'/') === filePath?.replace(/\\/g,'/'))) {
+      const markers = diagnostics.map((d: any) => ({
+        severity: d.severity === 'error' ? (monaco as any).MarkerSeverity.Error : d.severity === 'warning' ? (monaco as any).MarkerSeverity.Warning : (monaco as any).MarkerSeverity.Info,
+        message: `${d.ruleId ? '[' + d.ruleId + '] ' : ''}${d.message}`,
+        startLineNumber: d.line || 1, startColumn: d.column || 1,
+        endLineNumber: d.endLine || d.line || 1, endColumn: d.endColumn || 100,
+        source: d.source || 'lint',
+      }));
+      (monaco as any).editor.setModelMarkers(model, 'tcide-lint', markers);
+    }
+  }
+  updateProblemsPanel();
+  updateStatusBarLint();
+}
+function updateProblemsPanel(): void {
+  const panelList = document.getElementById('problems-list');
+  if (!panelList) return;
+  const allDiags: any[] = [];
+  for (const [fp, diags] of lintDiagnosticsByFile) { for (const d of diags) allDiags.push({ filePath: fp, ...d }); }
+  if (allDiags.length === 0) {
+    panelList.innerHTML = '<div class="problems-empty">\u2713 未检测到代码问题</div>';
+    return;
+  }
+  allDiags.sort((a, b) => { const sev: Record<string,number> = { error:0, warning:1, info:2 }; return (sev[a.severity]||2) - (sev[b.severity]||2); });
+  const icons: Record<string,string> = { error:'\u{1F534}', warning:'\u{1F7E1}', info:'\u{1F535}' };
+  panelList.innerHTML = allDiags.map((d: any) => {
+    const fileName = (d.filePath || '').replace(/^.*[/\\]/, '');
+    return `<div class="problem-item" data-file="${d.filePath||''}" data-line="${d.line||1}" style="padding:3px 8px;cursor:pointer;font-size:11px;border-bottom:1px solid var(--border-color);display:flex;gap:6px;">
+      <span style="flex-shrink:0;">${icons[d.severity]||'\u26AA'}</span>
+      <span style="flex:1;"><span style="font-weight:600;">${fileName}:${d.line}</span> <span style="color:var(--fg-secondary);margin-left:4px;">${(d.message||'').substring(0,120)}</span></span>
+    </div>`;
+  }).join('');
+  panelList.querySelectorAll('.problem-item').forEach((el: any) => {
+    el.addEventListener('click', async () => {
+      const fp = el.dataset.file, line = parseInt(el.dataset.line) || 1;
+      if (fp) {
+        const name = fp.replace(/^.*[/\\]/, '');
+        const existing = state.openFiles.findIndex((f: any) => f.path === fp);
+        if (existing >= 0) switchToFile(existing); else await openFile(fp, name);
+        if (editor) { editor.revealLineInCenter(line); editor.setPosition({ lineNumber: line, column: 1 }); }
+      }
+    });
+  });
+}
+function updateStatusBarLint(): void {
+  let totalErrors = 0, totalWarnings = 0;
+  for (const diags of lintDiagnosticsByFile.values()) { for (const d of diags) { if (d.severity === 'error') totalErrors++; else totalWarnings++; } }
+  const badge = document.getElementById('problems-badge') as HTMLElement;
+  if (badge) {
+    const total = totalErrors + totalWarnings;
+    badge.textContent = total > 99 ? '99+' : String(total);
+    badge.classList.toggle('hidden', total === 0);
+    badge.style.background = totalErrors > 0 ? '#e51400' : '#cca700';
+  }
+}
+
+// ═══════════════════════════════════════════════
+// P0: Debug Panel
+// ═══════════════════════════════════════════════
+let debugPanelInstance: DebugPanel | null = null;
+function mountDebugPanel(): void {
+  try {
+    const sidebar = document.getElementById('sidebar');
+    if (!sidebar) return;
+    let debugContainer = document.getElementById('debug-panel');
+    if (!debugContainer) {
+      debugContainer = document.createElement('div');
+      debugContainer.id = 'debug-panel';
+      debugContainer.className = 'view-panel hidden';
+      sidebar.appendChild(debugContainer);
+    }
+    debugPanelInstance = new DebugPanel();
+    debugPanelInstance.init(monaco, editor, debugContainer, (window as any).api);
+    if ((window as any).api.onDebugEvent) {
+      (window as any).api.onDebugEvent((data: any) => { if (debugPanelInstance) debugPanelInstance.handleDebugEvent(data.sessionId, data); });
+    }
+  } catch (err) { console.error('[Debug] mount failed:', err); }
+}
+
+// ═══════════════════════════════════════════════
+// P0: Chunker
+// ═══════════════════════════════════════════════
+function triggerChunkerForFile(filePath: string): void {
+  (window as any).api.chunkerNeedsChunking(filePath).then((needs: boolean) => {
+    if (needs) (window as any).api.chunkerChunkFile(filePath).catch(() => {});
+  }).catch(() => {});
+}
+
+// ═══════════════════════════════════════════════
+// P0: Perf
+// ═══════════════════════════════════════════════
+function updateStatusBarPerf(): void {
+  (window as any).api.perfGetMetrics().then((m: any) => {
+    if (m && m.openCount > 0) { /* metrics available */ }
+  }).catch(() => {});
+}
+
+// ═══════════════════════════════════════════════
+// P0: AutoHeal
+// ═══════════════════════════════════════════════
+function setupAutoHealForTerminal(): void {
+  const api = (window as any).api;
+  const origExec = api.execCommand;
+  if (!origExec) return;
+  api.execCommand = async function(cmd: string, cwd: string) {
+    const result = await origExec.call(api, cmd, cwd);
+    if (result.exitCode !== 0 && state.projectPath) {
+      const output = (result.stdout||'') + '\n' + (result.stderr||'');
+      try {
+        const errors = await api.autohealParseErrors(output, state.projectPath);
+        if (errors.length > 0) {
+          addChatMessage('system', '\u{1F527} 检测到 ' + errors.length + ' 个错误，输入"修复"以自动修复');
+          (window as any).__lastBuildErrors = errors;
+        }
+      } catch {}
+    }
+    return result;
+  };
+}
+
+// ═══════════════════════════════════════════════
+// P0: Batch Search
+// ═══════════════════════════════════════════════
+function setupBatchSearchIntegration(): void {
+  const searchInput = document.getElementById('search-input') as HTMLInputElement;
+  if (!searchInput) return;
+  let searchTimer: any = null;
+  searchInput.addEventListener('input', () => {
+    if (searchTimer) clearTimeout(searchTimer);
+    searchTimer = setTimeout(async () => {
+      const q = searchInput.value.trim();
+      if (q.length < 2 || !state.projectPath) return;
+      try {
+        const results = await (window as any).api.batchSearch(state.projectPath, q, { maxResults: 100 });
+        const rc = document.getElementById('search-results');
+        if (rc) rc.innerHTML = results.count === 0 ? '<div class="search-empty">未找到结果</div>' :
+          results.matches.slice(0, 100).map((m: any) => `<div class="search-result-item" data-file="${m.filePath}" data-line="${m.line}" style="padding:4px 8px;cursor:pointer;">${m.filePath.replace(/^.*[/\\]/,'')}:${m.line} ${m.lineContent.substring(0,80)}</div>`).join('');
+      } catch {}
+    }, 200);
+  });
+}
+
+// ═══════════════════════════════════════════════
+// P0: Lint Listener
+// ═══════════════════════════════════════════════
+function initLintListener(): void {
+  if ((window as any).api.onLintDiagnostics) {
+    (window as any).api.onLintDiagnostics(({ filePath, diagnostics }: any) => { applyLintDiagnostics(filePath, diagnostics); });
+  }
+}
+
+// ═══════════════════════════════════════════════
+// P0: Project Services
+// ═══════════════════════════════════════════════
+function initP0ProjectServices(projectPath: string): void {
+  const api = (window as any).api;
+  api.contextInit(projectPath).then(() => { api.contextStartTrim().catch(() => {}); }).catch(() => {});
+  initProjectMemory(projectPath).catch(() => {});
+  initVectorIndex(projectPath).catch(() => {});
+  setInterval(() => { api.perfGcSweep().catch(() => {}); }, 60000);
+}
+
+// ═══════════════════════════════════════════════
+// P1: Git Intelligence
+// ═══════════════════════════════════════════════
+async function generateSmartCommitMessage(): Promise<void> {
+  const msgInput = document.getElementById('git-commit-message') as HTMLInputElement;
+  if (!msgInput || !state.projectPath) return;
+  try {
+    msgInput.placeholder = 'AI 正在分析变更...';
+    const result = await (window as any).api.gitintelGenerateCommitMessage(state.projectPath, { style:'conventional', useAI:true });
+    if (result?.message && result.message !== 'chore: minor update') {
+      msgInput.value = result.message;
+      msgInput.placeholder = '提交信息';
+    } else { msgInput.placeholder = '提交信息 (变更较少)'; }
+  } catch { msgInput.placeholder = 'AI 分析失败'; }
+}
+
+// ═══════════════════════════════════════════════
+// P1: Project Memory
+// ═══════════════════════════════════════════════
+async function initProjectMemory(projectPath: string): Promise<void> {
+  try { await (window as any).api.memoryInit(projectPath); await (window as any).api.memoryGetInjection(); } catch {}
+}
+
+// ═══════════════════════════════════════════════
+// P1: Vector Index
+// ═══════════════════════════════════════════════
+async function initVectorIndex(projectPath: string): Promise<void> {
+  try { await (window as any).api.vectorInit(projectPath); setTimeout(() => { (window as any).api.vectorIndexAll().catch(() => {}); }, 2000); } catch {}
+}
+
+// ═══════════════════════════════════════════════
+// P1: Semantic Completion
+// ═══════════════════════════════════════════════
+function registerSemanticCompletion(): void {
+  if (!monaco) return;
+  try {
+    (monaco as any).languages.registerCompletionItemProvider('*', {
+      provideCompletionItems: async (model: any, position: any) => {
+        const text = model.getValueInRange({ startLineNumber: Math.max(1, position.lineNumber - 5), startColumn: 1, endLineNumber: position.lineNumber, endColumn: position.column });
+        try {
+          const c = await (window as any).api.completionGet({ prefix: text.substring(Math.max(0, text.length - 500)), filePath: model.uri?.fsPath, language: model.getLanguageId(), line: position.lineNumber, column: position.column });
+          if (c?.text) return { suggestions: [{ label: c.text.substring(0,50), kind: (monaco as any).languages.CompletionItemKind.Snippet, insertText: c.text, detail: 'AI 补全' }] };
+        } catch {}
+        return { suggestions: [] };
+      },
+      triggerCharacters: ['.', '(', ' '],
+    });
+  } catch {}
+}
+
+
+// ═══════════════════════════════════════════════
+// P2: Agent Orchestrator — /orchestrate command
+// ═══════════════════════════════════════════════
+async function runOrchestrator(requirement: string): Promise<void> {
+  if (!state.projectPath) { addChatMessage('system', '请先打开项目'); return; }
+  addChatMessage('system', '\u{1F916} Orchestrator \u542f\u52a8\uff0c\u5206\u6790\u9700\u6c42: ' + requirement.substring(0, 80));
+  try {
+    await (window as any).api.orchestratorInit(state.projectPath);
+    if ((window as any).api.onOrchestratorPhase) {
+      (window as any).api.onOrchestratorPhase((d: any) => {
+        addChatMessage('system', '\u{1F4CB} \u9636\u6bb5: ' + (d.phase||'') + ' ' + (d.desc||''));
+      });
+    }
+    if ((window as any).api.onOrchestratorTaskProgress) {
+      (window as any).api.onOrchestratorTaskProgress((d: any) => {
+        const emoji = { done:'\u2705', running:'\u23F3', failed:'\u274C', pending:'\u23F0' };
+        const icon = (emoji as any)[d.status] || '\u25CB';
+        // Task progress shown in chat
+      });
+    }
+    const result = await (window as any).api.orchestratorRun(requirement, {
+      projectPath: state.projectPath,
+      architectFile: state.openFiles[state.activeFileIndex]?.path,
+    });
+    if (result?.plan) {
+      const steps = result.plan.map((s: any, i: number) => `${i + 1}. **${s.title}** — ${s.description?.substring(0, 100) || ''}`).join('\n');
+      addChatMessage('assistant', '\u{1F4CB} \u6267\u884c\u8ba1\u5212:\n\n' + steps + '\n\n\u8f93\u5165 \u201c\u6267\u884c\u201d \u5f00\u59cb\u6267\u884c\u4efb\u52a1\u3002');
+      (window as any).__activeOrchestratorPlan = result;
+    }
+  } catch (err: any) {
+    addChatMessage('system', '\u274C Orchestrator \u5931\u8d25: ' + (err.message||'unknown'));
+  }
+}
+
+// ═══════════════════════════════════════════════
+// P2: Warehouse Analyzer — Enhanced ARCH panel
+// ═══════════════════════════════════════════════
+async function initWarehouse(projectPath: string): Promise<void> {
+  try {
+    await (window as any).api.warehouseInit(projectPath);
+    setTimeout(() => { (window as any).api.warehouseAnalyzeAll().catch(() => {}); }, 3000);
+  } catch {}
+}
+async function showCallChain(symbolName: string, filePath: string): Promise<void> {
+  try {
+    const chains = await (window as any).api.warehouseGetCallChain(symbolName, filePath, 'both');
+    if (chains?.length > 0) {
+      const text = chains.map((c: any, i: number) => `${i + 1}. ${c.symbol} (${c.file}:${c.line})`).join('\n');
+      addChatMessage('system', '\u{1F50D} \u8c03\u7528\u94fe: **' + symbolName + '**\n\n' + text);
+    }
+  } catch {}
+}
+async function showImpactAnalysis(filePath: string): Promise<void> {
+  try {
+    const impact = await (window as any).api.warehouseGetImpactAnalysis(filePath);
+    if (impact) {
+      addChatMessage('system', '\u{1F4CA} \u5F71\u54CD\u5206\u6790: **' + (filePath.split(/[/\\]/).pop()||'') + '**\n' +
+        '\u76F4\u63A5\u4F9D\u8D56: ' + (impact.directDependents||0) + ' \u4E2A\n' +
+        '\u95F4\u63A5\u4F9D\u8D56: ' + (impact.indirectDependents||0) + ' \u4E2A');
+    }
+  } catch {}
+}
+
+// ═══════════════════════════════════════════════
+// P2: Unattended Runner — Task Panel integration
+// ═══════════════════════════════════════════════
+async function initRunner(projectPath: string): Promise<void> {
+  try {
+    await (window as any).api.runnerInit(projectPath);
+    if ((window as any).api.onRunnerLog) {
+      (window as any).api.onRunnerLog((entry: any) => {
+        // Runner logs can be shown in output panel
+      });
+    }
+    if ((window as any).api.onRunnerStepChange) {
+      (window as any).api.onRunnerStepChange((d: any) => {
+        addChatMessage('system', '\u{1F3C3} Runner: ' + d.step + '/' + d.total + ' — ' + (d.status||''));
+      });
+    }
+  } catch {}
+}
+async function runUnattendedPlan(plan: string): Promise<void> {
+  try {
+    addChatMessage('system', '\u{1F916} Unattended Runner \u542F\u52A8...');
+    const result = await (window as any).api.runnerExecute(plan);
+    if (result?.success) {
+      addChatMessage('system', '\u2705 Runner \u5B8C\u6210: ' + (result.summary||''));
+    } else {
+      addChatMessage('system', '\u274C Runner \u5931\u8D25: ' + (result?.error||'unknown'));
+    }
+  } catch (err: any) {
+    addChatMessage('system', '\u274C Runner \u9519\u8BEF: ' + (err.message||''));
+  }
+}
+
+// ═══════════════════════════════════════════════
+// P3: Entropy Evaluator — Project health
+// ═══════════════════════════════════════════════
+let projectEntropyScore = 50;
+async function initEntropy(projectPath: string): Promise<void> {
+  try {
+    await (window as any).api.entropyInit(projectPath);
+    if ((window as any).api.onEntropyProgress) {
+      (window as any).api.onEntropyProgress((d: any) => {});
+    }
+    const result = await (window as any).api.entropyEvaluate();
+    projectEntropyScore = result?.score || 50;
+    updateEntropyIndicator();
+  } catch {}
+}
+function updateEntropyIndicator(): void {
+  let el = document.getElementById('status-entropy');
+  if (!el) {
+    el = document.createElement('span');
+    el.id = 'status-entropy';
+    el.className = 'status-item';
+    el.title = '\u9879\u76EE\u6D77\u5206 (Entropy): \u8D8A\u9AD8\u8D8A\u6DF7\u4E71';
+    const lang = document.getElementById('status-language');
+    if (lang) lang.before(el);
+    else document.getElementById('status-usage')?.before(el);
+  }
+  const level = projectEntropyScore > 70 ? '\u{1F534}' : projectEntropyScore > 40 ? '\u{1F7E1}' : '\u{1F7E2}';
+  el.textContent = level + ' E:' + projectEntropyScore;
+  el.style.cursor = 'pointer';
+  el.onclick = async () => {
+    const rec = await (window as any).api.entropyCtrlGetSessionRecommendation();
+    if (rec?.shouldRestart) {
+      addChatMessage('system', '\u{1F4AC} \u6D77\u5206\u8F83\u9AD8 (' + projectEntropyScore + ')\uFF0C\u5EFA\u8BAE\u65B0\u5EFA\u4F1A\u8BDD\u4EE5\u63D0\u5347 AI \u54CD\u5E94\u8D28\u91CF\u3002');
+    }
+  };
+}
+
+// ═══════════════════════════════════════════════
+// P3: Entropy Controller — Auto session management
+// ═══════════════════════════════════════════════
+async function initEntropyController(projectPath: string): Promise<void> {
+  try {
+    await (window as any).api.entropyCtrlInit(projectPath);
+    // Periodic entropy tick
+    setInterval(async () => {
+      try {
+        const result = await (window as any).api.entropyCtrlTick({ messageCount: ensureSession().chatHistory.length, projectPath });
+        if (result?.shouldTrim) {
+          console.log('[P3] Entropy tick: trim recommended');
+        }
+      } catch {}
+    }, 120000);
+  } catch {}
+}
+
+// ═══════════════════════════════════════════════
+// P2/P3: Init all
+// ═══════════════════════════════════════════════
+function initP2P3ProjectServices(projectPath: string): void {
+  initWarehouse(projectPath).catch(() => {});
+  initRunner(projectPath).catch(() => {});
+  initEntropy(projectPath).catch(() => {});
+  initEntropyController(projectPath).catch(() => {});
+}
+
+// ═══════════════════════════════════════════════
+// P2: Command — /orchestrate handler in chat
+// ═══════════════════════════════════════════════
+(function patchSendToAI() {
+  const origSend = (window as any).api.sendToAI;
+  if (!origSend) return;
+  (window as any).api.sendToAI = async function(messages: any[], options?: any) {
+    const lastUser = [...messages].reverse().find((m: any) => m.role === 'user');
+    if (lastUser?.content?.startsWith('/orchestrate')) {
+      const requirement = lastUser.content.replace('/orchestrate', '').trim();
+      await runOrchestrator(requirement);
+      return 'Orchestrator \u5DF2\u542F\u52A8\uFF0C\u8BF7\u67E5\u770B\u6267\u884C\u8BA1\u5212\u3002';
+    }
+    if (lastUser?.content?.startsWith('/runner')) {
+      const plan = lastUser.content.replace('/runner', '').trim();
+      await runUnattendedPlan(plan);
+      return 'Runner \u5DF2\u542F\u52A8\u3002';
+    }
+    if (lastUser?.content?.startsWith('/impact')) {
+      const file = lastUser.content.replace('/impact', '').trim();
+      const fp = file || state.openFiles[state.activeFileIndex]?.path;
+      if (fp) await showImpactAnalysis(fp);
+      return '\u5F71\u54CD\u5206\u6790\u5DF2\u5B8C\u6210\u3002';
+    }
+    return origSend.call((window as any).api, messages, options);
+  };
+})();
+
 // 初始化用量相关事件
 function initUsageEvents(): void {
   // 用量 Tab 切换时加载数据
@@ -6159,6 +6622,17 @@ function initUsageEvents(): void {
 
 initUsageEvents();
 initSettingsEvents();
+
+// ═══════════════════════════════════════════════
+// P0/P1: Init Renderer Integrations
+// ═══════════════════════════════════════════════
+initLintListener();
+setTimeout(() => { mountDebugPanel(); }, 500);
+setInterval(() => { updateStatusBarPerf(); }, 30000);
+updateStatusBarPerf();
+setupAutoHealForTerminal();
+try { setupBatchSearchIntegration(); } catch (e) { console.warn('[P0] Batch:', e); }
+setTimeout(() => { registerSemanticCompletion(); }, 1000);
 
 // ── MCP 工具切换 ──
 let mcpToolsEnabled = false;

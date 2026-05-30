@@ -1319,3 +1319,697 @@ electron_1.ipcMain.handle('apiConfigs:save', async (_e, data) => {
     store.set('activeApiConfigId', data.activeId);
     return { success: true };
 });
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// P1: Vector Index IPC
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+electron_1.ipcMain.handle('vector:init', async (_e, projectRoot) => {
+    try {
+        const { vectorIndexer } = require('../core/indexer/vector-indexer');
+        vectorIndexer.init(projectRoot);
+        return { success: true };
+    } catch (err) { return { success: false, error: err.message }; }
+});
+electron_1.ipcMain.handle('vector:indexAll', async () => {
+    try {
+        const { vectorIndexer } = require('../core/indexer/vector-indexer');
+        const result = await vectorIndexer.indexAll();
+        return { success: true, ...result };
+    } catch (err) { return { success: false, error: err.message }; }
+});
+electron_1.ipcMain.handle('vector:search', async (_e, query, options) => {
+    try {
+        const { vectorIndexer } = require('../core/indexer/vector-indexer');
+        return vectorIndexer.search(query, options);
+    } catch (err) { return []; }
+});
+electron_1.ipcMain.handle('vector:searchSymbol', async (_e, name, options) => {
+    try {
+        const { vectorIndexer } = require('../core/indexer/vector-indexer');
+        return vectorIndexer.searchSymbol(name, options);
+    } catch (err) { return []; }
+});
+electron_1.ipcMain.handle('vector:getStats', async () => {
+    try {
+        const { vectorIndexer } = require('../core/indexer/vector-indexer');
+        return vectorIndexer.getStats();
+    } catch (err) { return {}; }
+});
+electron_1.ipcMain.handle('vector:getDependencies', async (_e, filePath) => {
+    try {
+        const { vectorIndexer } = require('../core/indexer/vector-indexer');
+        return vectorIndexer.getDependencies(filePath);
+    } catch (err) { return []; }
+});
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// P1: Project Memory IPC
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+electron_1.ipcMain.handle('memory:init', async (_e, projectRoot) => {
+    try {
+        const { projectMemory } = require('../core/memory/project-memory');
+        projectMemory.init(projectRoot);
+        return { success: true };
+    } catch (err) { return { success: false, error: err.message }; }
+});
+electron_1.ipcMain.handle('memory:getInjection', async () => {
+    try {
+        const { projectMemory } = require('../core/memory/project-memory');
+        return projectMemory.getMemoryInjection();
+    } catch (err) { return ''; }
+});
+electron_1.ipcMain.handle('memory:recordRefactor', async (_e, type, desc, oldCode, newCode, fp) => {
+    try {
+        const { projectMemory } = require('../core/memory/project-memory');
+        projectMemory.recordRefactor(type, desc, oldCode, newCode, fp);
+        return { success: true };
+    } catch (err) { return { success: false, error: err.message }; }
+});
+electron_1.ipcMain.handle('memory:searchPatterns', async (_e, query) => {
+    try {
+        const { projectMemory } = require('../core/memory/project-memory');
+        return projectMemory.searchPatterns(query);
+    } catch (err) { return []; }
+});
+electron_1.ipcMain.handle('memory:getTimeline', async () => {
+    try {
+        const { projectMemory } = require('../core/memory/project-memory');
+        return projectMemory.getTimeline();
+    } catch (err) { return []; }
+});
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// P1: Semantic Completion IPC
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+electron_1.ipcMain.handle('completion:init', async (_e, projectRoot) => {
+    try {
+        const { semanticCompletion } = require('../core/completion/semantic-completion');
+        semanticCompletion.init(projectRoot);
+        return { success: true };
+    } catch (err) { return { success: false, error: err.message }; }
+});
+electron_1.ipcMain.handle('completion:get', async (_e, params) => {
+    try {
+        const { semanticCompletion } = require('../core/completion/semantic-completion');
+        const results = await semanticCompletion.getCompletions(params);
+        return { success: true, results };
+    } catch (err) { return { success: false, results: [], error: err.message }; }
+});
+electron_1.ipcMain.handle('completion:invalidateCache', async (_e, filePath) => {
+    try {
+        const { semanticCompletion } = require('../core/completion/semantic-completion');
+        semanticCompletion.invalidateCache(filePath);
+        return { success: true };
+    } catch (err) { return { success: false }; }
+});
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// P1: Git Intelligence IPC
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+electron_1.ipcMain.handle('gitintel:init', async (_e, projectRoot) => {
+    try {
+        const { gitIntelligence } = require('../core/git/git-intelligence');
+        gitIntelligence.init(projectRoot);
+        return { success: true };
+    } catch (err) { return { success: false, error: err.message }; }
+});
+electron_1.ipcMain.handle('gitintel:generateCommitMessage', async (_e, projectRoot, options) => {
+    try {
+        const { gitIntelligence } = require('../core/git/git-intelligence');
+        return await gitIntelligence.generateCommitMessage(projectRoot, options);
+    } catch (err) { return { message: 'chore: update', error: err.message }; }
+});
+electron_1.ipcMain.handle('gitintel:analyzeChanges', async (_e, projectRoot, baseRef, headRef) => {
+    try {
+        const { gitIntelligence } = require('../core/git/git-intelligence');
+        return await gitIntelligence.analyzeChanges(projectRoot, baseRef, headRef);
+    } catch (err) { return { risk: 'unknown', summary: err.message }; }
+});
+electron_1.ipcMain.handle('gitintel:analyzeConflicts', async (_e, projectRoot, branch) => {
+    try {
+        const { gitIntelligence } = require('../core/git/git-intelligence');
+        return await gitIntelligence.analyzeConflicts(projectRoot, branch);
+    } catch (err) { return { hasConflicts: false, conflicts: [] }; }
+});
+electron_1.ipcMain.handle('gitintel:blameHeatmap', async (_e, projectRoot, filePath) => {
+    try {
+        const { gitIntelligence } = require('../core/git/git-intelligence');
+        return await gitIntelligence.blameHeatmap(projectRoot, filePath);
+    } catch (err) { return []; }
+});
+electron_1.ipcMain.handle('gitintel:getFileOwners', async (_e, projectRoot, filePath) => {
+    try {
+        const { gitIntelligence } = require('../core/git/git-intelligence');
+        return await gitIntelligence.getFileOwners(projectRoot, filePath);
+    } catch (err) { return []; }
+});
+electron_1.ipcMain.handle('gitintel:getChangelog', async (_e, projectRoot, days) => {
+    try {
+        const { gitIntelligence } = require('../core/git/git-intelligence');
+        return await gitIntelligence.getChangelog(projectRoot, days);
+    } catch (err) { return []; }
+});
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// P2: Agent Orchestrator IPC
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+electron_1.ipcMain.handle('orchestrator:init', async (_e, projectRoot) => {
+    try {
+        const { agentOrchestrator } = require('../core/agent/agent-orchestrator');
+        agentOrchestrator.init(projectRoot);
+        return { success: true };
+    } catch (err) { return { success: false, error: err.message }; }
+});
+electron_1.ipcMain.handle('orchestrator:run', async (_e, requirement, context) => {
+    try {
+        const { agentOrchestrator } = require('../core/agent/agent-orchestrator');
+        agentOrchestrator.onPhaseChange = (d) => { win?.webContents.send('orchestrator:phase', d); };
+        agentOrchestrator.onTaskProgress = (d) => { win?.webContents.send('orchestrator:taskProgress', d); };
+        return await agentOrchestrator.run(requirement, context);
+    } catch (err) { return { success: false, error: err.message }; }
+});
+electron_1.ipcMain.handle('orchestrator:abort', async () => {
+    try {
+        const { agentOrchestrator } = require('../core/agent/agent-orchestrator');
+        agentOrchestrator.abort();
+        return { success: true };
+    } catch (err) { return { success: false }; }
+});
+electron_1.ipcMain.handle('orchestrator:status', async () => {
+    try {
+        const { agentOrchestrator } = require('../core/agent/agent-orchestrator');
+        return agentOrchestrator.getPipelineStatus();
+    } catch (err) { return []; }
+});
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// P2: Warehouse Analyzer IPC
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+electron_1.ipcMain.handle('warehouse:init', async (_e, projectRoot) => {
+    try {
+        const { warehouseAnalyzer } = require('../core/indexer/warehouse-analyzer');
+        warehouseAnalyzer.init(projectRoot);
+        return { success: true };
+    } catch (err) { return { success: false, error: err.message }; }
+});
+electron_1.ipcMain.handle('warehouse:analyzeAll', async () => {
+    try {
+        const { warehouseAnalyzer } = require('../core/indexer/warehouse-analyzer');
+        warehouseAnalyzer.onProgress = (d) => { win?.webContents.send('warehouse:progress', d); };
+        return await warehouseAnalyzer.analyzeAll();
+    } catch (err) { return { error: err.message }; }
+});
+electron_1.ipcMain.handle('warehouse:getCallChain', async (_e, symbolName, filePath, direction) => {
+    try {
+        const { warehouseAnalyzer } = require('../core/indexer/warehouse-analyzer');
+        return warehouseAnalyzer.getCallChain(symbolName, filePath, direction);
+    } catch (err) { return []; }
+});
+electron_1.ipcMain.handle('warehouse:getImpactAnalysis', async (_e, filePath) => {
+    try {
+        const { warehouseAnalyzer } = require('../core/indexer/warehouse-analyzer');
+        return warehouseAnalyzer.getImpactAnalysis(filePath);
+    } catch (err) { return { directDependents: [], indirectDependents: [] }; }
+});
+electron_1.ipcMain.handle('warehouse:findSimilarCode', async (_e, snippet, minScore) => {
+    try {
+        const { warehouseAnalyzer } = require('../core/indexer/warehouse-analyzer');
+        return warehouseAnalyzer.findSimilarCode(snippet, minScore);
+    } catch (err) { return []; }
+});
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// P2: Unattended Runner IPC
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+electron_1.ipcMain.handle('runner:init', async (_e, projectRoot) => {
+    try {
+        const { unattendedRunner } = require('../core/runner/unattended-runner');
+        unattendedRunner.init(projectRoot);
+        return { success: true };
+    } catch (err) { return { success: false, error: err.message }; }
+});
+electron_1.ipcMain.handle('runner:execute', async (_e, plan) => {
+    try {
+        const { unattendedRunner } = require('../core/runner/unattended-runner');
+        unattendedRunner.onLog = (entry) => { win?.webContents.send('runner:log', entry); };
+        unattendedRunner.onStepChange = (d) => { win?.webContents.send('runner:step', d); };
+        return await unattendedRunner.execute(plan);
+    } catch (err) { return { success: false, error: err.message }; }
+});
+electron_1.ipcMain.handle('runner:abort', async () => {
+    try {
+        const { unattendedRunner } = require('../core/runner/unattended-runner');
+        unattendedRunner.abort();
+        return { success: true };
+    } catch (err) { return { success: false }; }
+});
+electron_1.ipcMain.handle('runner:getHistory', async (_e, limit) => {
+    try {
+        const { unattendedRunner } = require('../core/runner/unattended-runner');
+        return unattendedRunner.getHistory(limit);
+    } catch (err) { return []; }
+});
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// P3: Entropy Evaluator IPC
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+electron_1.ipcMain.handle('entropy:init', async (_e, projectRoot) => {
+    try {
+        const { entropyEvaluator } = require('../core/entropy/entropy-evaluator');
+        entropyEvaluator.init(projectRoot);
+        return { success: true };
+    } catch (err) { return { success: false, error: err.message }; }
+});
+electron_1.ipcMain.handle('entropy:evaluate', async () => {
+    try {
+        const { entropyEvaluator } = require('../core/entropy/entropy-evaluator');
+        entropyEvaluator.onProgress = (d) => { win?.webContents.send('entropy:progress', d); };
+        return await entropyEvaluator.evaluate();
+    } catch (err) { return { score: 50, error: err.message }; }
+});
+electron_1.ipcMain.handle('entropy:getFileEntropy', async (_e, filePath) => {
+    try {
+        const { entropyEvaluator } = require('../core/entropy/entropy-evaluator');
+        return entropyEvaluator.getFileEntropy(filePath);
+    } catch (err) { return { entropy: 5 }; }
+});
+electron_1.ipcMain.handle('entropy:getProjectEntropy', async () => {
+    try {
+        const { entropyEvaluator } = require('../core/entropy/entropy-evaluator');
+        return entropyEvaluator.getProjectEntropy();
+    } catch (err) { return { score: 50 }; }
+});
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// P3: Smart Trimmer IPC
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+electron_1.ipcMain.handle('smartTrimmer:init', async (_e, projectRoot) => {
+    try {
+        const { smartTrimmer } = require('../core/trimmer/smart-trimmer');
+        smartTrimmer.init(projectRoot);
+        return { success: true };
+    } catch (err) { return { success: false, error: err.message }; }
+});
+electron_1.ipcMain.handle('smartTrimmer:trim', async (_e, messages, context) => {
+    try {
+        const { smartTrimmer } = require('../core/trimmer/smart-trimmer');
+        return smartTrimmer.trim(messages, context);
+    } catch (err) { return { trimmed: messages, removed: [], stats: {} }; }
+});
+electron_1.ipcMain.handle('smartTrimmer:setProjectEntropy', async (_e, entropy) => {
+    try {
+        const { smartTrimmer } = require('../core/trimmer/smart-trimmer');
+        smartTrimmer.setProjectEntropy(entropy);
+        return { success: true };
+    } catch (err) { return { success: false }; }
+});
+electron_1.ipcMain.handle('smartTrimmer:getArchiveSummary', async () => {
+    try {
+        const { smartTrimmer } = require('../core/trimmer/smart-trimmer');
+        return smartTrimmer.getArchiveSummary();
+    } catch (err) { return {}; }
+});
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// P3: Entropy Controller IPC
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+electron_1.ipcMain.handle('entropyCtrl:init', async (_e, projectRoot) => {
+    try {
+        const { entropyController } = require('../core/context/entropy-controller');
+        entropyController.init(projectRoot);
+        return { success: true };
+    } catch (err) { return { success: false, error: err.message }; }
+});
+electron_1.ipcMain.handle('entropyCtrl:tick', async (_e, state) => {
+    try {
+        const { entropyController } = require('../core/context/entropy-controller');
+        return entropyController.tick(state);
+    } catch (err) { return { shouldTrim: false, entropy: 0 }; }
+});
+electron_1.ipcMain.handle('entropyCtrl:getSystemPromptInjection', async () => {
+    try {
+        const { entropyController } = require('../core/context/entropy-controller');
+        return entropyController.getSystemPromptInjection();
+    } catch (err) { return ''; }
+});
+electron_1.ipcMain.handle('entropyCtrl:getSessionRecommendation', async () => {
+    try {
+        const { entropyController } = require('../core/context/entropy-controller');
+        return entropyController.getSessionRecommendation();
+    } catch (err) { return { shouldRestart: false }; }
+});
+electron_1.ipcMain.handle('entropyCtrl:getTrimmingStrategy', async () => {
+    try {
+        const { entropyController } = require('../core/context/entropy-controller');
+        return entropyController.getTrimmingStrategy();
+    } catch (err) { return { level: 'gentle' }; }
+});
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// P0: Debug Manager IPC
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+electron_1.ipcMain.handle('debug:getAdapters', async () => {
+    try {
+        const { debugManager } = require('../core/debug/debug-manager');
+        return debugManager.getAvailableAdapters();
+    } catch (err) { return []; }
+});
+electron_1.ipcMain.handle('debug:startSession', async (_e, type, program, cwd, options) => {
+    try {
+        const { debugManager } = require('../core/debug/debug-manager');
+        debugManager.onEvent = (sessionId, event, data) => {
+            const win = electron_1.BrowserWindow.getAllWindows()[0];
+            if (win && !win.isDestroyed()) {
+                win.webContents.send('debug:event', { sessionId, event, data });
+            }
+        };
+        return await debugManager.startSession(type, program, cwd, options || {});
+    } catch (err) { return { error: err.message }; }
+});
+electron_1.ipcMain.handle('debug:stopSession', async (_e, sessionId) => {
+    try {
+        const { debugManager } = require('../core/debug/debug-manager');
+        await debugManager.stopSession(sessionId);
+    } catch (err) { /* ignore */ }
+});
+electron_1.ipcMain.handle('debug:setBreakpoints', async (_e, sessionId, filePath, breakpoints) => {
+    try {
+        const { debugManager } = require('../core/debug/debug-manager');
+        return await debugManager.setBreakpoints(sessionId, filePath, breakpoints);
+    } catch (err) { return { breakpoints: [], error: err.message }; }
+});
+electron_1.ipcMain.handle('debug:continue', async (_e, sessionId) => {
+    try {
+        const { debugManager } = require('../core/debug/debug-manager');
+        await debugManager.continue_(sessionId);
+    } catch (err) { /* ignore */ }
+});
+electron_1.ipcMain.handle('debug:next', async (_e, sessionId) => {
+    try {
+        const { debugManager } = require('../core/debug/debug-manager');
+        await debugManager.next(sessionId);
+    } catch (err) { /* ignore */ }
+});
+electron_1.ipcMain.handle('debug:stepIn', async (_e, sessionId) => {
+    try {
+        const { debugManager } = require('../core/debug/debug-manager');
+        await debugManager.stepIn(sessionId);
+    } catch (err) { /* ignore */ }
+});
+electron_1.ipcMain.handle('debug:stepOut', async (_e, sessionId) => {
+    try {
+        const { debugManager } = require('../core/debug/debug-manager');
+        await debugManager.stepOut(sessionId);
+    } catch (err) { /* ignore */ }
+});
+electron_1.ipcMain.handle('debug:pause', async (_e, sessionId) => {
+    try {
+        const { debugManager } = require('../core/debug/debug-manager');
+        await debugManager.pause(sessionId);
+    } catch (err) { /* ignore */ }
+});
+electron_1.ipcMain.handle('debug:evaluate', async (_e, sessionId, expression, frameId) => {
+    try {
+        const { debugManager } = require('../core/debug/debug-manager');
+        return await debugManager.evaluate(sessionId, expression, frameId);
+    } catch (err) { return { result: '', error: err.message }; }
+});
+electron_1.ipcMain.handle('debug:getThreads', async (_e, sessionId) => {
+    try {
+        const { debugManager } = require('../core/debug/debug-manager');
+        return await debugManager.getThreads(sessionId);
+    } catch (err) { return { threads: [] }; }
+});
+electron_1.ipcMain.handle('debug:getStackTrace', async (_e, sessionId, threadId) => {
+    try {
+        const { debugManager } = require('../core/debug/debug-manager');
+        return await debugManager.getStackTrace(sessionId, threadId);
+    } catch (err) { return { stackFrames: [] }; }
+});
+electron_1.ipcMain.handle('debug:getScopes', async (_e, sessionId, frameId) => {
+    try {
+        const { debugManager } = require('../core/debug/debug-manager');
+        return await debugManager.getScopes(sessionId, frameId);
+    } catch (err) { return { scopes: [] }; }
+});
+electron_1.ipcMain.handle('debug:getVariables', async (_e, sessionId, variablesRef) => {
+    try {
+        const { debugManager } = require('../core/debug/debug-manager');
+        return await debugManager.getVariables(sessionId, variablesRef);
+    } catch (err) { return { variables: [] }; }
+});
+electron_1.ipcMain.handle('debug:getConsoleOutput', async (_e, sessionId) => {
+    try {
+        const { debugManager } = require('../core/debug/debug-manager');
+        return debugManager.getConsoleOutput(sessionId);
+    } catch (err) { return []; }
+});
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// P0: Lint Manager IPC
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+electron_1.ipcMain.handle('lint:isInstalled', async (_e, projectRoot, tool) => {
+    try {
+        const { lintManager } = require('../core/lint/lint-manager');
+        return lintManager.isInstalled(projectRoot, tool);
+    } catch (err) { return false; }
+});
+electron_1.ipcMain.handle('lint:getInstallGuide', async (_e, tool) => {
+    try {
+        const { lintManager } = require('../core/lint/lint-manager');
+        return lintManager.getInstallGuide(tool);
+    } catch (err) { return ''; }
+});
+electron_1.ipcMain.handle('lint:lintFile', async (_e, filePath, projectRoot) => {
+    try {
+        const { lintManager } = require('../core/lint/lint-manager');
+        lintManager.onDiagnostics = (diags) => {
+            const win = electron_1.BrowserWindow.getAllWindows()[0];
+            if (win && !win.isDestroyed()) {
+                win.webContents.send('lint:diagnostics', { filePath, diagnostics: diags });
+            }
+        };
+        return await lintManager.lintFile(filePath, projectRoot);
+    } catch (err) { return { diagnostics: [], errors: 0, warnings: 0 }; }
+});
+electron_1.ipcMain.handle('lint:formatFile', async (_e, filePath, projectRoot) => {
+    try {
+        const { lintManager } = require('../core/lint/lint-manager');
+        return await lintManager.formatFile(filePath, projectRoot);
+    } catch (err) { return { success: false, formatted: null, error: err.message }; }
+});
+electron_1.ipcMain.handle('lint:lintProject', async (event, projectRoot) => {
+    try {
+        const { lintManager } = require('../core/lint/lint-manager');
+        return await lintManager.lintProject(projectRoot, (file, percent) => {
+            const win = electron_1.BrowserWindow.fromWebContents(event.sender);
+            if (win && !win.isDestroyed()) {
+                win.webContents.send('lint:projectProgress', { file, percent });
+            }
+        });
+    } catch (err) { return new Map(); }
+});
+electron_1.ipcMain.handle('lint:fixAll', async (_e, projectRoot, filePaths) => {
+    try {
+        const { lintManager } = require('../core/lint/lint-manager');
+        return await lintManager.fixAll(projectRoot, filePaths);
+    } catch (err) { return []; }
+});
+electron_1.ipcMain.handle('lint:getFileSummary', async (_e, filePath) => {
+    try {
+        const { lintManager } = require('../core/lint/lint-manager');
+        return lintManager.getFileSummary(filePath);
+    } catch (err) { return { errors: 0, warnings: 0, total: 0 }; }
+});
+electron_1.ipcMain.handle('lint:getProjectSummary', async () => {
+    try {
+        const { lintManager } = require('../core/lint/lint-manager');
+        return lintManager.getProjectSummary();
+    } catch (err) { return { totalErrors: 0, totalWarnings: 0 }; }
+});
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// P0: Semantic Chunker IPC
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+electron_1.ipcMain.handle('chunker:needsChunking', async (_e, filePath) => {
+    try {
+        const { semanticChunker } = require('../core/chunker/semantic-chunker');
+        return semanticChunker.needsChunking(filePath);
+    } catch (err) { return false; }
+});
+electron_1.ipcMain.handle('chunker:chunkFile', async (_e, filePath) => {
+    try {
+        const { semanticChunker } = require('../core/chunker/semantic-chunker');
+        return semanticChunker.chunkFile(filePath);
+    } catch (err) { return { chunks: [], totalLines: 0, language: '' }; }
+});
+electron_1.ipcMain.handle('chunker:getChunkIndex', async (_e, filePath, lineNumber) => {
+    try {
+        const { semanticChunker } = require('../core/chunker/semantic-chunker');
+        return semanticChunker.getChunkIndex(filePath, lineNumber);
+    } catch (err) { return -1; }
+});
+electron_1.ipcMain.handle('chunker:getViewportChunks', async (_e, filePath, startLine, endLine) => {
+    try {
+        const { semanticChunker } = require('../core/chunker/semantic-chunker');
+        return semanticChunker.getViewportChunks(filePath, startLine, endLine);
+    } catch (err) { return []; }
+});
+electron_1.ipcMain.handle('chunker:getPreview', async (_e, filePath) => {
+    try {
+        const { semanticChunker } = require('../core/chunker/semantic-chunker');
+        return semanticChunker.getPreview(filePath);
+    } catch (err) { return { lines: [], totalLines: 0, hasMore: false, language: '' }; }
+});
+electron_1.ipcMain.handle('chunker:invalidate', async (_e, filePath) => {
+    try {
+        const { semanticChunker } = require('../core/chunker/semantic-chunker');
+        semanticChunker.invalidate(filePath);
+    } catch (err) { /* ignore */ }
+});
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// P0: Context Trimmer IPC
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+electron_1.ipcMain.handle('context:init', async (_e, projectRoot) => {
+    try {
+        const { contextTrimmer } = require('../core/trimmer/context-trimmer');
+        contextTrimmer.init(projectRoot);
+        return { success: true };
+    } catch (err) { return { success: false, error: err.message }; }
+});
+electron_1.ipcMain.handle('context:startTrim', async () => {
+    try {
+        const { contextTrimmer } = require('../core/trimmer/context-trimmer');
+        contextTrimmer.startBackgroundTrim();
+        return { success: true };
+    } catch (err) { return { success: false }; }
+});
+electron_1.ipcMain.handle('context:stopTrim', async () => {
+    try {
+        const { contextTrimmer } = require('../core/trimmer/context-trimmer');
+        contextTrimmer.stopBackgroundTrim();
+        return { success: true };
+    } catch (err) { return { success: false }; }
+});
+electron_1.ipcMain.handle('context:trim', async (_e, messages) => {
+    try {
+        const { contextTrimmer } = require('../core/trimmer/context-trimmer');
+        return contextTrimmer.trim(messages);
+    } catch (err) { return { trimmed: messages, archived: [], tokensSaved: 0 }; }
+});
+electron_1.ipcMain.handle('context:extractSummary', async (_e, messages) => {
+    try {
+        const { contextTrimmer } = require('../core/trimmer/context-trimmer');
+        return contextTrimmer.extractSummary(messages);
+    } catch (err) { return { originalReq: '', finalCode: [], keyErrors: [] }; }
+});
+electron_1.ipcMain.handle('context:getStats', async () => {
+    try {
+        const { contextTrimmer } = require('../core/trimmer/context-trimmer');
+        return contextTrimmer.getArchiveStats();
+    } catch (err) { return { archivedCount: 0, totalTokensSaved: 0, recentArchives: [] }; }
+});
+electron_1.ipcMain.handle('context:cachePrompt', async (_e, key, content) => {
+    try {
+        const { contextTrimmer } = require('../core/trimmer/context-trimmer');
+        contextTrimmer.cacheSystemPrompt(key, content);
+    } catch (err) { /* ignore */ }
+});
+electron_1.ipcMain.handle('context:getPrompt', async (_e, key) => {
+    try {
+        const { contextTrimmer } = require('../core/trimmer/context-trimmer');
+        return contextTrimmer.getCachedPrompt(key);
+    } catch (err) { return null; }
+});
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// P0: AutoHeal Manager IPC
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+electron_1.ipcMain.handle('autoheal:parseErrors', async (_e, output, projectRoot) => {
+    try {
+        const { autoHealManager } = require('../core/autoheal/autoheal-manager');
+        return autoHealManager.parseErrors(output, projectRoot);
+    } catch (err) { return []; }
+});
+electron_1.ipcMain.handle('autoheal:abort', async () => {
+    try {
+        const { autoHealManager } = require('../core/autoheal/autoheal-manager');
+        autoHealManager.abort();
+    } catch (err) { /* ignore */ }
+});
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// P0: Batch Modifier IPC
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+electron_1.ipcMain.handle('batch:collectFiles', async (_e, projectRoot, filter) => {
+    try {
+        const { batchModifier } = require('../core/batch/batch-modifier');
+        return batchModifier.collectFiles(projectRoot, filter);
+    } catch (err) { return []; }
+});
+electron_1.ipcMain.handle('batch:search', async (_e, projectRoot, pattern, options) => {
+    try {
+        const { batchModifier } = require('../core/batch/batch-modifier');
+        return batchModifier.search(projectRoot, pattern, options);
+    } catch (err) { return { matches: [], count: 0 }; }
+});
+electron_1.ipcMain.handle('batch:preview', async (_e, projectRoot, search, replace, options) => {
+    try {
+        const { batchModifier } = require('../core/batch/batch-modifier');
+        return batchModifier.preview(projectRoot, search, replace, options);
+    } catch (err) { return { changes: [], totalChanges: 0, totalMatches: 0 }; }
+});
+electron_1.ipcMain.handle('batch:apply', async (_e, projectRoot, search, replace, options) => {
+    try {
+        const { batchModifier } = require('../core/batch/batch-modifier');
+        return batchModifier.apply(projectRoot, search, replace, options);
+    } catch (err) { return { results: [], backupId: '', stats: { modified: 0, failed: 0 } }; }
+});
+electron_1.ipcMain.handle('batch:refactor', async (_e, projectRoot, oldName, newName, language, options) => {
+    try {
+        const { batchModifier } = require('../core/batch/batch-modifier');
+        return batchModifier.refactor(projectRoot, oldName, newName, language, options);
+    } catch (err) { return { results: [], backupId: '', stats: { modified: 0, failed: 0 } }; }
+});
+electron_1.ipcMain.handle('batch:rollback', async (_e, backupId) => {
+    try {
+        const { batchModifier } = require('../core/batch/batch-modifier');
+        return batchModifier.rollback(backupId);
+    } catch (err) { return []; }
+});
+electron_1.ipcMain.handle('batch:listBackups', async () => {
+    try {
+        const { batchModifier } = require('../core/batch/batch-modifier');
+        return batchModifier.listBackups();
+    } catch (err) { return []; }
+});
+electron_1.ipcMain.handle('batch:clearBackup', async (_e, backupId) => {
+    try {
+        const { batchModifier } = require('../core/batch/batch-modifier');
+        return batchModifier.clearBackup(backupId);
+    } catch (err) { return false; }
+});
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// P0: Perf Optimizer IPC
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+electron_1.ipcMain.handle('perf:getMetrics', async () => {
+    try {
+        const { perfOptimizer } = require('../core/perf/perf-optimizer');
+        return perfOptimizer.getMetrics();
+    } catch (err) { return { avgOpenTime: 0, avgSwitchTime: 0, openCount: 0, switchCount: 0 }; }
+});
+electron_1.ipcMain.handle('perf:resetMetrics', async () => {
+    try {
+        const { perfOptimizer } = require('../core/perf/perf-optimizer');
+        perfOptimizer.resetMetrics();
+    } catch (err) { /* ignore */ }
+});
+electron_1.ipcMain.handle('perf:gcSweep', async () => {
+    try {
+        const { perfOptimizer } = require('../core/perf/perf-optimizer');
+        perfOptimizer.gcSweep();
+        return { success: true };
+    } catch (err) { return { success: false }; }
+});

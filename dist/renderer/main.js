@@ -1273,6 +1273,14 @@ function switchToFile(index) {
     updateEditorStatusBar(file.language);
     // 🔀 Git diff 标记
     showGitDiffDecorations(file.path);
+    // P0: 实时 Lint 检测
+    triggerLintForFile(file.path);
+    // P0: 大文件分片检测
+    triggerChunkerForFile(file.path);
+    // P0: 更新状态栏 Lint 角标
+    updateStatusBarLint();
+    // P0: Perf 计时结束
+    if (window.__perfOpenTimer) { window.__perfOpenTimer(); window.__perfOpenTimer = null; }
     // 更新文件树选中
     document.querySelectorAll('.tree-item').forEach(el => {
         el.classList.toggle('selected', el.dataset.path === file.path);
@@ -2195,10 +2203,9 @@ async function saveSessionsToDisk() {
     if (!state.projectPath)
         return;
     try {
-        const p = window.path || require('path');
         const tcideDir = `${state.projectPath}/.tcide/chat`;
-        // 通过 API 创建目录
-        await window.api.writeFile(`${tcideDir}/.gitkeep`, '');
+        // Ensure directory exists before writing
+        try { await window.api.createDir(tcideDir); } catch {}
         // 只保存最近 500 条消息
         const data = JSON.stringify(state.chatSessions.map(s => ({
             id: s.id, name: s.name, customName: s.customName, chatHistory: s.chatHistory.slice(-500),
@@ -2775,10 +2782,7 @@ ${state.activeFileIndex >= 0 && state.openFiles[state.activeFileIndex] ? `当前
         ];
         window.api.sendToAIStream(messages, { model: state.config.model });
         showTypingIndicator();
-        session.chatHistory.push({
-            id: crypto.randomUUID(), role: 'user', content: text,
-            timestamp: Date.now(), attachments: currentAttach.length > 0 ? currentAttach : undefined
-        });
+        // Note: user message already saved by addChatMessage() above
         // 首次对话自动命名为用户第一条消息
         if (session.name.startsWith('对话 ') && session.chatHistory.filter(m => m.role === 'user').length === 1) {
             session.name = text.slice(0, 30) + (text.length > 30 ? '...' : '');
@@ -3312,6 +3316,29 @@ const VERSION_HISTORY = [
             '✏️ 对话内联重命名:双击编辑、Enter 保存、Escape 取消',
         ],
         philosophy: '从 Hackable 到 Professional。LSP 让代码理解不再靠猜,Emmet 让 HTML 飞起来,MCP 让 AI 真正能动手。'
+    },
+    {
+        version: 'v1.5.0-p0',
+        date: '2026-05-30',
+        emoji: '🚀',
+        title: '智能觉醒 - P0-P3 全栈 AI 能力矩阵',
+        features: [
+            '🔴 DAP 调试器:Node/Python/Go/Chrome, 断点/监视/调用栈/条件断点',
+            '🟡 Lint+Format:ESLint/Prettier 自动修复, 行内标红, 保存格式化',
+            '🟢 报错自愈:终端抓错→AI修复→重编译, 3次重试+自动备份',
+            '🔵 语义分片:大文件按函数/类切分, 视口按需加载',
+            '🔍 向量索引:全仓库文件/函数/类/接口 BM25 语义搜索',
+            '🧠 项目记忆:技术栈/风格/决策自动沉淀, 新会话注入',
+            '✨ 语义补全:3层策略(缓存→语义→AI), 变量/方法推断',
+            '🔧 Git 智能:约定式 Commit, 变更风险评估, 冲突类型识别',
+            '🤖 多Agent编排:Builder→Coder池→Reviewer→Tester 流水线',
+            '🔬 全仓库解析:调用图/依赖网/类型链/克隆检测/热点分析',
+            '🏃 无人值守:Checkpoint→Execute→Validate→Rollback 自治环',
+            '📊 代码熵评估:复杂度/重复/耦合/Churn 综合健康分 A-F',
+            '✂️ 熵感知瘦身:Score排序→Greedy-Knapsack→4级自适应压缩',
+            '🎛️ 上下文熵控:滑动窗口/注意力预算/SystemPrompt 压力注入',
+        ],
+        philosophy: '从"用 AI 写代码"到"AI 理解你的代码"。18 个模块 300KB 新代码,P0-P3 四层覆盖。'
     },
 ];
 function renderChangelog() {
@@ -4085,6 +4112,8 @@ function setupEventListeners() {
             window.api.setProjectRules(rules);
         }
         catch (_) { /* 无规则文件,使用内置默认 */ }
+        // P0: 初始化上下文瘦身 + 自愈引擎
+        initP0ProjectServices(state.projectPath);
         // 清除欢迎消息
         const container = document.getElementById('chat-messages');
         container.innerHTML = '';
@@ -4499,6 +4528,24 @@ function setupEventListeners() {
                 document.getElementById('sidebar')?.querySelector('.sidebar-title')?.replaceChildren('ARCH');
                 refreshArchPanel();
             }
+            else if (view === 'debug') {
+                const debugContainer = document.getElementById('debug-panel');
+                if (debugContainer) debugContainer.classList.remove('hidden');
+                if (searchBar) searchBar.classList.add('hidden');
+                document.getElementById('sidebar')?.querySelector('.sidebar-title')?.replaceChildren('DEBUG');
+                document.getElementById('file-tree')?.classList.add('hidden');
+                document.getElementById('git-panel')?.classList.add('hidden');
+                document.getElementById('arch-panel')?.classList.add('hidden');
+                if (debugPanelInstance) debugPanelInstance.toggle(true);
+            }
+            else if (view === 'problems') {
+                document.getElementById('problems-panel')?.classList.remove('hidden');
+                if (searchBar) searchBar.classList.add('hidden');
+                document.getElementById('sidebar')?.querySelector('.sidebar-title')?.replaceChildren('问题');
+                document.getElementById('file-tree')?.classList.add('hidden');
+                document.getElementById('git-panel')?.classList.add('hidden');
+                document.getElementById('arch-panel')?.classList.add('hidden');
+            }
             else if (view === 'settings') {
                 // settings 打开设置弹窗,保持当前视图
                 switchToSettingsTab();
@@ -4601,6 +4648,8 @@ function setupEventListeners() {
     });
     document.getElementById('btn-git-commit')?.addEventListener('click', () => {
         document.getElementById('git-commit-area')?.classList.toggle('hidden');
+        // P1: 智能 Commit Message — AI 自动生成
+        generateSmartCommitMessage();
     });
     document.getElementById('btn-git-do-commit')?.addEventListener('click', async () => {
         if (!state.projectPath)
@@ -5000,6 +5049,8 @@ async function openProjectDialog() {
             }
         }
         catch (_) { /* 无会话 */ }
+        // P0: 初始化上下文瘦身 + 自愈引擎
+        initP0ProjectServices(path);
     }
 }
 async function newFileDialog() {
@@ -5066,6 +5117,11 @@ const commandRegistry = [
     { id: 'show-help', label: '快捷键速查', category: '帮助', action: () => document.getElementById('help-dialog')?.classList.remove('hidden') },
     { id: 'show-about', label: '关于 TCIDE', category: '帮助', action: () => document.getElementById('about-dialog')?.classList.toggle('hidden') },
     { id: 'abort-task', label: '终止 AI 任务', category: 'AI', shortcut: 'Esc', action: () => { stopStreaming(); window.api.abortTask?.(); } },
+    { id: 'show-problems', label: '查看代码问题', category: '视图', shortcut: 'Ctrl+Shift+P', action: () => { document.querySelector('.activity-btn[data-view="problems"]')?.click(); } },
+    { id: 'show-debug', label: '调试面板', category: '视图', shortcut: 'Ctrl+Shift+D', action: () => { document.querySelector('.activity-btn[data-view="debug"]')?.click(); } },
+    { id: 'format-file', label: '格式化当前文件', category: '编辑', shortcut: 'Shift+Alt+F', action: async () => { const f = state.openFiles[state.activeFileIndex]; if (f && state.projectPath) { const r = await window.api.formatFile(f.path, state.projectPath); if (r.success) { f.content = r.formatted; if (editor) editor.setValue(r.formatted); showToast('已格式化', 'success'); } else { showToast('格式化失败: ' + (r.error || 'Prettier 未安装'), 'warning'); } } } },
+    { id: 'fix-all-lint', label: '一键修复 Lint 问题', category: '编辑', action: async () => { if (state.projectPath) { const results = await window.api.lintFixAll(state.projectPath); const fixed = results.filter(r => r.fixed).length; showToast(`已修复 ${fixed}/${results.length} 个文件`, fixed === results.length ? 'success' : 'warning'); } } },
+    { id: 'batch-search', label: '批量搜索替换', category: '编辑', shortcut: 'Ctrl+Shift+H', action: () => { openSearchPanel(); document.getElementById('search-replace')?.classList.remove('hidden'); } },
 ];
 let cmdPaletteSelectedIdx = 0;
 let cmdPaletteFiltered = [];
@@ -5819,8 +5875,8 @@ async function init() {
         updateZenStatusBar();
     });
     // ── 定期自动保存会话 ──
-    setInterval(() => saveSession(), 30_000); // 每 30 秒
-    window.addEventListener('beforeunload', () => saveSession());
+    setInterval(() => { saveSession(); saveSessionsToDisk(); }, 30_000); // 每 30 秒
+    window.addEventListener('beforeunload', () => { saveSession(); saveSessionsToDisk(); });
     console.log('[Renderer] PersonalIDE ready');
 }
 init().catch(console.error);
@@ -6055,6 +6111,549 @@ function showBalanceWarning(detail) {
     if (dialog)
         dialog.classList.remove('hidden');
 }
+// ═══════════════════════════════════════════════
+// P0: Lint Integration — Monaco markers + Problems panel
+// ═══════════════════════════════════════════════
+let lintDiagnosticsByFile = new Map();
+
+function triggerLintForFile(filePath) {
+    if (!state.projectPath) return;
+    const lang = filePath ? filePath.split('.').pop()?.toLowerCase() : '';
+    if (!lang) return;
+    const supported = ['js','jsx','ts','tsx','mjs','cjs','json','css','scss','less','html','vue','py','go','rs','java','kt','yml','yaml','md','sql'];
+    if (!supported.includes(lang)) return;
+    window.api.lintFile(filePath, state.projectPath).catch(() => {});
+}
+
+function applyLintDiagnostics(filePath, diagnostics) {
+    lintDiagnosticsByFile.set(filePath, diagnostics);
+    // Monaco markers
+    if (editor) {
+        const model = editor.getModel();
+        if (model) {
+            const modelPath = model.uri?.fsPath || model.uri?.path;
+            if (modelPath === filePath || modelPath?.replace(/\\/g, '/') === filePath?.replace(/\\/g, '/')) {
+                const markers = diagnostics.map(d => ({
+                    severity: d.severity === 'error' ? monaco.MarkerSeverity.Error :
+                              d.severity === 'warning' ? monaco.MarkerSeverity.Warning :
+                              monaco.MarkerSeverity.Info,
+                    message: `${d.ruleId ? `[${d.ruleId}] ` : ''}${d.message}${d.fix ? ' (可自动修复)' : ''}`,
+                    startLineNumber: d.line || 1,
+                    startColumn: d.column || 1,
+                    endLineNumber: d.endLine || d.line || 1,
+                    endColumn: d.endColumn || 100,
+                    source: d.source || 'lint',
+                }));
+                monaco.editor.setModelMarkers(model, 'tcide-lint', markers);
+            }
+        }
+    }
+    // Problems panel
+    updateProblemsPanel();
+    updateStatusBarLint();
+}
+
+function updateProblemsPanel() {
+    const panelList = document.getElementById('problems-list');
+    if (!panelList) return;
+    const allDiags = [];
+    for (const [fp, diags] of lintDiagnosticsByFile) {
+        for (const d of diags) {
+            allDiags.push({ filePath: fp, ...d });
+        }
+    }
+    if (allDiags.length === 0) {
+        panelList.innerHTML = '<div class="problems-empty">✓ 未检测到代码问题</div>';
+        // 也清空底部面板的问题列表
+        const bottomPanel = document.getElementById('panel-problems');
+        if (bottomPanel) {
+            const empty = bottomPanel.querySelector('.problems-empty');
+            const list = bottomPanel.querySelector('.problems-list');
+            if (empty) empty.classList.remove('hidden');
+            if (list) { list.classList.add('hidden'); list.innerHTML = ''; }
+        }
+        return;
+    }
+    // 按严重程度排序
+    allDiags.sort((a, b) => {
+        const sev = { error: 0, warning: 1, info: 2 };
+        return (sev[a.severity] || 2) - (sev[b.severity] || 2);
+    });
+    const icons = { error: '🔴', warning: '🟡', info: '🔵', hint: '💡' };
+    panelList.innerHTML = allDiags.map(d => {
+        const fileName = (d.filePath || '').replace(/^.*[/\\]/, '');
+        return `<div class="problem-item" data-file="${d.filePath || ''}" data-line="${d.line || 1}" style="padding:3px 8px;cursor:pointer;font-size:11px;border-bottom:1px solid var(--border-color);display:flex;gap:6px;align-items:flex-start;" onclick="document.querySelector('#problems-panel')?.classList.toggle('hidden')">
+            <span style="flex-shrink:0;">${icons[d.severity] || '⚪'}</span>
+            <span style="flex:1;min-width:0;">
+                <span style="font-weight:600;">${fileName}:${d.line}</span>
+                <span style="color:var(--fg-secondary);margin-left:4px;">${d.message?.substring(0, 120) || ''}</span>
+            </span>
+        </div>`;
+    }).join('');
+    // 点击跳转到文件+行
+    panelList.querySelectorAll('.problem-item').forEach(el => {
+        el.addEventListener('click', async () => {
+            const fp = el.dataset.file;
+            const line = parseInt(el.dataset.line) || 1;
+            if (fp) {
+                const name = fp.replace(/^.*[/\\]/, '');
+                const existing = state.openFiles.findIndex(f => f.path === fp);
+                if (existing >= 0) {
+                    switchToFile(existing);
+                } else {
+                    await openFile(fp, name);
+                }
+                if (editor) {
+                    editor.revealLineInCenter(line);
+                    editor.setPosition({ lineNumber: line, column: 1 });
+                }
+                // 自动关闭问题面板
+                document.getElementById('problems-panel')?.classList.add('hidden');
+            }
+        });
+    });
+    // 同步到底部面板
+    const bottomPanel = document.getElementById('panel-problems');
+    if (bottomPanel) {
+        const empty = bottomPanel.querySelector('.problems-empty');
+        const list = bottomPanel.querySelector('.problems-list');
+        if (empty) empty.classList.add('hidden');
+        if (list) { list.classList.remove('hidden'); list.innerHTML = panelList.innerHTML; }
+    }
+}
+
+function updateStatusBarLint() {
+    let totalErrors = 0, totalWarnings = 0;
+    for (const diags of lintDiagnosticsByFile.values()) {
+        for (const d of diags) {
+            if (d.severity === 'error') totalErrors++;
+            else totalWarnings++;
+        }
+    }
+    // 活动栏角标
+    const badge = document.getElementById('problems-badge');
+    if (badge) {
+        const total = totalErrors + totalWarnings;
+        badge.textContent = total > 99 ? '99+' : String(total);
+        badge.classList.toggle('hidden', total === 0);
+        if (totalErrors > 0) {
+            badge.style.background = '#e51400';
+        } else if (totalWarnings > 0) {
+            badge.style.background = '#cca700';
+        }
+    }
+    // 底部面板标签角标
+    const panelBadge = document.querySelector('#panel-tabs .panel-badge');
+    if (panelBadge) {
+        const total = totalErrors + totalWarnings;
+        panelBadge.textContent = total > 99 ? '99+' : String(total);
+        panelBadge.classList.toggle('hidden', total === 0);
+    }
+    // 状态栏
+    let el = document.getElementById('status-lint');
+    if (!el) {
+        el = document.createElement('span');
+        el.id = 'status-lint';
+        el.className = 'status-item';
+        el.style.cssText = 'cursor:pointer;';
+        el.title = '点击查看问题面板';
+        el.onclick = () => {
+            const panel = document.getElementById('panel-area');
+            if (panel) panel.classList.remove('hidden');
+            const tab = document.querySelector('.panel-tab[data-panel="problems"]');
+            if (tab) tab.click();
+        };
+        const spacer = document.getElementById('status-position');
+        if (spacer) spacer.before(el);
+    }
+    if (totalErrors > 0) {
+        el.innerHTML = `🔴 ${totalErrors} ⚠ ${totalWarnings}`;
+        el.style.color = '#f44747';
+    } else if (totalWarnings > 0) {
+        el.innerHTML = `⚠ ${totalWarnings}`;
+        el.style.color = '#cca700';
+    } else {
+        el.innerHTML = '✓ 0';
+        el.style.color = '#6a9955';
+    }
+}
+
+// ═══════════════════════════════════════════════
+// P0: Debug Panel Integration
+// ═══════════════════════════════════════════════
+let debugPanelInstance = null;
+let debugPanelMounted = false;
+
+function mountDebugPanel() {
+    if (debugPanelMounted) return;
+    try {
+        if (typeof DebugPanel === 'undefined') {
+            console.warn('[Debug Panel] debug-panel.js 未加载');
+            return;
+        }
+        // 创建调试面板容器
+        const sidebar = document.getElementById('sidebar');
+        if (!sidebar) return;
+        let debugContainer = document.getElementById('debug-panel');
+        if (!debugContainer) {
+            debugContainer = document.createElement('div');
+            debugContainer.id = 'debug-panel';
+            debugContainer.className = 'view-panel hidden';
+            sidebar.appendChild(debugContainer);
+        }
+        debugPanelInstance = new DebugPanel();
+        debugPanelInstance.init(monaco, editor, debugContainer, window.api);
+        // 监听调试事件
+        if (window.api.onDebugEvent) {
+            window.api.onDebugEvent((data) => {
+                if (debugPanelInstance) {
+                    debugPanelInstance.handleDebugEvent(data.sessionId, data);
+                }
+            });
+        }
+        // 添加调试活动按钮
+        const activityBar = document.getElementById('activity-bar');
+        if (activityBar) {
+            const debugBtn = document.createElement('button');
+            debugBtn.className = 'activity-btn';
+            debugBtn.dataset.view = 'debug';
+            debugBtn.title = '调试 (Ctrl+Shift+D)';
+            debugBtn.innerHTML = '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="m14.5 2 4.5 4.5-4.5 4.5"/><path d="M19 6.5H9a4 4 0 0 0 0 8h1"/><path d="m9.5 22-4.5-4.5 4.5-4.5"/><path d="M5 17.5h10a4 4 0 0 0 0-8h-1"/></svg>';
+            debugBtn.addEventListener('click', () => {
+                // 切换视图
+                document.querySelectorAll('.view-panel').forEach(p => p.classList.add('hidden'));
+                document.querySelectorAll('.activity-btn').forEach(b => b.classList.remove('active'));
+                debugBtn.classList.add('active');
+                debugContainer.classList.remove('hidden');
+                document.getElementById('sidebar')?.querySelector('.sidebar-title')?.replaceChildren('DEBUG');
+                document.getElementById('file-tree')?.classList.add('hidden');
+                document.getElementById('sidebar-search-explorer')?.classList.add('hidden');
+                document.getElementById('git-panel')?.classList.add('hidden');
+                document.getElementById('arch-panel')?.classList.add('hidden');
+                if (debugPanelInstance) debugPanelInstance.toggle(true);
+            });
+            activityBar.querySelector('.activity-top')?.appendChild(debugBtn);
+        }
+        debugPanelMounted = true;
+    } catch (err) {
+        console.error('[Debug Panel] 挂载失败:', err);
+    }
+}
+
+// ═══════════════════════════════════════════════
+// P0: Semantic Chunker Integration
+// ═══════════════════════════════════════════════
+function triggerChunkerForFile(filePath) {
+    window.api.chunkerNeedsChunking(filePath).then(needsChunking => {
+        if (needsChunking) {
+            window.api.chunkerChunkFile(filePath).then(result => {
+                if (result.chunks.length > 1) {
+                    console.log(`[Chunker] 文件已分片: ${filePath} → ${result.chunks.length} 个分片 (${result.totalLines} 行)`);
+                }
+            }).catch(() => {});
+        }
+    }).catch(() => {});
+}
+
+// ═══════════════════════════════════════════════
+// P0: Perf Integration
+// ═══════════════════════════════════════════════
+let perfStatusEl = null;
+function updateStatusBarPerf() {
+    window.api.perfGetMetrics().then(metrics => {
+        if (!perfStatusEl) {
+            perfStatusEl = document.createElement('span');
+            perfStatusEl.id = 'status-perf';
+            perfStatusEl.className = 'status-item';
+            perfStatusEl.style.cssText = 'font-size:10px;color:#808080;';
+            const lang = document.getElementById('status-language');
+            if (lang) lang.after(perfStatusEl);
+        }
+        if (metrics.openCount > 0) {
+            perfStatusEl.textContent = `⏱ ${metrics.avgOpenTime}ms`;
+            perfStatusEl.title = `文件打开: 平均 ${metrics.avgOpenTime}ms / ${metrics.openCount}次 | 标签切换: 平均 ${metrics.avgSwitchTime}ms / ${metrics.switchCount}次`;
+        }
+    }).catch(() => {});
+}
+
+// ═══════════════════════════════════════════════
+// P0: Lint Event Listener
+// ═══════════════════════════════════════════════
+function initLintListener() {
+    if (window.api.onLintDiagnostics) {
+        window.api.onLintDiagnostics(({ filePath, diagnostics }) => {
+            applyLintDiagnostics(filePath, diagnostics);
+        });
+    }
+    if (window.api.onLintProgress) {
+        window.api.onLintProgress(({ file, percent }) => {
+            // 全项目 Lint 进度可在此扩展
+        });
+    }
+}
+
+// ═══════════════════════════════════════════════
+// P0: Perf Timer on File Open
+// ═══════════════════════════════════════════════
+function startPerfOpenTimer() {
+    if (!window.__perfOpenTimer) {
+        window.__perfOpenTimer = null;
+    }
+}
+
+// ═══════════════════════════════════════════════
+// P1: Git Intelligence — Smart Commit Message
+// ═══════════════════════════════════════════════
+async function generateSmartCommitMessage() {
+    const msgInput = document.getElementById('git-commit-message');
+    if (!msgInput || !state.projectPath) return;
+    try {
+        msgInput.placeholder = 'AI 正在分析变更...';
+        const result = await window.api.gitintelGenerateCommitMessage(state.projectPath, { style: 'conventional', useAI: true });
+        if (result && result.message && result.message !== 'chore: minor update') {
+            msgInput.value = result.message;
+            msgInput.placeholder = '提交信息';
+            if (result.breakdown && result.breakdown.length > 0) {
+                const detail = result.breakdown.map(b => `- ${b.type}${b.scope ? '(' + b.scope + ')' : ''}: ${b.short}`).join('\n');
+                addChatMessage('system', `🤖 AI 分析变更:\n${detail}`);
+            }
+        } else { msgInput.placeholder = '提交信息 (变更较少)'; }
+    } catch { msgInput.placeholder = 'AI 分析失败'; }
+}
+
+// ═══════════════════════════════════════════════
+// P1: Project Memory — Auto-load & Inject
+// ═══════════════════════════════════════════════
+async function initProjectMemory(projectPath) {
+    try {
+        await window.api.memoryInit(projectPath);
+        const injection = await window.api.memoryGetInjection();
+        if (injection) window.__projectMemoryInjection = injection;
+    } catch { /* 非致命 */ }
+}
+
+// ═══════════════════════════════════════════════
+// P1: Vector Index — Auto-init & Background Index
+// ═══════════════════════════════════════════════
+async function initVectorIndex(projectPath) {
+    try {
+        await window.api.vectorInit(projectPath);
+        setTimeout(() => { window.api.vectorIndexAll().catch(() => {}); }, 2000);
+    } catch { /* 非致命 */ }
+}
+
+// ═══════════════════════════════════════════════
+// P1: Semantic Completion — Monaco Provider
+// ═══════════════════════════════════════════════
+function registerSemanticCompletion() {
+    if (!monaco) return;
+    try {
+        monaco.languages.registerCompletionItemProvider('*', {
+            provideCompletionItems: async (model, position) => {
+                const textUntilPosition = model.getValueInRange({
+                    startLineNumber: Math.max(1, position.lineNumber - 5),
+                    startColumn: 1,
+                    endLineNumber: position.lineNumber,
+                    endColumn: position.column,
+                });
+                const fp = model.uri?.fsPath || model.uri?.path;
+                const lang = model.getLanguageId();
+                try {
+                    const completion = await window.api.completionGet({
+                        prefix: textUntilPosition.substring(Math.max(0, textUntilPosition.length - 500)),
+                        filePath: fp, language: lang,
+                        line: position.lineNumber, column: position.column,
+                    });
+                    if (completion && completion.text) {
+                        return { suggestions: [{ label: completion.text.substring(0, 50), kind: monaco.languages.CompletionItemKind.Snippet, insertText: completion.text, detail: 'AI 补全' }] };
+                    }
+                } catch {}
+                return { suggestions: [] };
+            },
+            triggerCharacters: ['.', '(', ' '],
+        });
+    } catch {}
+}
+
+// ═══════════════════════════════════════════════
+// P0: Project-Level Service Initialization
+// ═══════════════════════════════════════════════
+let p0ServicesInitialized = false;
+function initP0ProjectServices(projectPath) {
+    if (p0ServicesInitialized) return;
+    p0ServicesInitialized = true;
+    // Context Trimmer: 初始化 + 后台瘦身
+    window.api.contextInit(projectPath).then(() => {
+        window.api.contextStartTrim().catch(() => {});
+        window.api.contextCachePrompt('default', 'TCIDE AI 编程助手系统提示词...').catch(() => {});
+    }).catch(() => {});
+    // P1: 项目记忆
+    initProjectMemory(projectPath).catch(() => {});
+    // P1: 向量索引
+    initVectorIndex(projectPath).catch(() => {});
+    // Perf: 定时 GC 清理
+    setInterval(() => {
+        window.api.perfGcSweep().catch(() => {});
+        if (editor) {
+            // 限制内存中的模型数量
+            const models = monaco.editor.getModels();
+            if (models.length > 20) {
+                for (let i = 0; i < models.length - 15; i++) {
+                    try { models[i].dispose(); } catch {}
+                }
+            }
+        }
+    }, 60000);
+    // 输入防抖：为编辑器添加防抖
+    if (editor) {
+        let debounceTimer = null;
+        editor.onDidChangeModelContent(() => {
+            if (debounceTimer) clearTimeout(debounceTimer);
+            debounceTimer = setTimeout(() => {
+                // Lint 延迟检测（300ms 后触发）
+                const model = editor.getModel();
+                if (model && state.projectPath) {
+                    const fp = model.uri?.fsPath || model.uri?.path;
+                    if (fp) triggerLintForFile(fp);
+                }
+            }, 300);
+        });
+    }
+    // 大文件滚动分片监听
+    if (editor) {
+        editor.onDidScrollChange((e) => {
+            if (!e.scrollTopChanged) return;
+            const model = editor.getModel();
+            if (!model) return;
+            const fp = model.uri?.fsPath || model.uri?.path;
+            if (!fp) return;
+            const visibleRanges = editor.getVisibleRanges();
+            if (visibleRanges.length > 0) {
+                const startLine = visibleRanges[0].startLineNumber;
+                const endLine = visibleRanges[visibleRanges.length - 1].endLineNumber;
+                window.api.chunkerGetViewportChunks(fp, startLine, endLine).then(chunks => {
+                    // 预加载逻辑已由 Core 处理，此处仅触发视口更新
+                }).catch(() => {});
+            }
+        });
+    }
+    console.log('[P0] 项目服务已初始化:', projectPath);
+}
+
+// ═══════════════════════════════════════════════
+// P0: AutoHeal — 终端报错自动修复（终端输出拦截）
+// ═══════════════════════════════════════════════
+function setupAutoHealForTerminal() {
+    // 拦截终端命令输出，检测错误并触发自愈
+    const originalExecCommand = window.api.execCommand;
+    if (!originalExecCommand) return;
+    // 包装 execCommand，在返回结果时检测错误
+    window.api.execCommand = async function(command, cwd) {
+        const result = await originalExecCommand.call(window.api, command, cwd);
+        if (result.exitCode !== 0 && state.projectPath) {
+            const output = (result.stdout || '') + '\n' + (result.stderr || '');
+            try {
+                const errors = await window.api.autohealParseErrors(output, state.projectPath);
+                if (errors.length > 0) {
+                    addChatMessage('system', `🔧 检测到 ${errors.length} 个编译错误，是否需要 AI 自动修复？\n\n${errors.slice(0, 3).map(e => `- ${e.filePath || '?'}:${e.line} ${e.message?.substring(0, 80)}`).join('\n')}\n\n输入 "修复" 以启动自动修复。`);
+                    // 存储错误供后续修复
+                    window.__lastBuildErrors = errors;
+                    window.__lastBuildCommand = command;
+                }
+            } catch { /* 自愈解析失败 */ }
+        }
+        return result;
+    };
+}
+
+// ═══════════════════════════════════════════════
+// P0: Batch — 搜索面板集成
+// ═══════════════════════════════════════════════
+function setupBatchSearchIntegration() {
+    // 增强搜索面板：连接 batch API 支持全局搜索替换
+    const searchPanel = document.getElementById('search-panel');
+    if (!searchPanel) return;
+    // 监听搜索输入，使用 debounce 调用 batch:search
+    const searchInput = document.getElementById('search-input');
+    if (!searchInput) return;
+    let searchTimer = null;
+    searchInput.addEventListener('input', () => {
+        if (searchTimer) clearTimeout(searchTimer);
+        searchTimer = setTimeout(async () => {
+            const query = searchInput.value.trim();
+            if (query.length < 2 || !state.projectPath) return;
+            const fileFilter = document.getElementById('search-file-filter');
+            const fileTypes = fileFilter?.value === '*' ? undefined : fileFilter?.value.split(',').map(s => s.trim());
+            try {
+                const results = await window.api.batchSearch(state.projectPath, query, { fileTypes, maxResults: 100 });
+                const resultsContainer = document.getElementById('search-results');
+                if (resultsContainer) {
+                    if (results.count === 0) {
+                        resultsContainer.innerHTML = '<div class="search-empty">未找到结果</div>';
+                    } else {
+                        resultsContainer.innerHTML = `<div class="search-summary">找到 ${results.count} 个结果${results.count > 100 ? ' (仅显示前100个)' : ''}</div>` +
+                            results.matches.slice(0, 100).map(m => {
+                                const fileName = m.filePath.replace(/^.*[/\\]/, '');
+                                const preview = m.lineContent.substring(0, 120);
+                                return `<div class="search-result-item" data-file="${m.filePath}" data-line="${m.line}" data-col="${m.column}" style="padding:4px 8px;cursor:pointer;border-bottom:1px solid var(--border-color);display:flex;gap:6px;">
+                                    <span style="color:var(--fg-secondary);flex-shrink:0;font-size:10px;">${fileName}:${m.line}</span>
+                                    <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px;">${preview}</span>
+                                </div>`;
+                            }).join('');
+                        // 点击跳转
+                        resultsContainer.querySelectorAll('.search-result-item').forEach(el => {
+                            el.addEventListener('click', async () => {
+                                const fp = el.dataset.file;
+                                const line = parseInt(el.dataset.line);
+                                if (fp) {
+                                    const name = fp.replace(/^.*[/\\]/, '');
+                                    const existing = state.openFiles.findIndex(f => f.path === fp);
+                                    if (existing >= 0) switchToFile(existing);
+                                    else await openFile(fp, name);
+                                    if (editor) { editor.revealLineInCenter(line); editor.setPosition({ lineNumber: line, column: 1 }); }
+                                }
+                            });
+                        });
+                    }
+                }
+            } catch { /* search failed */ }
+        }, 200);
+    });
+    // 替换按钮：使用 batch:preview + batch:apply
+    const replaceInput = document.getElementById('search-replace');
+    const toggleReplaceBtn = document.getElementById('btn-toggle-replace');
+    if (toggleReplaceBtn && replaceInput) {
+        toggleReplaceBtn.addEventListener('click', () => {
+            const isHidden = replaceInput.classList.contains('hidden');
+            replaceInput.classList.toggle('hidden');
+            toggleReplaceBtn.textContent = isHidden ? '↔ (预览)' : '↔';
+        });
+        // 监听替换输入 + Enter 执行替换
+        replaceInput.addEventListener('keydown', async (e) => {
+            if (e.key === 'Enter' && e.ctrlKey) {
+                const search = searchInput.value.trim();
+                const replace = replaceInput.value.trim();
+                if (!search || !replace || !state.projectPath) return;
+                try {
+                    const preview = await window.api.batchPreview(state.projectPath, search, replace);
+                    const confirm = window.confirm(`将替换 ${preview.totalChanges} 处匹配 (${preview.affectedFiles} 个文件)。确认？`);
+                    if (confirm) {
+                        const result = await window.api.batchApply(state.projectPath, search, replace);
+                        showToast(`已修改 ${result.stats.modified} 个文件 (${result.stats.failed} 失败)`, result.stats.failed === 0 ? 'success' : 'warning');
+                        if (result.stats.failed > 0) {
+                            addChatMessage('system', `⚠ 批量替换部分失败:\n${result.results.filter(r => !r.success).map(r => `- ${r.filePath}: ${r.error}`).join('\n')}`);
+                        }
+                        // 刷新文件树
+                        if (state.projectPath) loadFileTree(state.projectPath);
+                    }
+                } catch (err) {
+                    showToast(`替换失败: ${err.message}`, 'error');
+                }
+            }
+        });
+    }
+}
+
 // 初始化用量相关事件
 function initUsageEvents() {
     // 用量 Tab 切换时加载数据
@@ -6084,6 +6683,23 @@ function initUsageEvents() {
 }
 initUsageEvents();
 initSettingsEvents();
+
+// ═══════════════════════════════════════════════
+// P0: Init Renderer Integrations (Lint / Debug / Perf / Context / AutoHeal / Batch)
+// ═══════════════════════════════════════════════
+initLintListener();
+// Debug panel 延迟挂载（等 DOM 就绪）
+setTimeout(() => { mountDebugPanel(); }, 500);
+// Perf 状态栏更新
+setInterval(() => { updateStatusBarPerf(); }, 30000);
+updateStatusBarPerf();
+// AutoHeal: 终端错误拦截
+setupAutoHealForTerminal();
+// Batch: 搜索面板集成
+try { setupBatchSearchIntegration(); } catch(e) { console.warn('[P0] Batch search integration:', e); }
+// P1: 语义补全注册（等 Monaco 初始化后）
+setTimeout(() => { registerSemanticCompletion(); }, 1000);
+
 // ── MCP 工具切换 ──
 let mcpToolsEnabled = false;
 const toolsToggle = document.getElementById('btn-tools-toggle');
