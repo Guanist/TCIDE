@@ -4515,3 +4515,9 @@ input:focus, button:focus-visible, select:focus, textarea:focus {
 
 /* ═── AI 统计栏 ── */
 .ai-stats-bar { padding: 6px 12px; font-size: 11px; color: var(--tc-orange); background: rgba(255,140,0,.06); border: 1px solid rgba(255,140,0,.12); border-radius: var(--radius-sm); margin-bottom: 8px; text-align: center; font-weight: 500; }
+.ai-stats-bar.ai-stats-active { animation: statsPulse 2s ease-in-out infinite; }
+@keyframes statsPulse { 0%,100%{border-color:rgba(255,140,0,.12)} 50%{border-color:rgba(255,140,0,.4)} }
+
+/* ═── 消息气泡限高 ── */
+.msg-content { max-height: 400px; overflow-y: auto; }
+.chat-message.assistant .msg-content { max-height: 500px; }

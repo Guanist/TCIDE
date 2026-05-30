@@ -3015,10 +3015,15 @@ function hideTypingIndicator(): void {
 }
 
 // ── AI 状态统计（工具调用/深度思考） ──
-let aiStats = { toolCalls: 0, deepThinkings: 0 };
+let aiStats = { toolCalls: 0, deepThinkings: 0, isActive: false };
 
 function resetAiStats(): void {
-  aiStats = { toolCalls: 0, deepThinkings: 0 };
+  aiStats = { toolCalls: 0, deepThinkings: 0, isActive: true };
+  renderAiStatsBar();
+}
+
+function stopAiStats(): void {
+  aiStats.isActive = false;
   renderAiStatsBar();
 }
 
@@ -3039,7 +3044,7 @@ function renderAiStatsBar(): void {
   const chatMsgs = document.getElementById('chat-messages');
   if (!chatMsgs) return;
 
-  if (aiStats.toolCalls === 0 && aiStats.deepThinkings === 0) {
+  if (!aiStats.isActive && aiStats.toolCalls === 0 && aiStats.deepThinkings === 0) {
     bar?.remove();
     return;
   }
@@ -3052,9 +3057,11 @@ function renderAiStatsBar(): void {
   }
 
   const parts: string[] = [];
+  if (aiStats.isActive) parts.push('🐯 虎猫正在工作中...');
   if (aiStats.toolCalls > 0) parts.push(`🔧 工具调用 ${aiStats.toolCalls} 次`);
   if (aiStats.deepThinkings > 0) parts.push(`🧠 深度思考 ${aiStats.deepThinkings} 次`);
   bar.textContent = parts.join('  ·  ');
+  bar.className = 'ai-stats-bar' + (aiStats.isActive ? ' ai-stats-active' : '');
 }
 
 // ── AI 模型状态指示器 ──
@@ -4281,10 +4288,15 @@ function setupEventListeners(): void {
       } catch { /* not JSON, regular text */ }
     }
     appendStreamChunk(text);
+    // 检测流中的深度思考标记
+    if (text.includes('[reasoning]') && !state.currentStreamContent.includes('[reasoning]')) {
+      incrementDeepThinking();
+    }
   });
 
   window.api.on('ai-stream-end', () => {
     hideTypingIndicator();
+    stopAiStats();
     const session = ensureSession();
     const content = state.currentStreamContent;
     stopStreaming();
