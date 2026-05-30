@@ -4482,3 +4482,15 @@ input:focus, button:focus-visible, select:focus, textarea:focus {
 .media-preview-container.hidden { display:none; }
 .media-video-preview { max-width:100%; max-height:100%; }
 .media-audio-preview { width:400px; }
+
+/* ═── 代码块折叠 ── */
+.code-block-pre.code-block-collapsed { max-height: 8.5em; overflow: hidden; position: relative; }
+.code-block-pre.code-block-collapsed::after { content: ''; position: absolute; bottom: 0; left: 0; right: 0; height: 3em; background: linear-gradient(transparent, var(--bg-primary)); pointer-events: none; }
+.code-expand-btn { font-size: 11px; padding: 2px 8px; border: 1px solid var(--border-subtle); border-radius: var(--radius-sm); background: transparent; color: var(--text-secondary); cursor: pointer; transition: all var(--ease-fast); white-space: nowrap; }
+.code-expand-btn:hover { border-color: var(--tc-orange); color: var(--tc-orange); }
+
+/* ═── 关闭未保存文件提示 ── */
+.btn-confirm-ok.primary { background: var(--tc-gradient); color: #fff; border-color: var(--tc-orange); }
+.btn-confirm-ok.primary:hover { background: var(--tc-orange); }
+.btn-confirm-cancel.danger { border-color: var(--error); color: var(--error); }
+.btn-confirm-cancel.danger:hover { background: #f443361a; }

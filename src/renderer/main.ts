@@ -1274,6 +1274,25 @@ function closeFile(index: number): void {
   if (index < 0 || index >= state.openFiles.length) return;
 
   const file = state.openFiles[index];
+
+  // ── 未保存文件提示 ──
+  if (file.dirty) {
+    showConfirm(`「${file.name}」有未保存的修改，是否保存？`, () => {
+      // 保存后关闭
+      try { window.api.writeFile(file.path, file.content); } catch {}
+      doCloseFile(index);
+    }, () => {
+      // 不保存直接关闭
+      doCloseFile(index);
+    }, '保存', '不保存');
+    return;
+  }
+
+  doCloseFile(index);
+}
+
+function doCloseFile(index: number): void {
+  const file = state.openFiles[index];
   (window as any).__lspNotifyClose?.(file.path, file.language);
 
   state.openFiles.splice(index, 1);
@@ -1690,10 +1709,16 @@ function renderMarkdown(text: string): string {
       <button class="code-action-btn code-save-btn" title="保存到项目"
         onclick="event.stopPropagation();(function(){const el=document.getElementById('${codeId}');const code=el?el.textContent:'';window.__saveCodeToProject__('${escapedLang}',code)})()">💾 保存</button>
     `;
+
+    // 长代码块折叠（>10 行），默认只显示前 6 行
+    const lines = block.code.split('\n');
+    const isLong = lines.length > 10;
+    const collapsibleClass = isLong ? ' code-block-collapsed' : '';
+    const toggleBtn = isLong ? `<button class="code-expand-btn" onclick="const w=this.closest('.code-block-wrapper');const p=w.querySelector('.code-block-pre');const e=w.querySelector('.code-expand-btn');if(p.classList.contains('code-block-collapsed')){p.classList.remove('code-block-collapsed');e.textContent='收起 ▲'}else{p.classList.add('code-block-collapsed');e.textContent='展开 ▼ ('+${lines.length}+'行)'};return false">展开 ▼ (${lines.length}行)</button>` : '';
     
     return `<div class="code-block-wrapper">
-      <div class="code-block-header">${langLabel}<span class="code-block-spacer"></span>${actionsHtml}<button class="copy-code-btn" onclick="var t=this.parentElement.parentElement.querySelector('code').textContent;navigator.clipboard.writeText(t).then(()=>{this.textContent='✓已复制';setTimeout(()=>{this.textContent='📋 复制'},2000)})">📋 复制</button></div>
-      <pre class="code-block-pre"><code id="${codeId}" class="lang-${block.lang}">${escaped}</code></pre>
+      <div class="code-block-header">${langLabel}<span class="code-block-spacer"></span>${actionsHtml}${toggleBtn}<button class="copy-code-btn" onclick="var t=this.parentElement.parentElement.querySelector('code').textContent;navigator.clipboard.writeText(t).then(()=>{this.textContent='✓已复制';setTimeout(()=>{this.textContent='📋 复制'},2000)})">📋 复制</button></div>
+      <pre class="code-block-pre${collapsibleClass}"><code id="${codeId}" class="lang-${block.lang}">${escaped}</code></pre>
     </div>`;
   });
 
@@ -2293,20 +2318,22 @@ function renameSession(id: string): void {
 }
 
 /** 通用二次确认模态框 */
-function showConfirm(message: string, onConfirm: () => void): void {
+function showConfirm(message: string, onConfirm: () => void, onCancel?: () => void, confirmLabel?: string, cancelLabel?: string): void {
   const overlay = document.createElement('div');
   overlay.className = 'confirm-overlay';
+  const confBtn = confirmLabel || '确定删除';
+  const cancBtn = cancelLabel || '取消';
   overlay.innerHTML = `
     <div class="confirm-dialog">
       <div class="confirm-msg">${message}</div>
       <div class="confirm-actions">
-        <button class="btn-confirm-cancel">取消</button>
-        <button class="btn-confirm-ok">确定删除</button>
+        <button class="btn-confirm-cancel">${cancBtn}</button>
+        <button class="btn-confirm-ok">${confBtn}</button>
       </div>
     </div>`;
-  overlay.querySelector('.btn-confirm-cancel')?.addEventListener('click', () => overlay.remove());
+  overlay.querySelector('.btn-confirm-cancel')?.addEventListener('click', () => { overlay.remove(); onCancel?.(); });
   overlay.querySelector('.btn-confirm-ok')?.addEventListener('click', () => { overlay.remove(); onConfirm(); });
-  overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
+  overlay.addEventListener('click', (e) => { if (e.target === overlay) { overlay.remove(); onCancel?.(); } });
   document.body.appendChild(overlay);
 }
 
