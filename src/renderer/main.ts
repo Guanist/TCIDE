@@ -3466,6 +3466,37 @@ const VERSION_HISTORY: Array<{ version: string; date: string; emoji: string; tit
     ],
     philosophy: '从 Hackable 到 Professional。LSP 让代码理解不再靠猜,Emmet 让 HTML 飞起来,MCP 让 AI 真正能动手。'
   },
+  {
+    version: 'v1.5.0-p0',
+    date: '2026-05-30',
+    emoji: '🐲',
+    title: '全模块交付 — P0/P1/P2/P3 十八模块',
+    features: [
+      '🏗️ P0: DebugManager/LintManager/Chunker/Trimmer/AutoHeal/Batch/Perf/Keybindings',
+      '🧠 P1: GitIntelligence/Memory/Vector/SemanticCompletion',
+      '⚙️ P2: Orchestrator/Warehouse/Runner',
+      '📊 P3: Entropy/Controller/SmartTrimmer',
+      '🔌 57个IPC通道+397行Preload / 图片视频音频预览',
+      '📋 版本记录面板 / 活动栏标签 / 对话多选清空',
+      '🐛 图片关闭残留 / 版本记录点不开',
+    ],
+    philosophy: '从Demo到生产。18个模块一次交付,57个IPC通道全部接通。'
+  },
+  {
+    version: 'v1.5.1',
+    date: '2026-05-30',
+    emoji: '🐯',
+    title: '体验打磨 — 聊天修复/思考动画/代码折叠/保存提示',
+    features: [
+      '🐯 虎猫思考动画: 弹跳虎猫 + 阶段指示(分析/工具/思考)',
+      '📊 AI统计栏: 实时工具调用+深度思考计数',
+      '📦 长代码块折叠 + 💾 关闭保存确认',
+      '🐛 AI回复内容丢失 / 用户消息重复 / 回复中断',
+      '🐛 HTML/SVG预览串位 / 设置子标签点击无效',
+      '🎨 聊天气泡限高 / MCP开关视觉反馈 / 活动栏标签',
+    ],
+    philosophy: '细节决定体验。思考动画让等待可感知,代码折叠让聊天不臃肿。'
+  },
 ];
 
 function renderChangelog(): void {
