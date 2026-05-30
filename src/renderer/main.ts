@@ -6047,6 +6047,7 @@ async function init(): Promise<void> {
   initSearchPanel();
   initTabContextMenu();
   initTerminal();
+  initSettingsEvents();
   // ── 会话恢复已在上面完成 ──
 
   // 编辑器光标变化时更新面包屑和 Zen 状态栏
