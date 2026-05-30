@@ -1181,13 +1181,22 @@ function switchToFile(index: number): void {
     if (mediaContainer) { mediaContainer.classList.remove('hidden'); video?.classList.add('hidden'); audio?.classList.remove('hidden'); }
     if (audio) { audio.src = file.content; audio.load(); }
   } else if (file.language === 'html' || file.language === 'xml' || file.name.endsWith('.svg')) {
-    // 预览/源码可切换
+    // 预览/源码可切换 — 先设内容再显示，避免预览串位
     const htmlErr = document.getElementById('html-error-console');
-    if (file.name.endsWith('.svg')) {
-      // SVG 用 srcdoc 包裹确保渲染
-      if (htmlFrame) { htmlFrame.classList.remove('hidden'); htmlFrame.src = ''; htmlFrame.srcdoc = `<html><body style="margin:0;display:flex;align-items:center;justify-content:center;min-height:100vh;background:#fff">${file.content}</body></html>`; }
-    } else {
-      if (htmlFrame) { htmlFrame.classList.remove('hidden'); htmlFrame.src = ''; htmlFrame.srcdoc = wrapHtmlWithErrorCapture(file.content); }
+    if (htmlFrame) {
+      // 先清再赋，确保 iframe 刷新
+      htmlFrame.srcdoc = '';
+      htmlFrame.src = 'about:blank';
+      // 下一帧赋值内容并显示
+      requestAnimationFrame(() => {
+        if (state.openFiles[state.activeFileIndex] !== file) return; // 已切换文件，放弃
+        if (file.name.endsWith('.svg')) {
+          htmlFrame.srcdoc = `<html><body style="margin:0;display:flex;align-items:center;justify-content:center;min-height:100vh;background:#fff">${file.content}</body></html>`;
+        } else {
+          htmlFrame.srcdoc = wrapHtmlWithErrorCapture(file.content);
+        }
+        htmlFrame.classList.remove('hidden');
+      });
     }
     const modeBtn = document.getElementById('html-mode-toggle');
     if (modeBtn) { modeBtn.style.display = ''; modeBtn.textContent = '📝 源码'; }
