@@ -94,46 +94,77 @@ class SemanticChunker {
      * @returns {{chunks: Chunk[], totalLines: number, language: string}}
      */
     chunkFile(filePath) {
-        const cached = this._cache.get(filePath);
-        const stat = fs.statSync(filePath);
-        const version = stat.mtimeMs;
+        try {
+            const cached = this._cache.get(filePath);
+            const stat = fs.statSync(filePath);
+            const version = stat.mtimeMs;
 
-        // 缓存命中（文件未修改）
-        if (cached && cached.version === version) {
-            return { chunks: cached.chunks, totalLines: cached.totalLines, language: cached.language };
-        }
+            // 缓存命中（文件未修改）
+            if (cached && cached.version === version) {
+                return { chunks: cached.chunks, totalLines: cached.totalLines, language: cached.language };
+            }
 
-        const content = fs.readFileSync(filePath, 'utf-8');
-        this._contentCache.set(filePath, content);
+            const content = fs.readFileSync(filePath, 'utf-8');
+            this._contentCache.set(filePath, content);
 
-        const lines = content.split('\n');
-        const totalLines = lines.length;
-        const language = this._detectLanguage(filePath);
+            const lines = content.split('\n');
+            const totalLines = lines.length;
+            const language = this._detectLanguage(filePath);
 
-        // 不需要分片
-        if (totalLines <= this.options.lineThreshold) {
-            const chunk = {
-                index: 0,
-                startLine: 1,
-                endLine: totalLines,
-                byteOffset: 0,
-                byteLength: Buffer.byteLength(content, 'utf-8'),
-                semanticType: 'generic',
-                preview: lines.slice(0, this.options.previewLines).join('\n'),
-                status: 'loaded',
-            };
-            const result = { chunks: [chunk], totalLines, language };
+            // 不需要分片
+            if (totalLines <= this.options.lineThreshold) {
+                const chunk = {
+                    index: 0,
+                    startLine: 1,
+                    endLine: totalLines,
+                    byteOffset: 0,
+                    byteLength: Buffer.byteLength(content, 'utf-8'),
+                    semanticType: 'generic',
+                    preview: lines.slice(0, this.options.previewLines).join('\n'),
+                    status: 'loaded',
+                };
+                const result = { chunks: [chunk], totalLines, language };
+                this._cache.set(filePath, { ...result, version });
+                return result;
+            }
+
+            // 执行语义分片
+            const boundaries = this._findSemanticBoundaries(lines, language);
+            const chunks = this._buildChunks(lines, boundaries, content);
+
+            const result = { chunks, totalLines, language };
             this._cache.set(filePath, { ...result, version });
             return result;
+        } catch (e) {
+            // 异常降级：文件不可读/编码错误/语法异常时，用简单行数分片兜底
+            console.warn(`[Chunker] 语义分片异常，降级为行分片: ${filePath}`, e.message);
+            try {
+                const content = this._contentCache.get(filePath) || '';
+                const lines = content ? content.split('\n') : [];
+                const totalLines = lines.length;
+                if (!totalLines) return { chunks: [], totalLines: 0, language: this._detectLanguage(filePath) };
+                const chunkSize = this.options.chunkTargetLines;
+                const chunks = [];
+                for (let i = 0; i < totalLines; i += chunkSize) {
+                    const end = Math.min(i + chunkSize, totalLines);
+                    chunks.push({
+                        index: chunks.length,
+                        startLine: i + 1,
+                        endLine: end,
+                        byteOffset: content.split('\n').slice(0, i).join('\n').length,
+                        byteLength: lines.slice(i, end).join('\n').length,
+                        semanticType: 'generic',
+                        preview: lines.slice(i, Math.min(i + this.options.previewLines, end)).join('\n'),
+                        status: 'virtual',
+                    });
+                }
+                const result = { chunks, totalLines, language: this._detectLanguage(filePath) };
+                return result;
+            } catch (fallbackErr) {
+                console.error(`[Chunker] 降级分片也失败: ${filePath}`, fallbackErr.message);
+                return { chunks: [], totalLines: 0, language: this._detectLanguage(filePath) };
+            }
         }
-
-        // 执行语义分片
-        const boundaries = this._findSemanticBoundaries(lines, language);
-        const chunks = this._buildChunks(lines, boundaries, content);
-
-        const result = { chunks, totalLines, language };
-        this._cache.set(filePath, { ...result, version });
-        return result;
     }
 
     // ── 查询 ──
