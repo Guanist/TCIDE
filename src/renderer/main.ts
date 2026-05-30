@@ -2753,10 +2753,6 @@ ${state.activeFileIndex >= 0 && state.openFiles[state.activeFileIndex] ? `当前
     window.api.sendToAIStream(messages, { model: state.config.model });
     showTypingIndicator();
 
-    session.chatHistory.push({
-      id: crypto.randomUUID(), role: 'user', content: text,
-      timestamp: Date.now(), attachments: currentAttach.length > 0 ? currentAttach : undefined
-    });
     // 首次对话自动命名为用户第一条消息
     if (session.name.startsWith('对话 ') && session.chatHistory.filter(m => m.role === 'user').length === 1) {
       session.name = text.slice(0, 30) + (text.length > 30 ? '...' : '');

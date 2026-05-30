@@ -1528,6 +1528,13 @@ html, body {
   border-color: var(--tc-orange);
 }
 
+.chat-tool-btn.active {
+  background: rgba(255, 140, 0, 0.2) !important;
+  color: var(--tc-orange) !important;
+  border-color: var(--tc-orange) !important;
+  box-shadow: 0 0 8px var(--tc-glow);
+}
+
 .chat-input-footer {
   display: flex;
   justify-content: space-between;

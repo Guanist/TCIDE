@@ -5878,6 +5878,8 @@ async function init() {
     loadModelList(); // 异步加载模型注册表
     // ── 会话恢复（必须在其他初始化之前）──
     await restoreLastSession();
+    // 清理历史重复消息（旧版 streamToAI 产生的双份用户消息）
+    deduplicateChatHistory();
     // 如果没有会话则初始化首个
     ensureSession();
     // v1.1 新功能初始化
@@ -6720,6 +6722,31 @@ try { setupBatchSearchIntegration(); } catch(e) { console.warn('[P0] Batch searc
 // P1: 语义补全注册（等 Monaco 初始化后）
 setTimeout(() => { registerSemanticCompletion(); }, 1000);
 
+// ── 清理历史重复消息 ──
+function deduplicateChatHistory() {
+    let cleaned = 0;
+    for (const session of state.chatSessions) {
+        const filtered = [];
+        for (let i = 0; i < session.chatHistory.length; i++) {
+            const curr = session.chatHistory[i];
+            const prev = filtered[filtered.length - 1];
+            // 跳过相邻重复的用户消息
+            if (prev && prev.role === 'user' && curr.role === 'user' && prev.content === curr.content) {
+                cleaned++;
+                continue;
+            }
+            filtered.push(curr);
+        }
+        if (filtered.length !== session.chatHistory.length) {
+            session.chatHistory = filtered;
+            session.updatedAt = Date.now();
+        }
+    }
+    if (cleaned > 0) {
+        console.log(`[Dedup] 清理了 ${cleaned} 条重复消息`);
+        saveSessionsToDisk();
+    }
+}
 // ── MCP 工具切换 ──
 let mcpToolsEnabled = false;
 const toolsToggle = document.getElementById('btn-tools-toggle');
@@ -6727,8 +6754,7 @@ if (toolsToggle) {
     toolsToggle.addEventListener('click', () => {
         mcpToolsEnabled = !mcpToolsEnabled;
         toolsToggle.classList.toggle('active', mcpToolsEnabled);
-        toolsToggle.style.background = mcpToolsEnabled ? 'rgba(255,165,0,0.2)' : '';
-        showToast(mcpToolsEnabled ? '🔧 工具模式: AI 可读写文件/执行命令' : '🔧 工具模式: 关闭', 'info', 2000);
+        showToast(mcpToolsEnabled ? '✅ 工具模式已开启: AI 可读写文件/执行命令' : '❌ 工具模式已关闭', 'info', 2000);
     });
 }
 // ── 多选模式 ──
