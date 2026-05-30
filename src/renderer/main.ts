@@ -3852,12 +3852,12 @@ function switchToChatTab(): void {
 
 // 初始化设置面板事件
 function initSettingsEvents(): void {
-  // 设置 Tab 切换
-  document.querySelectorAll('.settings-tab').forEach(tab => {
-    tab.addEventListener('click', () => {
-      const tabName = (tab as HTMLElement).dataset.settingsTab || 'providers';
-      switchSettingsSubTab(tabName);
-    });
+  // 使用事件委托，避免 DOM 顺序问题
+  document.querySelector('.settings-tabs')?.addEventListener('click', (e) => {
+    const tab = (e.target as HTMLElement).closest('.settings-tab') as HTMLElement;
+    if (!tab) return;
+    const tabName = tab.dataset.settingsTab || 'providers';
+    switchSettingsSubTab(tabName);
   });
 
   // Provider 切换 → 自动填充默认值
