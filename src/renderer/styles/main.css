@@ -1144,18 +1144,22 @@ html, body {
   line-height: 1.65;
   word-break: break-word;
   color: var(--text-primary);
+  max-height: 600px;
+  overflow-y: auto;
 }
 
 .chat-message.user .msg-content {
   background: linear-gradient(135deg, var(--tc-orange), var(--tc-orange-dark));
   color: #FFFFFF;
   border-bottom-right-radius: var(--radius-sm);
+  max-height: 400px;
 }
 
 .chat-message.assistant .msg-content {
   background: var(--bg-tertiary);
   border: 1px solid var(--border-subtle);
   border-bottom-left-radius: var(--radius-sm);
+  max-height: 500px;
 }
 
 .chat-message.system .msg-content {
@@ -1255,7 +1259,8 @@ html, body {
 .code-block-pre {
   margin: 0;
   padding: 12px;
-  overflow-x: auto;
+  overflow: auto;
+  max-height: 300px;
   font-family: 'Cascadia Code', 'JetBrains Mono', 'Fira Code', 'Consolas', monospace;
   font-size: 13px;
   line-height: 1.55;
@@ -4518,6 +4523,3 @@ input:focus, button:focus-visible, select:focus, textarea:focus {
 .ai-stats-bar.ai-stats-active { animation: statsPulse 2s ease-in-out infinite; }
 @keyframes statsPulse { 0%,100%{border-color:rgba(255,140,0,.12)} 50%{border-color:rgba(255,140,0,.4)} }
 
-/* ═── 消息气泡限高 ── */
-.msg-content { max-height: 400px; overflow-y: auto; }
-.chat-message.assistant .msg-content { max-height: 500px; }
