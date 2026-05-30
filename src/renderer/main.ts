@@ -1522,7 +1522,6 @@ function streamToAI(userMsg: string, ctxMsg: string, fileName: string): void {
       ];
       window.api.sendToAIStream(msg, { model: state.config.model });
       showTypingIndicator();
-      session.chatHistory.push({ id: crypto.randomUUID(), role: 'user', content: userMsg, timestamp: Date.now() });
       session.updatedAt = Date.now();
     } catch (err) {
       addChatMessage('assistant', `错误: ${(err as Error).message}`);
@@ -4177,9 +4176,9 @@ function setupEventListeners(): void {
 
   window.api.on('ai-stream-end', () => {
     hideTypingIndicator();
-    stopStreaming();
     const session = ensureSession();
     const content = state.currentStreamContent;
+    stopStreaming();
     session.chatHistory.push({
       id: crypto.randomUUID(),
       role: 'assistant',

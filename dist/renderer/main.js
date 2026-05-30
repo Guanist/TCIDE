@@ -1591,7 +1591,6 @@ function streamToAI(userMsg, ctxMsg, fileName) {
             ];
             window.api.sendToAIStream(msg, { model: state.config.model });
             showTypingIndicator();
-            session.chatHistory.push({ id: crypto.randomUUID(), role: 'user', content: userMsg, timestamp: Date.now() });
             session.updatedAt = Date.now();
         }
         catch (err) {
@@ -4154,9 +4153,9 @@ function setupEventListeners() {
     });
     window.api.on('ai-stream-end', () => {
         hideTypingIndicator();
-        stopStreaming();
         const session = ensureSession();
         const content = state.currentStreamContent;
+        stopStreaming();
         session.chatHistory.push({
             id: crypto.randomUUID(),
             role: 'assistant',
