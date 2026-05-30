@@ -2502,6 +2502,30 @@ function deleteSelectedMessages(): void {
   });
 }
 
+function selectAllMessages(): void {
+  const session = state.chatSessions.find(s => s.id === state.currentSessionId);
+  if (!session) return;
+  chatSelectedIds = new Set(session.chatHistory.map(m => m.id));
+  updateSelectBarUI();
+  renderChatHistory();
+  showToast(`已全选 ${chatSelectedIds.size} 条`, 'info', 1500);
+}
+
+function deleteAllMessages(): void {
+  const session = state.chatSessions.find(s => s.id === state.currentSessionId);
+  if (!session || session.chatHistory.length === 0) return;
+  showConfirm(`确定清空全部 ${session.chatHistory.length} 条消息?此操作不可撤销。`, () => {
+    session.chatHistory = [];
+    session.updatedAt = Date.now();
+    chatSelectedIds.clear();
+    chatSelectMode = false;
+    updateSelectBarUI();
+    renderChatHistory();
+    saveSessionsToDisk();
+    showToast('已清空全部消息', 'success');
+  });
+}
+
 function clearChatSelectMode(): void {
   chatSelectedIds.clear();
   chatSelectMode = false;
@@ -6654,6 +6678,8 @@ if (selectToggleBtn) {
   });
 }
 document.getElementById('btn-delete-selected')?.addEventListener('click', deleteSelectedMessages);
+document.getElementById('btn-select-all')?.addEventListener('click', selectAllMessages);
+document.getElementById('btn-delete-all')?.addEventListener('click', deleteAllMessages);
 document.getElementById('btn-clear-select')?.addEventListener('click', clearChatSelectMode);
 
 // ── 右键菜单 ──
