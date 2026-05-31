@@ -2938,7 +2938,7 @@ async function executeTaskAgentLoop(description) {
         return;
     }
     // 使用流水线面板
-    showPipelinePanel('🧱 构建模式串行执行');
+    showPipelinePanel('🧱 Builder 串行执行');
     setPipelinePhase('builder');
     let tasks;
     try {
@@ -2994,7 +2994,7 @@ async function executeOrchestratorLoop(description) {
         addChatMessage('assistant', '⚠️ 请先打开一个项目文件夹');
         return;
     }
-    showPipelinePanel('🚀 流水线全流程');
+    showPipelinePanel('🚀 Pipeline 全流水线');
     setPipelinePhase('builder');
     document.getElementById('pipeline-abort-btn')?.addEventListener('click', () => {
         window.api.orchestratorAbort?.();
@@ -3446,7 +3446,7 @@ async function renderDreamJournal() {
                     return `<div style="background:rgba(255,255,255,0.03);border-radius:6px;padding:8px 10px;font-size:11px">
           <div style="display:flex;align-items:center;gap:8px">
             <span>${cardEmoji}</span>
-            <span style="font-weight:600;color:var(--text-primary)">梦境 #${j.dreamId?.slice(-6) || '?'}</span>
+            <span style="font-weight:600;color:var(--text-primary)">梦 #${j.dreamId?.slice(-6) || '?'}</span>
             <span style="font-size:10px;color:var(--text-secondary);margin-left:auto">${timeStr}</span>
           </div>
           <div style="margin-top:4px;color:var(--text-secondary);display:flex;gap:8px">
@@ -3504,7 +3504,7 @@ document.getElementById('btn-dream-trigger')?.addEventListener('click', async ()
         const result = await window.api.dreamTrigger?.();
         if (result?.skipped) showToast('已跳过: ' + result.reason, 'info');
         else if (result) {
-            showToast(`✨ 梦境完成！生成 ${result.stats?.cardsCreated || 0} 张记忆卡`, 'success', 3000);
+            showToast(`✨ 梦境完成! 生成 ${result.stats?.cardsCreated || 0} 张记忆卡`, 'success', 3000);
             renderDreamJournal();
         }
     } catch (e) { showToast('做梦失败', 'error'); }
@@ -3513,7 +3513,7 @@ document.getElementById('btn-dream-trigger')?.addEventListener('click', async ()
 // ── 监听做梦完毕事件 ──
 window.api.onDreamComplete?.((result) => {
     if (result?.stats?.cardsCreated > 0) {
-        showToast(`🧠 梦境引擎：发现 ${result.stats.cardsCreated} 条新洞察`, 'info', 5000);
+        showToast(`🧠 梦境引擎: 发现 ${result.stats.cardsCreated} 条新洞察`, 'info', 5000);
     }
 });
 // ─────────────────────────────────────────
@@ -3538,7 +3538,7 @@ const VERSION_HISTORY = [
         philosophy: '把 AI 工程师装进 IDE。不是又一个套壳 ChatGPT,而是让 AI 真正理解项目上下文,规划、编码、验证一条龙。'
     },
     {
-        version: 'v0.11.0',
+        version: 'v1.1.0',
         date: '2026-05-28',
         emoji: '🐅',
         title: '全面升级 - 双主题 / Git 集成 / 文件预览 / 终端',
@@ -3558,7 +3558,7 @@ const VERSION_HISTORY = [
         philosophy: '从"能跑"到"好用"。每一个细节都打磨过--文件预览、Git 流程、对话体验、主题切换。让工具适配人,而不是人适应工具。'
     },
     {
-        version: 'v0.12.0',
+        version: 'v1.2.0',
         date: '2026-05-30',
         emoji: '🐆',
         title: '专业进化 - 代码大纲 / 命令面板 / Zen Mode / 终端流式',
@@ -3573,7 +3573,7 @@ const VERSION_HISTORY = [
         philosophy: '专注力是程序员最稀缺的资源。Zen Mode + 命令面板,让工具退到幕后,代码走到台前。'
     },
     {
-        version: 'v0.13.0',
+        version: 'v1.3.0',
         date: '2026-05-30',
         emoji: '🐅',
         title: '智能加持 — 项目搜索 / 欢迎页 / 通知系统',
@@ -3587,7 +3587,7 @@ const VERSION_HISTORY = [
         philosophy: '不只是编辑器,而是有判断力的 AI 搭档。角色切换让 AI 适配场景,模板系统消灭重复劳动。'
     },
     {
-        version: 'v0.14.0',
+        version: 'v1.4.0',
         date: '2026-05-30',
         emoji: '🐉',
         title: '专业完备 — LSP 多语言 / Emmet / Snippets / MCP 工具',
@@ -3605,7 +3605,7 @@ const VERSION_HISTORY = [
         philosophy: '从 Hackable 到 Professional。LSP 让代码理解不再靠猜,Emmet 让 HTML 飞起来,MCP 让 AI 真正能动手。'
     },
     {
-        version: 'v0.15.0',
+        version: 'v1.5.0-p0',
         date: '2026-05-30',
         emoji: '🐲',
         title: '全模块交付 — P0/P1/P2/P3 十八模块一次投产',
@@ -3624,7 +3624,7 @@ const VERSION_HISTORY = [
         philosophy: '从Demo到生产。18个模块一次交付，57个IPC通道全部接通。不是功能堆砌，而是系统化的工程能力。'
     },
     {
-        version: 'v0.15.1',
+        version: 'v1.5.1',
         date: '2026-05-30',
         emoji: '🐯',
         title: '体验打磨 — 聊天修复 / 思考动画 / 代码折叠 / 保存提示',
@@ -3643,39 +3643,24 @@ const VERSION_HISTORY = [
         philosophy: '细节决定体验。思考动画让等待可感知，代码折叠让聊天不臃肿，保存提示减少误操作。每一个小改进都在让AI真正成为可靠的编程伙伴。'
     },
     {
-        version: 'v0.16.0',
-        date: '2026-05-31',
-        emoji: '🚀',
-        title: 'Agent 觉醒 — UI 重构 / 多 Agent 全流水线',
-        features: [
-            '🎛️ Agent 模式选择器: 对话/工具/构建/流水线 四模式一键切换',
-            '📊 Pipeline 实时面板: 阶段进度动画(构建→开发→审查→验证)、任务卡片、计时器',
-            '🔧 MCP 工具模式: sendToAI 根据开关自动路由到 function calling',
-            '🧱 构建模式: 直接输入需求自动拆解执行',
-            '🚀 流水线模式: 全流程接入 UI，并行开发池 + 审查 + 构建',
-            '📦 长代码块折叠: >10 行自动折叠、展开/收起按钮',
-            '⌨️ 快捷键编辑器: 34 条命令可视化编辑、持久化',
-            '🩺 自诊断引擎: console.log 残留/any 类型/重复代码检测',
-            '🌐 CSP 放宽: 允许 CDN 加载',
-            '🧹 Changelog 清理: 移除虚构功能，写实每一版本',
-        ],
-        philosophy: 'AI 不再是聊天框里的摆设。构建模式拆解需求，流水线并行执行，工具模式真正读写文件——这是虎猫从对话助手到自主 Agent 的质变。'
-    },
-    {
-        version: 'v0.17.0',
+        version: 'v1.7.0',
         date: '2026-05-31',
         emoji: '🧠',
-        title: '自主进化 — 做梦引擎 / 15 服务全接线 / 中文本地化',
+        title: '做梦引擎觉醒 — UI 重构 / 多 Agent 全流水线 / 真实可用的工具模式',
         features: [
-            '🧠 自主做梦引擎: 后台消化操作日志→聚类分析→专家记忆卡、空闲自动触发',
-            '📋 梦境日志面板: 查看梦记录时间线 + 专家记忆卡列表',
-            '⚡ 15 个智能服务全量接线: Lint/Debug/Git/Warehouse/Perf/Entropy...',
-            '🎛️ 智能服务管理: 设置页 15 个独立开关',
-            '🇨🇳 全面中文本地化: 模式选择器、流水线面板、设置页、欢迎页',
-            '📊 状态栏扩展: RAM 用量 + 健康度指数实时显示',
-            '🔢 版本号重置: 1.x → 0.1x，回归实事求是的版本节奏',
+            '🎛️ Agent 模式选择器:💬对话 🔧工具 🧱Builder 🚀Pipeline 四模式一键切换',
+            '📊 Pipeline 实时面板:阶段进度动画(Builder→Coder→Reviewer→Tester)、任务卡片、计时器',
+            '🔧 MCP 工具模式接入:sendToAI 根据开关自动路由到 function calling，AI 真正能读写文件',
+            '🧱 Builder 模式:直接输入需求自动拆解执行，无需 /task 命令',
+            '🚀 Pipeline 模式:AgentOrchestrator 全流水线接入 UI，并行 Coder 池 + 审查 + 构建',
+            '📦 长代码块折叠:>10 行自动折叠为~8 行，展开/收起按钮',
+            '⌨️ 快捷键编辑器完成:34 条命令可视化编辑、持久化到 localStorage',
+            '🩺 自诊断引擎:console.log 残留/any 类型/重复代码 6 项规则检测',
+            '🧠 自主做梦引擎:后台消化操作日志→凝练专家记忆卡、空闲自动触发、梦境日志面板',
+            '🌐 CSP 放宽:允许 CDN 加载 (jsDelivr/unpkg/cdnjs/esm.sh)，three.js 等可正常使用',
+            '🔄 /orch 命令接入:保留文本命令作为兜底',
         ],
-        philosophy: 'AI 要学会从你的操作中学习。做梦引擎每晚凝练当天的编码经验，把碎片化的操作日志变成结构化的专家知识。虎猫不只是工具，而是会成长的编程搭档。'
+        philosophy: 'AI 不再是聊天框里的摆设。Builder 拆解需求，Pipeline 并行执行，工具模式真正读写文件——这是虎猫从对话助手到自主 Agent 的质变。'
     },
 ];
 function renderChangelog() {
@@ -7166,21 +7151,21 @@ function initP0ProjectServices(projectPath) {
 
 // ═══ 智能服务定义与面板渲染 ═══
 const serviceDefs = [
-    { id: 'gitintel', name: '智能提交', desc: 'AI 生成提交信息', category: 'P1' },
-    { id: 'warehouse', name: '架构分析', desc: '模块与依赖关系', category: 'P2' },
-    { id: 'completion', name: '语义补全', desc: '上下文感知补全', category: 'P1' },
-    { id: 'memory', name: '项目记忆', desc: '记录编码模式', category: 'P1' },
-    { id: 'vectorindex', name: '向量索引', desc: '语义代码搜索', category: 'P1' },
-    { id: 'lint', name: '语法检查', desc: '多工具语法检查', category: 'P0' },
-    { id: 'debug', name: '断点调试', desc: '运行时调试', category: 'P0' },
-    { id: 'autoheal', name: '自愈引擎', desc: '自动修复报错', category: 'P0' },
-    { id: 'batch', name: '批量修改', desc: '跨文件批量修改', category: 'P0' },
-    { id: 'perf', name: '性能优化', desc: '内存监控回收', category: 'P0' },
-    { id: 'contexttrim', name: '上下文瘦身', desc: '对话历史压缩', category: 'P0' },
-    { id: 'unattended', name: '沙箱执行', desc: '安全执行代码', category: 'P2' },
-    { id: 'entropy', name: '熵值评估', desc: '代码健康度评估', category: 'P3' },
-    { id: 'entropyctrl', name: '健康监控', desc: '实时健康监控', category: 'P3' },
-    { id: 'smarttrim', name: '智能修剪', desc: '智能对话管理', category: 'P3' },
+    { id: 'gitintel', name: 'GitIntelligence', desc: '智能提交消息分析', category: 'P1' },
+    { id: 'warehouse', name: 'WarehouseAnalyzer', desc: '项目架构分析', category: 'P2' },
+    { id: 'completion', name: 'SemanticCompletion', desc: '语义代码补全', category: 'P1' },
+    { id: 'memory', name: 'ProjectMemory', desc: '项目记忆与模式学习', category: 'P1' },
+    { id: 'vectorindex', name: 'VectorIndexer', desc: '代码向量索引搜索', category: 'P1' },
+    { id: 'lint', name: 'LintManager', desc: '语法检查与格式化', category: 'P0' },
+    { id: 'debug', name: 'DebugManager', desc: '断点调试引擎', category: 'P0' },
+    { id: 'autoheal', name: 'AutoHeal', desc: 'AI 错误自愈', category: 'P0' },
+    { id: 'batch', name: 'BatchModifier', desc: '批量代码修改', category: 'P0' },
+    { id: 'perf', name: 'PerfOptimizer', desc: '性能监控与 GC', category: 'P0' },
+    { id: 'contexttrim', name: 'ContextTrimmer', desc: '上下文智能瘦身', category: 'P0' },
+    { id: 'unattended', name: 'UnattendedRunner', desc: '沙箱执行环境', category: 'P2' },
+    { id: 'entropy', name: 'EntropyEvaluator', desc: '代码熵值评估', category: 'P3' },
+    { id: 'entropyctrl', name: 'EntropyController', desc: '健康度监控', category: 'P3' },
+    { id: 'smarttrim', name: 'SmartTrimmer', desc: '自适应上下文修剪', category: 'P3' },
 ];
 let serviceStates = {};
 try { serviceStates = JSON.parse(localStorage.getItem('tcide-services') || '{}'); } catch {}
@@ -7423,8 +7408,8 @@ document.querySelectorAll('.agent-mode-btn').forEach(btn => {
         const hints = {
             chat: '输入消息，Shift+Enter 换行，Enter 发送...',
             tools: '🔧 工具模式 — AI 可读写文件、搜索代码、执行命令',
-            builder: '🧱 构建模式 — 描述需求，AI 自动拆解并逐步执行',
-            pipeline: '🚀 流水线模式 — 全流程：并行开发 + 审查 + 构建验证'
+            builder: '🧱 Builder 模式 — 描述需求，AI 自动拆解并逐步执行',
+            pipeline: '🚀 Pipeline 模式 — 全流水线：并行 Coder + 审查 + 构建验证'
         };
         input.placeholder = hints[currentAgentMode] || hints.chat;
         if (footer) {
