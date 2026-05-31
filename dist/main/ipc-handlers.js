@@ -2016,3 +2016,42 @@ electron_1.ipcMain.handle('perf:gcSweep', async () => {
         return { success: true };
     } catch (err) { return { success: false }; }
 });
+
+// ═══════════════════════════════════════════════
+// DreamEngine — 自主做梦引擎
+// ═══════════════════════════════════════════════
+{
+    const { dreamEngine } = require('../core/dream/dream-engine');
+    
+    electron_1.ipcMain.handle('dream:init', async (_e, projectRoot) => {
+        try {
+            dreamEngine.init(projectRoot);
+            dreamEngine.onDreamProgress = (d) => { win?.webContents.send('dream:progress', d); };
+            dreamEngine.onDreamComplete = (d) => { win?.webContents.send('dream:complete', d); };
+            return { success: true };
+        } catch (err) { return { success: false, error: err.message }; }
+    });
+    electron_1.ipcMain.handle('dream:trigger', async () => {
+        return await dreamEngine.dream();
+    });
+    electron_1.ipcMain.handle('dream:getJournal', async (_e, limit) => {
+        return dreamEngine.getJournal(limit || 20);
+    });
+    electron_1.ipcMain.handle('dream:getExpertMemory', async (_e, type) => {
+        return dreamEngine.getExpertMemory(type || null);
+    });
+    electron_1.ipcMain.handle('dream:shouldDream', async () => {
+        return dreamEngine.shouldDream();
+    });
+    electron_1.ipcMain.handle('dream:record', async (_e, entry) => {
+        const { DreamCollector } = require('../core/dream/dream-engine');
+        DreamCollector.record(entry);
+        return { success: true };
+    });
+    // 空闲检查：每30秒检查是否该做梦
+    setInterval(() => {
+        if (dreamEngine.shouldDream() && dreamEngine.projectRoot) {
+            dreamEngine.dream().catch(() => {});
+        }
+    }, 30000);
+}

@@ -333,5 +333,15 @@ const api = {
     entropyCtrlGetSystemPromptInjection: () => electron_1.ipcRenderer.invoke('entropyCtrl:getSystemPromptInjection'),
     entropyCtrlGetSessionRecommendation: () => electron_1.ipcRenderer.invoke('entropyCtrl:getSessionRecommendation'),
     entropyCtrlGetTrimmingStrategy: () => electron_1.ipcRenderer.invoke('entropyCtrl:getTrimmingStrategy'),
+
+    // === Dream Engine ===
+    dreamInit: (projectRoot) => electron_1.ipcRenderer.invoke('dream:init', projectRoot),
+    dreamTrigger: () => electron_1.ipcRenderer.invoke('dream:trigger'),
+    dreamGetJournal: (limit) => electron_1.ipcRenderer.invoke('dream:getJournal', limit),
+    dreamGetExpertMemory: (type) => electron_1.ipcRenderer.invoke('dream:getExpertMemory', type),
+    dreamShouldDream: () => electron_1.ipcRenderer.invoke('dream:shouldDream'),
+    dreamRecord: (entry) => electron_1.ipcRenderer.invoke('dream:record', entry),
+    onDreamProgress: (cb) => { electron_1.ipcRenderer.on('dream:progress', (_e, d) => cb(d)); },
+    onDreamComplete: (cb) => { electron_1.ipcRenderer.on('dream:complete', (_e, d) => cb(d)); },
 };
 electron_1.contextBridge.exposeInMainWorld('api', api);

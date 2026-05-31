@@ -1407,6 +1407,11 @@ function refreshFileDiagnostics() {
     const issues = runSelfDiagnostic(file);
     renderDiagnosticResults(issues);
 }
+// ── 做梦引擎：操作记录钩子 ──
+function recordDreamOp(type, data = {}) {
+    if (!state.projectPath) return;
+    window.api.dreamRecord?.({ type, ...data }).catch(() => {});
+}
 async function showGitDiffDecorations(filePath) {
     if (!editor || !state.projectPath) {
         clearGitDecorations();
@@ -3411,7 +3416,106 @@ function switchSettingsSubTab(tab) {
         renderChangelog();
     if (tab === 'services')
         renderServiceToggles();
+    if (tab === 'dream')
+        renderDreamJournal();
 }
+// ─────────────────────────────────────────
+// 梦境日志渲染
+// ─────────────────────────────────────────
+const dreamTypeEmoji = {
+    pattern: '🔁', lesson: '📖', stack: '🧱',
+    workflow: '🔄', insight: '💡', preference: '⭐'
+};
+async function renderDreamJournal() {
+    const list = document.getElementById('dream-journal-list');
+    const cards = document.getElementById('dream-memory-cards');
+    const countEl = document.getElementById('mem-card-count');
+    const statusEl = document.getElementById('dream-status');
+
+    if (list) {
+        try {
+            const journal = await window.api.dreamGetJournal?.(10) || [];
+            if (journal.length) {
+                list.innerHTML = journal.map(j => {
+                    const d = new Date(j.startedAt);
+                    const timeStr = d.toLocaleString('zh-CN');
+                    const dMs = `${((j.stats?.durationMs || 0) / 1000).toFixed(1)}s`;
+                    const cardEmoji = j.artifacts?.length ? '✨' : '💤';
+                    const cardPreview = j.artifacts?.slice(0, 3).map(a => a.topic).join(', ') || '无洞察';
+                    const errorMsg = j.error ? ` <span style="color:#f44336">⚠${j.error.slice(0,30)}</span>` : '';
+                    return `<div style="background:rgba(255,255,255,0.03);border-radius:6px;padding:8px 10px;font-size:11px">
+          <div style="display:flex;align-items:center;gap:8px">
+            <span>${cardEmoji}</span>
+            <span style="font-weight:600;color:var(--text-primary)">梦 #${j.dreamId?.slice(-6) || '?'}</span>
+            <span style="font-size:10px;color:var(--text-secondary);margin-left:auto">${timeStr}</span>
+          </div>
+          <div style="margin-top:4px;color:var(--text-secondary);display:flex;gap:8px">
+            <span>📊 ${j.stats?.inputCount || 0}条</span>
+            <span>📝 ${j.stats?.cardsCreated || 0}卡</span>
+            <span>⏱ ${dMs}</span>
+            ${errorMsg}
+          </div>
+          <div style="margin-top:2px;font-size:10px;color:var(--text-secondary)">${cardPreview}</div>
+        </div>`;
+                }).join('');
+            } else {
+                list.innerHTML = '<div style="text-align:center;color:var(--text-secondary);padding:24px;font-size:12px">📖 暂无梦境记录。打开项目运行一会儿，或点击「🌙 手动做梦」立即触发。</div>';
+            }
+        } catch { list.innerHTML = '<div style="text-align:center;color:var(--text-secondary);padding:16px">加载失败</div>'; }
+    }
+
+    if (cards) {
+        try {
+            const memories = await window.api.dreamGetExpertMemory?.(null) || [];
+            if (countEl) countEl.textContent = memories.length;
+            if (memories.length) {
+                cards.innerHTML = memories.slice(-20).reverse().map(m => {
+                    const d = new Date(m.createdAt);
+                    const emoji = dreamTypeEmoji[m.type] || '📌';
+                    return `<div style="background:rgba(255,255,255,0.02);border-left:2px solid var(--tc-orange);border-radius:0 4px 4px 0;padding:6px 10px;font-size:11px">
+          <div style="display:flex;align-items:center;gap:6px">
+            <span>${emoji}</span>
+            <span style="color:var(--text-primary);font-weight:500">${m.topic}</span>
+            <span style="font-size:9px;color:var(--text-secondary);margin-left:auto">${d.toLocaleDateString('zh-CN')}</span>
+          </div>
+          <div style="margin-top:2px;color:var(--text-secondary);font-size:10px">${m.summary || ''}</div>
+          ${m.tags?.length ? `<div style="margin-top:2px;display:flex;gap:3px;flex-wrap:wrap">${m.tags.slice(0,6).map(t => `<span style="font-size:9px;padding:1px 5px;border-radius:3px;background:rgba(255,165,0,0.08);color:var(--tc-orange)">#${t}</span>`).join('')}</div>` : ''}
+        </div>`;
+                }).join('');
+            } else {
+                cards.innerHTML = '<div style="text-align:center;color:var(--text-secondary);padding:16px;font-size:11px">暂无记忆卡，触发一次做梦生成</div>';
+            }
+        } catch { cards.innerHTML = '<div style="text-align:center;color:var(--text-secondary);padding:16px">加载失败</div>'; }
+    }
+
+    if (statusEl) {
+        try {
+            const should = await window.api.dreamShouldDream?.();
+            statusEl.textContent = should ? '🌙 可以做梦' : '💤 待命中';
+            statusEl.style.background = should ? 'rgba(255,165,0,0.15)' : 'rgba(255,255,255,0.05)';
+        } catch {}
+    }
+}
+document.getElementById('btn-dream-trigger')?.addEventListener('click', async () => {
+    const btn = document.getElementById('btn-dream-trigger');
+    if (btn) { btn.disabled = true; btn.textContent = '⏳ 做梦...'; }
+    showToast('🌙 开始做梦...', 'info');
+    try {
+        const result = await window.api.dreamTrigger?.();
+        if (result?.skipped) showToast('已跳过: ' + result.reason, 'info');
+        else if (result) {
+            showToast(`✨ 梦境完成! 生成 ${result.stats?.cardsCreated || 0} 张记忆卡`, 'success', 3000);
+            renderDreamJournal();
+        }
+    } catch (e) { showToast('做梦失败', 'error'); }
+    if (btn) { btn.disabled = false; btn.textContent = '🌙 手动做梦'; }
+});
+// ── 监听做梦完毕事件 ──
+window.api.onDreamComplete?.((result) => {
+    if (result?.stats?.cardsCreated > 0) {
+        showToast(`🧠 梦境引擎: 发现 ${result.stats.cardsCreated} 条新洞察`, 'info', 5000);
+    }
+});
 // ─────────────────────────────────────────
 // 版本记录
 // ─────────────────────────────────────────
@@ -6993,6 +7097,8 @@ function initP0ProjectServices(projectPath) {
     window.api.entropyInit?.(projectPath).catch(() => {});
     // P3: SmartTrimmer
     window.api.smartTrimmerInit?.(projectPath).catch(() => {});
+    // Dream Engine
+    window.api.dreamInit?.(projectPath).catch(() => {});
     // Perf: 定时 GC
     setInterval(() => {
         window.api.perfGcSweep().catch(() => {});
