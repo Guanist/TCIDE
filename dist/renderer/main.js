@@ -3409,6 +3409,8 @@ function switchSettingsSubTab(tab) {
     // 切换到版本记录 Tab 时渲染时间线
     if (tab === 'changelog')
         renderChangelog();
+    if (tab === 'services')
+        renderServiceToggles();
 }
 // ─────────────────────────────────────────
 // 版本记录
@@ -4795,6 +4797,133 @@ function setupEventListeners() {
         });
     });
     // ═══ 主题切换(白虎 / 老虎) ═══
+    // ── 初始化所有智能服务 ──
+    function initAllServices() {
+        if (!state.projectPath) return;
+        const p = state.projectPath;
+        // 逐个初始化，失败不影响其他
+        window.api.memoryInit?.(p).catch(() => {});
+        window.api.gitintelInit?.(p).catch(() => {});
+        window.api.warehouseInit?.(p).catch(() => {});
+        window.api.completionInit?.(p).catch(() => {});
+        window.api.entropyInit?.(p).catch(() => {});
+        window.api.smartTrimmerInit?.(p).catch(() => {});
+        showToast('智能服务已初始化', 'info', 1500);
+    }
+    // ── Lint：文件切换时自动检查 ──
+    let lintEnabled = true;
+    let lintLastFile = null;
+    async function autoLintFile(filePath) {
+        if (!lintEnabled || !state.projectPath || !filePath || filePath === lintLastFile) return;
+        lintLastFile = filePath;
+        try {
+            const result = await window.api.lintFile?.(filePath, state.projectPath);
+            if (result?.diagnostics?.length) {
+                const panel = document.getElementById('problems-list');
+                const empty = document.getElementById('problems-empty');
+                if (panel && empty) {
+                    empty.classList.add('hidden');
+                    panel.classList.remove('hidden');
+                    const icons = { error: '❌', warning: '⚠️', info: 'ℹ️' };
+                    panel.innerHTML = result.diagnostics.map(d => {
+                        const fname = filePath.split(/[/\\]/).pop();
+                        return `<div class="problem-item problem-${d.severity || 'warning'}" style="padding:4px 8px;font-size:11px;border-bottom:1px solid var(--border-subtle);cursor:pointer" onclick="editor.revealLine(${d.line || 1})">
+        <span style="color:var(--text-secondary)">${fname}:${d.line || ''}</span>
+        <span style="margin-left:6px">${icons[d.severity] || '•'} ${d.message || d.rule || ''}</span>
+      </div>`;
+                    }).join('');
+                    const badge = document.getElementById('problems-badge');
+                    if (badge) { badge.textContent = result.diagnostics.length; badge.classList.remove('hidden'); }
+                }
+            }
+        } catch { /* lint tool not installed */ }
+    }
+    // Auto-lint on file switch (debounced)
+    let lintTimer = null;
+    const origSwitchToFile = switchToFile;
+    switchToFile = function(index) {
+        origSwitchToFile(index);
+        if (lintTimer) clearTimeout(lintTimer);
+        const f = state.openFiles[index];
+        if (f) lintTimer = setTimeout(() => autoLintFile(f.path), 500);
+    };
+    // ── GitIntelligence：智能提交消息 ──
+    async function generateSmartCommitMessage() {
+        if (!state.projectPath) return showToast('请先打开项目', 'warning');
+        const input = document.getElementById('git-commit-input');
+        if (!input) return;
+        input.placeholder = '🤖 AI 正在生成提交信息...';
+        try {
+            const msg = await window.api.gitintelGenerateCommitMessage(state.projectPath, { style: 'conventional' });
+            if (msg) {
+                input.value = msg;
+                input.placeholder = '输入提交信息...';
+                showToast('AI 已生成提交信息', 'success');
+            }
+        } catch (e) {
+            input.placeholder = '输入提交信息...';
+            showToast('智能提交信息生成失败', 'warning');
+        }
+    }
+    // ── WarehouseAnalyzer：架构分析面板 ──
+    async function refreshArchPanel() {
+        const container = document.getElementById('arch-panel');
+        if (!container || !state.projectPath) return;
+        container.innerHTML = '<div style="padding:16px;font-size:12px;color:var(--text-secondary)">⏳ 正在分析项目结构...</div>';
+        try {
+            const result = await window.api.warehouseAnalyzeAll?.();
+            if (!result) { container.innerHTML = '<div style="padding:16px;font-size:12px;color:var(--text-secondary)">未找到分析数据</div>'; return; }
+            let html = '<div style="padding:8px 12px;font-size:11px">';
+            if (result.modules?.length) {
+                html += '<div style="font-weight:600;margin-bottom:6px;color:var(--tc-orange)">📦 模块 (' + result.modules.length + ')</div>';
+                result.modules.slice(0, 20).forEach(m => {
+                    html += '<div style="padding:2px 0;color:var(--text-primary)">' + (m.name || m.path || '?') + ' <span style="color:var(--text-secondary);font-size:10px">' + (m.fileCount || '') + '文件</span></div>';
+                });
+            }
+            if (result.dependencies?.length) {
+                html += '<div style="font-weight:600;margin:10px 0 6px;color:var(--tc-orange)">🔗 依赖关系 (' + result.dependencies.length + ')</div>';
+                result.dependencies.slice(0, 15).forEach(d => {
+                    html += '<div style="padding:2px 0;font-size:10px"><span style="color:var(--text-primary)">' + (d.from || '?') + '</span> → <span style="color:var(--text-secondary)">' + (d.to || '?') + '</span></div>';
+                });
+            }
+            html += '</div>';
+            container.innerHTML = html;
+        } catch { container.innerHTML = '<div style="padding:16px;font-size:12px;color:var(--text-secondary)">分析失败</div>'; }
+    }
+    // Progress listener
+    window.api.onWarehouseProgress?.((data) => {
+        const container = document.getElementById('arch-panel');
+        if (container) container.innerHTML = `<div style="padding:16px;font-size:12px;color:var(--text-secondary)">⏳ 分析中: ${data.percent || 0}%</div>`;
+    });
+    // ── Entropy + SmartTrimmer 健康面板 ──
+    window.api.onEntropyProgress?.((data) => {
+        document.getElementById('health-score')?.replaceChildren(`健康度: ${data.entropy || '?'}`);
+    });
+    // ── PerfOptimizer ──
+    async function updatePerfStatus() {
+        try {
+            const m = await window.api.perfGetMetrics?.();
+            const el = document.getElementById('perf-status');
+            if (el && m) el.textContent = `RAM:${((m.heapUsed||0)/1024/1024).toFixed(0)}MB`;
+        } catch {}
+    }
+    setInterval(updatePerfStatus, 5000);
+    // ── ContextTrimmer 状态更新 ──
+    let trimmerStats = { trimmed: 0, archived: 0 };
+    setInterval(async () => {
+        try { const s = await window.api.smartTrimmerGetArchiveSummary?.(); if (s) trimmerStats = s; } catch {}
+    }, 30000);
+    // ── UnattendedRunner ──
+    async function runInSandbox(taskDesc, files) {
+        if (!state.projectPath) return showToast('请先打开项目', 'warning');
+        try {
+            const result = await window.api.unattendedRun?.(state.projectPath, taskDesc, files);
+            if (result?.success) showToast('沙箱执行完成', 'success', 3000);
+            else showToast('沙箱执行失败: ' + (result?.error || '未知'), 'error');
+        } catch (e) { showToast('沙箱执行异常', 'error'); }
+    }
+    // ── AutoHeal：自动修复文档 ──
+    window.api.onAutoHealFix?.(() => {}); // 预留监听
     // ── Problems 刷新按钮 ──
     document.getElementById('btn-problems-refresh')?.addEventListener('click', () => {
         refreshFileDiagnostics();
@@ -6846,20 +6975,28 @@ let p0ServicesInitialized = false;
 function initP0ProjectServices(projectPath) {
     if (p0ServicesInitialized) return;
     p0ServicesInitialized = true;
-    // Context Trimmer: 初始化 + 后台瘦身
+    // Context Trimmer
     window.api.contextInit(projectPath).then(() => {
         window.api.contextStartTrim().catch(() => {});
-        window.api.contextCachePrompt('default', 'TCIDE AI 编程助手系统提示词...').catch(() => {});
     }).catch(() => {});
     // P1: 项目记忆
     initProjectMemory(projectPath).catch(() => {});
     // P1: 向量索引
     initVectorIndex(projectPath).catch(() => {});
-    // Perf: 定时 GC 清理
+    // P1: GitIntelligence
+    window.api.gitintelInit?.(projectPath).catch(() => {});
+    // P1: SemanticCompletion
+    window.api.completionInit?.(projectPath).catch(() => {});
+    // P2: WarehouseAnalyzer
+    window.api.warehouseInit?.(projectPath).catch(() => {});
+    // P3: EntropyEvaluator
+    window.api.entropyInit?.(projectPath).catch(() => {});
+    // P3: SmartTrimmer
+    window.api.smartTrimmerInit?.(projectPath).catch(() => {});
+    // Perf: 定时 GC
     setInterval(() => {
         window.api.perfGcSweep().catch(() => {});
         if (editor) {
-            // 限制内存中的模型数量
             const models = monaco.editor.getModels();
             if (models.length > 20) {
                 for (let i = 0; i < models.length - 15; i++) {
@@ -6903,6 +7040,58 @@ function initP0ProjectServices(projectPath) {
     }
     console.log('[P0] 项目服务已初始化:', projectPath);
 }
+
+// ═══ 智能服务定义与面板渲染 ═══
+const serviceDefs = [
+    { id: 'gitintel', name: 'GitIntelligence', desc: '智能提交消息分析', category: 'P1' },
+    { id: 'warehouse', name: 'WarehouseAnalyzer', desc: '项目架构分析', category: 'P2' },
+    { id: 'completion', name: 'SemanticCompletion', desc: '语义代码补全', category: 'P1' },
+    { id: 'memory', name: 'ProjectMemory', desc: '项目记忆与模式学习', category: 'P1' },
+    { id: 'vectorindex', name: 'VectorIndexer', desc: '代码向量索引搜索', category: 'P1' },
+    { id: 'lint', name: 'LintManager', desc: '语法检查与格式化', category: 'P0' },
+    { id: 'debug', name: 'DebugManager', desc: '断点调试引擎', category: 'P0' },
+    { id: 'autoheal', name: 'AutoHeal', desc: 'AI 错误自愈', category: 'P0' },
+    { id: 'batch', name: 'BatchModifier', desc: '批量代码修改', category: 'P0' },
+    { id: 'perf', name: 'PerfOptimizer', desc: '性能监控与 GC', category: 'P0' },
+    { id: 'contexttrim', name: 'ContextTrimmer', desc: '上下文智能瘦身', category: 'P0' },
+    { id: 'unattended', name: 'UnattendedRunner', desc: '沙箱执行环境', category: 'P2' },
+    { id: 'entropy', name: 'EntropyEvaluator', desc: '代码熵值评估', category: 'P3' },
+    { id: 'entropyctrl', name: 'EntropyController', desc: '健康度监控', category: 'P3' },
+    { id: 'smarttrim', name: 'SmartTrimmer', desc: '自适应上下文修剪', category: 'P3' },
+];
+let serviceStates = {};
+try { serviceStates = JSON.parse(localStorage.getItem('tcide-services') || '{}'); } catch {}
+function renderServiceToggles() {
+    const container = document.getElementById('service-toggles');
+    if (!container) return;
+    const catEmoji = { P0: '🏗️', P1: '🧠', P2: '⚙️', P3: '📊' };
+    let html = '';
+    ['P0','P1','P2','P3'].forEach(cat => {
+        const svcs = serviceDefs.filter(s => s.category === cat);
+        if (!svcs.length) return;
+        html += `<div style="font-size:10px;font-weight:600;color:var(--tc-orange);padding:8px 0 2px">${catEmoji[cat]||'•'} ${cat}</div>`;
+        svcs.forEach(s => {
+            const enabled = serviceStates[s.id] !== false;
+            html += `<label style="display:flex;align-items:center;gap:8px;padding:5px 8px;background:rgba(255,255,255,0.02);border-radius:4px;cursor:pointer;font-size:12px">
+        <input type="checkbox" data-svc="${s.id}" ${enabled?'checked':''} onchange="serviceStates[this.dataset.svc]=this.checked;localStorage.setItem('tcide-services',JSON.stringify(serviceStates))">
+        <span style="flex:1;color:var(--text-primary)">${s.name}</span>
+        <span style="font-size:10px;color:var(--text-secondary)">${s.desc}</span>
+      </label>`;
+        });
+    });
+    container.innerHTML = html;
+}
+document.getElementById('btn-services-refresh-all')?.addEventListener('click', () => {
+    if (!state.projectPath) return showToast('请先打开项目', 'warning');
+    p0ServicesInitialized = false;
+    initP0ProjectServices(state.projectPath);
+    showToast('所有智能服务已重新初始化', 'success');
+});
+document.getElementById('btn-services-gc')?.addEventListener('click', async () => {
+    await window.api.perfGcSweep?.();
+    updatePerfStatus();
+    showToast('内存回收完成', 'info');
+});
 
 // ═══════════════════════════════════════════════
 // P0: AutoHeal — 终端报错自动修复（终端输出拦截）

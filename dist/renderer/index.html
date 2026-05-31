@@ -547,6 +547,7 @@
               <button class="settings-tab active" data-settings-tab="providers">模型服务商</button>
               <button class="settings-tab" data-settings-tab="custom">自定义配置</button>
               <button class="settings-tab" data-settings-tab="changelog">📋 版本记录</button>
+              <button class="settings-tab" data-settings-tab="services">⚡ 智能服务</button>
             </div>
             <div id="settings-providers" class="settings-tab-content active">
               <div class="provider-list" id="provider-list">
@@ -689,6 +690,16 @@
                 <div class="changelog-loading">加载中...</div>
               </div>
             </div>
+            <div id="settings-services" class="settings-tab-content hidden">
+              <div style="padding:12px">
+                <h4 style="margin:0 0 8px;color:var(--tc-orange);font-size:13px">⚡ 智能服务管理</h4>
+                <p style="font-size:11px;color:var(--text-secondary);margin:0 0 12px">启用或关闭各智能服务模块。关闭可减少资源消耗。</p>
+                <div id="service-toggles" style="display:flex;flex-direction:column;gap:4px">
+                </div>
+                <button id="btn-services-refresh-all" style="margin-top:12px;padding:6px 12px;border:1px solid var(--tc-orange);border-radius:4px;background:rgba(255,165,0,0.1);color:var(--tc-orange);cursor:pointer;font-size:11px">🔄 重新初始化所有服务</button>
+                <button id="btn-services-gc" style="margin-left:8px;padding:6px 12px;border:1px solid var(--border-subtle);border-radius:4px;background:transparent;color:var(--text-secondary);cursor:pointer;font-size:11px">🗑 手动 GC 回收</button>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -707,6 +718,8 @@
       <button class="gradle-badge" data-gradle="clean">Clean</button>
     </span>
     <span class="status-spacer"></span>
+    <span id="perf-status" class="status-item" title="内存用量"></span>
+    <span id="health-score" class="status-item" title="项目健康度"></span>
     <span id="status-usage" class="status-item status-usage" title="今日 token 用量 / 费用">-- tokens / -- 元</span>
     <span id="status-position" class="status-item">行 1, 列 1</span>
     <span id="status-model" class="status-item">DeepSeek</span>
