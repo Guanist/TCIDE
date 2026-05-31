@@ -1220,10 +1220,18 @@ function switchToFile(index) {
             audio.load();
         }
     }
-    else if (file.language === 'html' || file.language === 'xml' || file.name.endsWith('.svg')) {
+    else if (file.language === 'html' || file.language === 'xml' || file.language === 'markdown' || file.name.endsWith('.svg')) {
         // 预览/源码可切换
         const htmlErr = document.getElementById('html-error-console');
-        if (file.name.endsWith('.svg')) {
+        if (file.language === 'markdown') {
+            // Markdown 预览渲染
+            if (htmlFrame) {
+                htmlFrame.classList.remove('hidden');
+                htmlFrame.src = '';
+                htmlFrame.srcdoc = wrapMarkdownForPreview(file.content);
+            }
+        }
+        else if (file.name.endsWith('.svg')) {
             // SVG 用 srcdoc 包裹确保渲染
             if (htmlFrame) {
                 htmlFrame.classList.remove('hidden');
@@ -1246,8 +1254,10 @@ function switchToFile(index) {
         const toolbar = document.getElementById('html-toolbar');
         if (toolbar)
             toolbar.style.display = 'flex';
-        if (htmlErr)
+        if (htmlErr && file.language !== 'markdown')
             htmlErr.classList.remove('hidden');
+        else if (htmlErr)
+            htmlErr.classList.add('hidden');
         htmlMode = 'preview';
     }
     else {
@@ -1447,8 +1457,11 @@ function toggleHtmlMode(mode) {
         if (frame) {
             frame.classList.remove('hidden');
             const file = state.openFiles[state.activeFileIndex];
-            if (file && (file.language === 'html' || file.language === 'xml' || file.name.endsWith('.svg'))) {
-                if (file.name.endsWith('.svg')) {
+            if (file && (file.language === 'html' || file.language === 'xml' || file.language === 'markdown' || file.name.endsWith('.svg'))) {
+                if (file.language === 'markdown') {
+                    frame.srcdoc = wrapMarkdownForPreview(file.content);
+                }
+                else if (file.name.endsWith('.svg')) {
                     // SVG 用 srcdoc 包裹确保渲染
                     frame.srcdoc = `<html><body style="margin:0;display:flex;align-items:center;justify-content:center;min-height:100vh;background:#fff">${file.content}</body></html>`;
                     frame.src = '';
@@ -1477,7 +1490,7 @@ function toggleHtmlMode(mode) {
         if (errCon)
             errCon.classList.add('hidden');
         const file = state.openFiles[state.activeFileIndex];
-        if (file && (file.language === 'html' || file.language === 'xml')) {
+        if (file && (file.language === 'html' || file.language === 'xml' || file.language === 'markdown')) {
             const model = monaco.editor.createModel(file.content, file.language);
             editor?.setModel(model);
         }
@@ -1757,6 +1770,36 @@ function renderMarkdown(text) {
     </div>`;
     });
     return html;
+}
+// ─────────────────────────────────────────
+// Markdown 预览包装（用于文件预览 iframe）
+// ─────────────────────────────────────────
+function wrapMarkdownForPreview(mdContent) {
+    const mdHtml = renderMarkdown(mdContent);
+    const css = `
+<style>
+*{box-sizing:border-box}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif;font-size:15px;line-height:1.7;color:#1f2328;max-width:860px;margin:0 auto;padding:32px 40px;background:#fff}
+h1{font-size:2em;border-bottom:1px solid #d8dee4;padding-bottom:.3em;margin:24px 0 16px}
+h2{font-size:1.5em;border-bottom:1px solid #d8dee4;padding-bottom:.3em;margin:24px 0 16px}
+h3{font-size:1.25em;margin:24px 0 16px}
+h4{font-size:1em;margin:24px 0 16px}
+p{margin:0 0 16px}
+code{background:#f6f8fa;padding:.2em .4em;border-radius:3px;font-size:85%;font-family:ui-monospace,'Cascadia Code','Fira Code',monospace}
+pre{background:#f6f8fa;padding:16px;border-radius:6px;overflow-x:auto}
+pre code{background:none;padding:0;font-size:13px;line-height:1.5}
+li{margin:4px 0}
+ul,ol{padding-left:2em}
+table{border-collapse:collapse;width:100%}
+th,td{border:1px solid #d8dee4;padding:8px 12px;text-align:left}
+th{background:#f6f8fa}
+blockquote{border-left:3px solid #d8dee4;padding:0 1em;color:#656d76;margin:0 0 16px}
+a{color:#0969da}
+hr{border:none;border-top:1px solid #d8dee4;margin:24px 0}
+img{max-width:100%}
+strong{font-weight:600}
+</style>`;
+    return '<!DOCTYPE html><html><head><meta charset="UTF-8">' + css + '</head><body>' + mdHtml + '</body></html>';
 }
 // ─────────────────────────────────────────
 // AI 代码块：打开编辑 / 预览
