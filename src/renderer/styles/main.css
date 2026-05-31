@@ -4553,3 +4553,21 @@ input:focus, button:focus-visible, select:focus, textarea:focus {
 .ai-stats-bar.ai-stats-active { animation: statsPulse 2s ease-in-out infinite; }
 @keyframes statsPulse { 0%,100%{border-color:rgba(255,140,0,.12)} 50%{border-color:rgba(255,140,0,.4)} }
 
+/* ═── 头像选择器 ── */
+.avatar-picker { position:relative; }
+.avatar-picker .avatar-emoji-grid {
+  position:absolute; top:100%; left:0; z-index:200;
+  display:grid; grid-template-columns:repeat(6,1fr); gap:4px;
+  padding:6px; background:var(--bg-secondary); border:1px solid var(--border-color);
+  border-radius:var(--radius-sm); box-shadow:0 4px 16px rgba(0,0,0,.3);
+  max-height:160px; overflow-y:auto;
+}
+.avatar-picker .avatar-emoji-grid:not(.hidden) { display:grid; }
+.avatar-picker .avatar-emoji-grid button {
+  width:32px; height:32px; font-size:20px; line-height:1;
+  border:none; background:transparent; cursor:pointer; border-radius:4px;
+  padding:0; display:flex; align-items:center; justify-content:center;
+  transition:background .15s;
+}
+.avatar-picker .avatar-emoji-grid button:hover { background:var(--bg-active); }
+
