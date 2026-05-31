@@ -1149,6 +1149,10 @@ function switchToFile(index: number): void {
   if (imgContainer) imgContainer.classList.add('hidden');
   const mediaContainer = document.getElementById('media-preview-container');
   if (mediaContainer) mediaContainer.classList.add('hidden');
+  const mdContainer = document.getElementById('md-preview-container');
+  if (mdContainer) mdContainer.classList.add('hidden');
+  const mdToolbar = document.getElementById('md-toolbar');
+  if (mdToolbar) mdToolbar.style.display = 'none';
 
   if (file.language === 'pdf') {
     if (pdfFrame) { pdfFrame.classList.remove('hidden'); pdfFrame.src = file.content; }
@@ -1216,6 +1220,23 @@ function switchToFile(index: number): void {
     if (errInd) errInd.classList.add('hidden');
     const model = monaco.editor.createModel(file.content, file.language);
     editor?.setModel(model);
+  }
+
+  // ── Markdown 文件 ──
+  if (file.language === 'markdown') {
+    const mdContainer = document.getElementById('md-preview-container');
+    if (mdContainer) {
+      mdContainer.classList.remove('hidden');
+      editorEl.classList.add('hidden');
+      const contentEl = document.getElementById('md-preview-content');
+      if (contentEl) contentEl.innerHTML = renderMarkdown(file.content);
+    }
+    const mdToolbar = document.getElementById('md-toolbar');
+    if (mdToolbar) mdToolbar.style.display = 'flex';
+    const modeBtn = document.getElementById('md-mode-toggle');
+    if (modeBtn) { modeBtn.style.display = ''; modeBtn.textContent = '📝 源码'; }
+  } else if (file.language !== 'html' && file.language !== 'xml' && !file.name.endsWith('.svg') && file.language !== 'image' && file.language !== 'video' && file.language !== 'audio' && file.language !== 'pdf') {
+    editorEl.classList.remove('hidden');
   }
 
   renderEditorTabs();
@@ -1391,6 +1412,41 @@ function clearGitDecorations(): void {
 
 // ═══ HTML 预览/源码 双模式 ═══
 let htmlMode: 'preview' | 'source' = 'preview';
+// ═══ Markdown 预览/源码 双模式 ═══
+let mdMode: 'preview' | 'source' = 'preview';
+
+function toggleMdMode(mode?: 'preview' | 'source'): void {
+  if (mode) mdMode = mode; else mdMode = mdMode === 'preview' ? 'source' : 'preview';
+
+  const container = document.getElementById('md-preview-container');
+  const toggleBtn = document.getElementById('md-mode-toggle');
+  const editorEl = document.getElementById('monaco-container')!;
+  const toolbar = document.getElementById('md-toolbar');
+
+  if (mdMode === 'preview') {
+    if (container) {
+      container.classList.remove('hidden');
+      const file = state.openFiles[state.activeFileIndex];
+      if (file && file.language === 'markdown') {
+        const contentEl = document.getElementById('md-preview-content');
+        if (contentEl) contentEl.innerHTML = renderMarkdown(file.content);
+      }
+    }
+    editorEl.classList.add('hidden');
+    if (toolbar) toolbar.style.display = 'flex';
+    if (toggleBtn) toggleBtn.textContent = '📝 源码';
+  } else {
+    if (container) container.classList.add('hidden');
+    editorEl.classList.remove('hidden');
+    if (toolbar) toolbar.style.display = 'flex';
+    if (toggleBtn) toggleBtn.textContent = '👁 预览';
+    const file = state.openFiles[state.activeFileIndex];
+    if (file && file.language === 'markdown' && editor) {
+      const model = editor.getModel();
+      if (model && model.getValue() !== file.content) editor.setValue(file.content);
+    }
+  }
+}
 
 function toggleHtmlMode(mode?: 'preview' | 'source'): void {
   if (mode) htmlMode = mode; else htmlMode = htmlMode === 'preview' ? 'source' : 'preview';
@@ -1471,6 +1527,7 @@ window.addEventListener('message', (e) => {
 });
 
 document.getElementById('html-mode-toggle')?.addEventListener('click', () => toggleHtmlMode());
+document.getElementById('md-mode-toggle')?.addEventListener('click', () => toggleMdMode());
 
 // ═══ AI 文件大纲生成 ═══
 function generateFileOutline(content: string, lang: string): string {
