@@ -1,10 +1,10 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' blob: https://cdn.jsdelivr.net https://unpkg.com https://cdnjs.cloudflare.com https://esm.sh https://*.jsdelivr.net https://cdn.skypack.dev; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://unpkg.com https://cdnjs.cloudflare.com https://esm.sh https://*.jsdelivr.net; font-src 'self' data: https://cdn.jsdelivr.net https://cdnjs.cloudflare.com; img-src 'self' data: blob: https:; frame-src data: blob:; connect-src 'self' localhost:* 127.0.0.1:* https://api.deepseek.com https://api.openai.com https://*.volces.com https://cdn.jsdelivr.net https://unpkg.com https://esm.sh https://*.jsdelivr.net blob:;">
-  <title>铏庣尗 TCIDE</title>
+  <title>虎猫 TCIDE</title>
 
 
 
@@ -14,7 +14,7 @@
   <link rel="stylesheet" crossorigin href="./assets/vendor-monaco-core-D4zjdeIP.css">
   <link rel="stylesheet" crossorigin href="./assets/index-BpOg2DNo.css">
   <style>
-/* Agent Mode Selector */
+/* ═══ Agent Mode Selector ═══ */
 .agent-mode-bar{display:flex;gap:2px;padding:4px 6px;background:var(--bg-secondary,#252526);border-bottom:1px solid var(--border-subtle,rgba(255,255,255,.06))}
 .agent-mode-btn{flex:1;display:flex;align-items:center;justify-content:center;gap:6px;padding:7px 8px;border:1px solid transparent;border-radius:6px;background:transparent;color:var(--text-secondary,#888);font-size:11px;cursor:pointer;transition:all .2s;font-family:inherit}
 .agent-mode-btn:hover{background:rgba(255,165,0,.08);color:var(--text-primary,#ccc)}
@@ -24,7 +24,7 @@
 .mode-dot.tools{background:#66bb6a}
 .mode-dot.builder{background:#ffa726}
 .mode-dot.pipeline{background:#ef5350}
-/* /* Pipeline Panel */*/
+/* ═══ Pipeline Panel ═══ */
 .agent-pipeline-panel{margin:8px 10px;padding:12px;background:linear-gradient(135deg,rgba(30,30,30,.95),rgba(37,37,38,.95));border:1px solid rgba(255,165,0,.15);border-radius:10px}
 .pipeline-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}
 .pipeline-title{font-size:13px;font-weight:600;color:var(--tc-orange,#ffa500)}
@@ -46,7 +46,7 @@
 .pipeline-connector{flex:0 0 20px;display:flex;align-items:center;padding:0 2px}
 .connector-line{width:100%;height:1.5px;background:rgba(255,255,255,.08);transition:all .4s}
 .pipeline-phase.done+.pipeline-connector .connector-line,.pipeline-phase.active+.pipeline-connector .connector-line{background:rgba(76,175,80,.35);height:2px}
-/* 鈺愨晲鈺?Task Cards 鈺愨晲鈺?*/
+/* ═══ Task Cards ═══ */
 .pipeline-task-list{display:flex;flex-direction:column;gap:4px;max-height:200px;overflow-y:auto}
 .pipeline-task-card{display:flex;align-items:flex-start;gap:8px;padding:7px 9px;background:rgba(255,255,255,.02);border-radius:6px;border-left:3px solid rgba(255,255,255,.06);font-size:11px;transition:all .3s}
 .pipeline-task-card.running{border-left-color:var(--tc-orange,#ffa500);background:rgba(255,165,0,.05)}
@@ -64,7 +64,7 @@
 .pipeline-summary{margin-top:10px;padding:10px 12px;border-radius:6px;background:rgba(255,255,255,.03);font-size:11px;color:var(--text-primary,#ccc);display:flex;align-items:center;justify-content:space-between}
 .pipeline-summary.success{border:1px solid rgba(76,175,80,.2);background:rgba(76,175,80,.05)}
 .pipeline-summary.failed{border:1px solid rgba(244,67,54,.2);background:rgba(244,67,54,.05)}
-/* 鈺愨晲鈺?Code Block Folding 鈺愨晲鈺?*/
+/* ═══ Code Block Folding ═══ */
 .code-block-pre.folded{max-height:200px;overflow:hidden;position:relative}
 .code-block-pre.folded::after{content:'';position:absolute;bottom:0;left:0;right:0;height:40px;background:linear-gradient(transparent,var(--bg-secondary,#1e1e1e))}
 .code-fold-bar{padding:6px 12px;text-align:center;font-size:11px;color:var(--tc-orange,#ffa500);cursor:pointer;border-top:1px solid rgba(255,165,0,.1);background:rgba(255,165,0,.05);transition:all .2s;user-select:none}
@@ -75,10 +75,10 @@
 <body>
   <div id="app">
 
-    <!-- 鈺愨晲鈺?Activity Bar锛堟椿鍔ㄦ爮锛夆晲鈺愨晲 -->
+    <!-- ═══ Activity Bar（活动栏）═══ -->
     <nav id="activity-bar" class="activity-bar">
       <div class="activity-top">
-        <button class="activity-btn active" data-view="explorer" title="璧勬簮绠＄悊鍣?(Ctrl+Shift+E)">
+        <button class="activity-btn active" data-view="explorer" title="资源管理器 (Ctrl+Shift+E)">
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
           <span class="activity-label">文件</span>
         </button>
@@ -86,122 +86,122 @@
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
           <span class="activity-label">搜索</span>
         </button>
-        <button class="activity-btn" data-view="git" title="Git 鐗堟湰鎺у埗">
+        <button class="activity-btn" data-view="git" title="Git 版本控制">
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><circle cx="18" cy="6" r="3"/><path d="M6 6v0.17.0M18 6v0.17.0M12 6v0.17.0"/><line x1="6" y1="9" x2="12" y2="15"/><line x1="18" y1="9" x2="12" y2="15"/></svg>
           <span class="activity-label">Git</span>
         </button>
-        <button class="activity-btn" data-view="arch" title="鏋舵瀯鍒嗘瀽">
+        <button class="activity-btn" data-view="arch" title="架构分析">
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><line x1="6.5" y1="10" x2="6.5" y2="14"/><line x1="17.5" y1="10" x2="17.5" y2="14"/><line x1="10" y1="6.5" x2="14" y2="6.5"/><line x1="10" y1="17.5" x2="14" y2="17.5"/></svg>
-          <span class="activity-label">鏋舵瀯</span>
+          <span class="activity-label">架构</span>
         </button>
-        <button class="activity-btn" data-view="problems" title="闂闈㈡澘 (Ctrl+Shift+D)">
+        <button class="activity-btn" data-view="problems" title="问题面板 (Ctrl+Shift+D)">
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="m21.7 18.3-9.2-16a1 1 0 0 0-1.7 0l-9.3 16a1 1 0 0 0 .8 1.5h18.6a1 1 0 0 0 .8-1.5Z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
-          <span class="activity-label">闂</span>
+          <span class="activity-label">问题</span>
           <span id="problems-badge" class="activity-badge hidden">0</span>
         </button>
       </div>
       <div class="activity-bottom">
-        <button class="activity-btn" id="btn-toggle-theme" title="鍒囨崲涓婚 (鐧借檸/鑰佽檸)">
+        <button class="activity-btn" id="btn-toggle-theme" title="切换主题 (白虎/老虎)">
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
-          <span class="activity-label">涓婚</span>
+          <span class="activity-label">主题</span>
         </button>
       </div>
     </nav>
 
-    <!-- 鈺愨晲鈺?宸︿晶锛氭枃浠舵爲 / 搜索 鈺愨晲鈺?-->
+    <!-- ═══ 左侧：文件树 / 搜索 ═══ -->
     <aside id="sidebar" class="sidebar">
       <div class="sidebar-header">
         <span class="sidebar-title">EXPLORER</span>
         <div class="sidebar-actions">
           <button id="btn-new-file" class="icon-btn" title="新建文件 (Ctrl+N)">+</button>
-          <button id="btn-new-folder" class="icon-btn" title="新建文件澶?>馃搧</button>
-          <button id="btn-collapse-all" class="icon-btn" title="折叠全部">鈯?/button>
+          <button id="btn-new-folder" class="icon-btn" title="新建文件夹">📁</button>
+          <button id="btn-collapse-all" class="icon-btn" title="折叠全部">⊟</button>
           <span class="toolbar-sep">|</span>
-          <button id="btn-open-terminal" class="icon-btn" title="鎵撳紑缁堢 (Ctrl+Shift+T)">馃捇</button>
-          <button id="btn-open-browser" class="icon-btn" title="娴忚鍣ㄦ祴璇?(Ctrl+Shift+U)">馃寪</button>
-          <button id="btn-open-folder" class="icon-btn" title="文件绠＄悊鍣?(Ctrl+Shift+O)">馃搨</button>
+          <button id="btn-open-terminal" class="icon-btn" title="打开终端 (Ctrl+Shift+T)">💻</button>
+          <button id="btn-open-browser" class="icon-btn" title="浏览器测试 (Ctrl+Shift+U)">🌐</button>
+          <button id="btn-open-folder" class="icon-btn" title="文件管理器 (Ctrl+Shift+O)">📂</button>
         </div>
       </div>
       <div class="sidebar-search" id="sidebar-search-explorer">
         <input id="file-tree-search" type="text" placeholder="搜索文件..." />
-        <button id="btn-clear-search" class="search-clear hidden">鉁?/button>
+        <button id="btn-clear-search" class="search-clear hidden">✕</button>
       </div>
       <div id="file-tree" class="file-tree view-panel">
         <div class="empty-state">
-          <img src="icons/brand/empty-files.png" alt="绌? class="empty-illustration" />
-          <p>鎵撳紑椤圭洰寮€濮?(Ctrl+O)</p>
+          <img src="icons/brand/empty-files.png" alt="空" class="empty-illustration" />
+          <p>打开项目开始 (Ctrl+O)</p>
         </div>
       </div>
-      <!-- Git 闈㈡澘 -->
+      <!-- Git 面板 -->
       <div id="git-panel" class="view-panel hidden">
         <div class="git-panel-header">
-          <span id="git-branch-name" class="git-branch" title="鐐瑰嚮鍒囨崲鍒嗘敮">main</span>
-          <select id="git-branch-select" class="git-branch-select hidden" title="鍒囨崲鍒嗘敮"></select>
+          <span id="git-branch-name" class="git-branch" title="点击切换分支">main</span>
+          <select id="git-branch-select" class="git-branch-select hidden" title="切换分支"></select>
           <div class="git-actions">
-            <button id="btn-git-pull" class="icon-btn" title="鎷夊彇 (Pull)">鈫?/button>
-            <button id="btn-git-commit" class="icon-btn primary" title="鎻愪氦 (Commit)">鉁?/button>
-            <button id="btn-git-push" class="icon-btn" title="鎺ㄩ€?(Push)">鈫?/button>
+            <button id="btn-git-pull" class="icon-btn" title="拉取 (Pull)">↓</button>
+            <button id="btn-git-commit" class="icon-btn primary" title="提交 (Commit)">✓</button>
+            <button id="btn-git-push" class="icon-btn" title="推送 (Push)">↑</button>
           </div>
         </div>
         <div id="git-status-list" class="git-status-list">
-          <div class="git-empty">鍔犺浇涓?..</div>
+          <div class="git-empty">加载中...</div>
         </div>
         <div class="git-commit-area hidden" id="git-commit-area">
-          <input id="git-commit-message" type="text" placeholder="鎻愪氦淇℃伅..." />
-          <button id="btn-git-do-commit" class="welcome-btn primary" style="width:100%;margin-top:4px">鎻愪氦骞舵帹閫?/button>
+          <input id="git-commit-message" type="text" placeholder="提交信息..." />
+          <button id="btn-git-do-commit" class="welcome-btn primary" style="width:100%;margin-top:4px">提交并推送</button>
         </div>
       </div>
-      <!-- 鏋舵瀯鍒嗘瀽闈㈡澘 -->
+      <!-- 架构分析面板 -->
       <div id="arch-panel" class="view-panel hidden">
         <div class="arch-panel-header">
-          <span class="arch-panel-title">馃搻 鏋舵瀯鍒嗘瀽</span>
-          <button id="btn-arch-refresh" class="icon-btn" title="刷新鍒嗘瀽">鈫?/button>
+          <span class="arch-panel-title">📐 架构分析</span>
+          <button id="btn-arch-refresh" class="icon-btn" title="刷新分析">↻</button>
         </div>
         <div id="arch-overview" class="arch-overview">
-          <div class="arch-empty">鐐瑰嚮 鈫?寮€濮嬪垎鏋?/div>
+          <div class="arch-empty">点击 ↻ 开始分析</div>
         </div>
         <div id="arch-deps" class="arch-deps hidden">
-          <div class="arch-section-title">馃搳 渚濊禆鍥?/div>
+          <div class="arch-section-title">📊 依赖图</div>
           <div id="arch-dep-graph" class="arch-dep-graph"></div>
         </div>
         <div id="arch-smells" class="arch-smells hidden">
-          <div class="arch-section-title">鈿狅笍 浠ｇ爜寮傚懗</div>
+          <div class="arch-section-title">⚠️ 代码异味</div>
           <div id="arch-smell-list" class="arch-smell-list"></div>
         </div>
       </div>
 
-      <!-- Problems 闈㈡澘锛歀SP 璇婃柇 -->
+      <!-- Problems 面板：LSP 诊断 -->
       <div id="problems-panel" class="view-panel hidden">
         <div class="problems-panel-header">
-          <span class="problems-panel-title">馃攳 闂</span>
+          <span class="problems-panel-title">🔍 问题</span>
           <div class="problems-actions">
-            <button id="btn-problems-collapse" class="icon-btn" title="鍏ㄩ儴鎶樺彔">鈯?/button>
-            <button id="btn-problems-refresh" class="icon-btn" title="刷新">鈫?/button>
+            <button id="btn-problems-collapse" class="icon-btn" title="全部折叠">⊟</button>
+            <button id="btn-problems-refresh" class="icon-btn" title="刷新">↻</button>
           </div>
         </div>
         <div id="problems-list" class="problems-list">
-          <div class="problems-empty">鏈墦寮€文件鎴栨棤闂</div>
+          <div class="problems-empty">未打开文件或无问题</div>
         </div>
       </div>
     </aside>
 
-    <!-- 鎷栨嫿璋冩暣鍣?-->
+    <!-- 拖拽调整器 -->
     <div id="sidebar-resizer" class="resizer"></div>
 
-    <!-- 鈺愨晲鈺?涓棿锛氱紪杈戝櫒鍖?+ 搴曢儴闈㈡澘 鈺愨晲鈺?-->
+    <!-- ═══ 中间：编辑器区 + 底部面板 ═══ -->
     <main id="editor-area">
-      <!-- 闈㈠寘灞戝鑸?-->
+      <!-- 面包屑导航 -->
       <div id="breadcrumb-bar" class="breadcrumb-bar hidden">
         <span id="breadcrumb-path"></span>
         <span id="breadcrumb-symbol"></span>
       </div>
-      <!-- 椤圭洰搜索闈㈡澘 -->
+      <!-- 项目搜索面板 -->
       <div id="search-panel" class="search-panel hidden">
         <div class="search-panel-header">
           <input id="search-input" type="text" placeholder="搜索..." />
-          <input id="search-replace" type="text" placeholder="鏇挎崲涓?.." class="hidden" />
+          <input id="search-replace" type="text" placeholder="替换为..." class="hidden" />
           <select id="search-file-filter">
-            <option value="*">鎵€鏈夋枃浠?/option>
+            <option value="*">所有文件</option>
             <option value="*.kt,*.java">Kotlin/Java</option>
             <option value="*.ts,*.js">TypeScript/JS</option>
             <option value="*.py">Python</option>
@@ -209,145 +209,145 @@
             <option value="*.rs">Rust</option>
           </select>
           <div class="search-actions">
-            <button id="btn-toggle-replace" title="鍒囨崲鏇挎崲妯″紡">鈫?/button>
-            <button id="btn-search-prev" title="涓婁竴涓?>鈫?/button>
-            <button id="btn-search-next" title="涓嬩竴涓?>鈫?/button>
-            <button id="btn-search-close" title="关闭">鉁?/button>
+            <button id="btn-toggle-replace" title="切换替换模式">↔</button>
+            <button id="btn-search-prev" title="上一个">↑</button>
+            <button id="btn-search-next" title="下一个">↓</button>
+            <button id="btn-search-close" title="关闭">✕</button>
           </div>
         </div>
         <div id="search-results" class="search-results">
-          <div class="search-empty">杈撳叆搜索鍐呭寮€濮嬫悳绱?/div>
+          <div class="search-empty">输入搜索内容开始搜索</div>
         </div>
       </div>
-      <!-- 娆㈣繋椤?-->
+      <!-- 欢迎页 -->
       <div id="welcome-page" class="welcome-page">
         <div class="welcome-hero">
-          <img src="icons/brand/welcome-illustration.png" alt="铏庣尗" class="welcome-illustration" />
-          <h1 class="welcome-title">铏庣尗 TCIDE</h1>
-          <p class="welcome-subtitle" id="welcome-subtitle">涓汉涓撳睘 AI 缂栫▼ IDE 路 v0.17.0</p>
+          <img src="icons/brand/welcome-illustration.png" alt="虎猫" class="welcome-illustration" />
+          <h1 class="welcome-title">虎猫 TCIDE</h1>
+          <p class="welcome-subtitle" id="welcome-subtitle">个人专属 AI 编程 IDE · v0.17.0</p>
         </div>
         <div class="welcome-actions">
-          <button id="welcome-open-project" class="welcome-btn primary">馃搨 鎵撳紑椤圭洰</button>
-          <button id="welcome-new-project" class="welcome-btn">馃啎 鏂板缓椤圭洰</button>
-          <button id="welcome-snake-demo" class="welcome-btn demo">馃悕 璐悆铔?Demo</button>
+          <button id="welcome-open-project" class="welcome-btn primary">📂 打开项目</button>
+          <button id="welcome-new-project" class="welcome-btn">🆕 新建项目</button>
+          <button id="welcome-snake-demo" class="welcome-btn demo">🐍 贪吃蛇 Demo</button>
         </div>
         <div id="welcome-recent" class="welcome-recent hidden">
-          <h3 class="welcome-section-title">鏈€杩戦」鐩?/h3>
+          <h3 class="welcome-section-title">最近项目</h3>
           <div id="welcome-recent-list" class="welcome-recent-list"></div>
         </div>
         <div class="welcome-tips">
-          <h3 class="welcome-section-title">蹇€熷紑濮?/h3>
+          <h3 class="welcome-section-title">快速开始</h3>
           <ul class="welcome-tip-list">
-            <li><kbd>Ctrl+O</kbd> 鎵撳紑宸叉湁椤圭洰</li>
+            <li><kbd>Ctrl+O</kbd> 打开已有项目</li>
             <li><kbd>Ctrl+N</kbd> 新建文件</li>
-            <li>鍦?AI 闈㈡澘杈撳叆闇€姹傚紑濮嬬紪鐮?/li>
-            <li>璁剧疆涓厤缃?API Key 瑙ｉ攣 AI 鍔熻兘</li>
+            <li>在 AI 面板输入需求开始编码</li>
+            <li>设置中配置 API Key 解锁 AI 功能</li>
           </ul>
         </div>
       </div>
-      <!-- 鏍囩鏍?-->
+      <!-- 标签栏 -->
       <div id="editor-tabs" class="editor-tabs"></div>
-      <!-- Monaco 缂栬緫鍣?-->
+      <!-- Monaco 编辑器 -->
       <div id="monaco-container" class="monaco-container"></div>
-      <!-- PDF 棰勮 -->
+      <!-- PDF 预览 -->
       <embed id="pdf-preview" class="pdf-preview hidden" type="application/pdf" />
-      <!-- HTML 棰勮锛坰rcdoc 鍐呭祵锛岃嚜甯﹂殧绂伙級-->
+      <!-- HTML 预览（srcdoc 内嵌，自带隔离）-->
       <iframe id="html-preview" class="html-preview hidden"></iframe>
-      <!-- 鍥剧墖棰勮 -->
+      <!-- 图片预览 -->
       <div id="image-preview-container" class="image-preview-container hidden">
         <img id="image-preview-img" class="image-preview-img" src="" alt="" />
       </div>
-      <!-- 瑙嗛/闊抽棰勮 -->
+      <!-- 视频/音频预览 -->
       <div id="media-preview-container" class="media-preview-container hidden">
         <video id="media-video-preview" class="media-video-preview hidden" controls></video>
         <audio id="media-audio-preview" class="media-audio-preview hidden" controls></audio>
       </div>
       <div id="html-toolbar" class="html-toolbar" style="display:none">
-        <button id="html-mode-toggle" class="html-mode-btn">馃摑 婧愮爜</button>
-        <span id="html-error-indicator" class="html-error-indicator hidden" title="棰勮涓湁閿欒">鈿狅笍 閿欒</span>
+        <button id="html-mode-toggle" class="html-mode-btn">📝 源码</button>
+        <span id="html-error-indicator" class="html-error-indicator hidden" title="预览中有错误">⚠️ 错误</span>
       </div>
       <div id="html-error-console" class="html-error-console hidden"></div>
-      <!-- Markdown 棰勮 -->
+      <!-- Markdown 预览 -->
       <div id="md-preview-container" class="md-preview-container hidden">
         <div id="md-preview-content" class="md-preview-content"></div>
       </div>
       <div id="md-toolbar" class="html-toolbar" style="display:none">
-        <button id="md-mode-toggle" class="html-mode-btn">馃摑 婧愮爜</button>
+        <button id="md-mode-toggle" class="html-mode-btn">📝 源码</button>
       </div>
 
-      <!-- 鈺愨晲鈺?搴曢儴闈㈡澘 鈺愨晲鈺?-->
+      <!-- ═══ 底部面板 ═══ -->
       <div id="panel-resizer" class="panel-resizer hidden"></div>
       <div id="panel-area" class="panel-area hidden">
         <div class="panel-tabs" id="panel-tabs">
-          <button class="panel-tab active" data-panel="terminal">缁堢</button>
+          <button class="panel-tab active" data-panel="terminal">终端</button>
           <button class="panel-tab" data-panel="problems">
-            闂
+            问题
             <span class="panel-badge hidden" id="problems-badge">0</span>
           </button>
-          <button class="panel-tab" data-panel="output">杈撳嚭</button>
+          <button class="panel-tab" data-panel="output">输出</button>
           <div class="panel-tabs-spacer"></div>
-          <button class="panel-close" id="btn-panel-close" title="关闭闈㈡澘 (Ctrl+J)">鉁?/button>
+          <button class="panel-close" id="btn-panel-close" title="关闭面板 (Ctrl+J)">✕</button>
         </div>
-        <!-- 缁堢闈㈡澘 -->
+        <!-- 终端面板 -->
         <div id="panel-terminal" class="panel-content active">
           <div class="terminal-tabs" id="terminal-tabs">
             <div class="terminal-tabs-list" id="terminal-tabs-list"></div>
-            <button class="terminal-tab-add" id="btn-terminal-add" title="鏂板缓缁堢">+</button>
+            <button class="terminal-tab-add" id="btn-terminal-add" title="新建终端">+</button>
           </div>
           <div id="terminal-container" class="terminal-container"></div>
         </div>
-        <!-- 闂闈㈡澘 -->
+        <!-- 问题面板 -->
         <div id="panel-problems" class="panel-content">
           <div class="problems-empty" id="problems-empty">
-            <p>灏氭湭妫€娴嬪埌浠ｇ爜闂</p>
-            <span class="problems-empty-hint">缂栬瘧鍚庡皢鑷姩鏄剧ず閿欒鍜岃鍛?/span>
+            <p>尚未检测到代码问题</p>
+            <span class="problems-empty-hint">编译后将自动显示错误和警告</span>
           </div>
           <div class="problems-list hidden" id="problems-list"></div>
         </div>
-        <!-- 杈撳嚭闈㈡澘 -->
+        <!-- 输出面板 -->
         <div id="panel-output" class="panel-content">
           <div class="output-toolbar">
             <select id="output-channel" class="output-channel-select">
-              <option value="build">鏋勫缓杈撳嚭</option>
-              <option value="ai">AI 鎵ц鏃ュ織</option>
-              <option value="main">涓昏繘绋嬫棩蹇?/option>
+              <option value="build">构建输出</option>
+              <option value="ai">AI 执行日志</option>
+              <option value="main">主进程日志</option>
             </select>
-            <button id="btn-clear-output" class="output-clear-btn" title="娓呯┖杈撳嚭">馃棏</button>
+            <button id="btn-clear-output" class="output-clear-btn" title="清空输出">🗑</button>
           </div>
           <div id="output-content" class="output-content">
-            <div class="output-empty">閫夋嫨杈撳嚭閫氶亾鏌ョ湅鏃ュ織</div>
+            <div class="output-empty">选择输出通道查看日志</div>
           </div>
         </div>
       </div>
     </main>
 
-    <!-- 鎷栨嫿璋冩暣鍣?-->
+    <!-- 拖拽调整器 -->
     <div id="ai-panel-resizer" class="resizer"></div>
 
-    <!-- 鈺愨晲鈺?鍙充晶锛欰I 闈㈡澘 鈺愨晲鈺?-->
+    <!-- ═══ 右侧：AI 面板 ═══ -->
     <aside id="ai-panel" class="ai-panel">
       <div class="ai-panel-header">
         <div class="ai-panel-title-area">
-          <span class="ai-panel-title">AI 鍔╂墜</span>
+          <span class="ai-panel-title">AI 助手</span>
           <span id="ai-model-dot" class="ai-model-dot"></span>
-          <span id="ai-model-name" class="ai-model-name-text">鍔犺浇涓?..</span>
-          <select id="model-select-header" class="model-select-header" title="鍒囨崲妯″瀷">
-            <option value="">閫夋嫨妯″瀷...</option>
+          <span id="ai-model-name" class="ai-model-name-text">加载中...</span>
+          <select id="model-select-header" class="model-select-header" title="切换模型">
+            <option value="">选择模型...</option>
           </select>
         </div>
         <div class="ai-header-actions">
-          <button id="btn-new-chat" class="icon-btn" title="鏂板缓瀵硅瘽">+</button>
-          <button id="btn-chat-history" class="icon-btn" title="对话历史">鈽?/button>
+          <button id="btn-new-chat" class="icon-btn" title="新建对话">+</button>
+          <button id="btn-chat-history" class="icon-btn" title="对话历史">☰</button>
         </div>
       </div>
 
-      <!-- AI 鏍囩鏍?-->
+      <!-- AI 标签栏 -->
       <div class="ai-tabs-bar">
-        <button class="ai-tab active" data-tab="chat">馃挰 瀵硅瘽</button>
-        <button class="ai-tab" data-tab="settings">鈿?璁剧疆</button>
+        <button class="ai-tab active" data-tab="chat">💬 对话</button>
+        <button class="ai-tab" data-tab="settings">⚙ 设置</button>
       </div>
 
-      <!-- Agent 妯″紡閫夋嫨鍣?-->
+      <!-- Agent 模式选择器 -->
       <div id="agent-mode-bar" class="agent-mode-bar">
         <button class="agent-mode-btn active" data-mode="chat" title="普通对话：一问一答">
           <span class="mode-dot chat"></span>
@@ -359,39 +359,39 @@
         </button>
         <button class="agent-mode-btn" data-mode="builder" title="Builder 串行：AI 拆解需求 → 逐步执行 → 自动修复">
           <span class="mode-dot builder"></span>
-          <span>构建</span>
+          <span>Builder</span>
         </button>
         <button class="agent-mode-btn" data-mode="pipeline" title="全流水线：Builder → 并行 Coder(×4) → Reviewer → Tester">
           <span class="mode-dot pipeline"></span>
-          <span>流水线</span>
+          <span>Pipeline</span>
         </button>
       </div>
 
-      <!-- 瀵硅瘽鍒楄〃瑙嗗浘锛堝垏鎹㈠巻鍙插璇濇椂锛?-->
+      <!-- 对话列表视图（切换历史对话时） -->
       <div id="chat-list-view" class="chat-list-view hidden">
         <div class="chat-list-header">
           <span>对话历史</span>
-          <button id="btn-back-to-chat" class="icon-btn" title="返回对话">鈫?/button>
+          <button id="btn-back-to-chat" class="icon-btn" title="返回对话">←</button>
         </div>
         <div id="chat-list" class="chat-list">
           <div class="chat-list-empty">暂无历史对话</div>
         </div>
       </div>
 
-      <!-- 瀵硅瘽鍐呭 -->
+      <!-- 对话内容 -->
       <div id="chat-content-view" class="chat-content-view">
-        <!-- 瀵硅瘽 Tab -->
+        <!-- 对话 Tab -->
         <div id="tab-chat" class="ai-tab-content active">
           <div id="chat-messages" class="chat-messages">
-            <!-- 澶氶€夊伐鍏锋爮 -->
+            <!-- 多选工具栏 -->
             <div id="chat-select-bar" class="chat-select-bar hidden">
-              <span class="select-count">宸查€?0 鏉?/span>
-              <button id="btn-select-all" class="select-action-btn">鈽?鍏ㄩ€?/button>
-              <button id="btn-delete-selected" class="select-action-btn">馃棏 鍒犻櫎鎵€閫?/button>
+              <span class="select-count">已选 0 条</span>
+              <button id="btn-select-all" class="select-action-btn">☑ 全选</button>
+              <button id="btn-delete-selected" class="select-action-btn">🗑 删除所选</button>
               <button id="btn-delete-all" class="select-action-btn" style="background:rgba(244,71,71,0.15);border-color:rgba(244,71,71,0.4);">🔥 清空全部</button>
-              <button id="btn-clear-select" class="select-action-btn">鉁?取消</button>
+              <button id="btn-clear-select" class="select-action-btn">✕ 取消</button>
             </div>
-            <!-- Agent Pipeline 杩涘害闈㈡澘 -->
+            <!-- Agent Pipeline 进度面板 -->
             <div id="agent-pipeline-panel" class="agent-pipeline-panel hidden">
               <div class="pipeline-header">
                 <span class="pipeline-title" id="pipeline-title">🚀 任务流水线</span>
@@ -402,25 +402,25 @@
               </div>
               <div class="pipeline-phases" id="pipeline-phases">
                 <div class="pipeline-phase" data-phase="builder">
-                  <div class="phase-ring"><span class="phase-icon">🧏</span></div>
+                  <div class="phase-ring"><span class="phase-icon">🧱</span></div>
                   <span class="phase-name">Builder</span>
                   <span class="phase-label">拆解需求</span>
                 </div>
                 <div class="pipeline-connector"><div class="connector-line"></div></div>
                 <div class="pipeline-phase" data-phase="coder">
-                  <div class="phase-ring"><span class="phase-icon">🧩</span></div>
+                  <div class="phase-ring"><span class="phase-icon">🔧</span></div>
                   <span class="phase-name">Coder</span>
                   <span class="phase-label">并行开发</span>
                 </div>
                 <div class="pipeline-connector"><div class="connector-line"></div></div>
                 <div class="pipeline-phase" data-phase="reviewer">
-                  <div class="phase-ring"><span class="phase-icon">🔎</span></div>
+                  <div class="phase-ring"><span class="phase-icon">🔍</span></div>
                   <span class="phase-name">Reviewer</span>
                   <span class="phase-label">代码审查</span>
                 </div>
                 <div class="pipeline-connector"><div class="connector-line"></div></div>
                 <div class="pipeline-phase" data-phase="tester">
-                  <div class="phase-ring"><span class="phase-icon">✅</span></div>
+                  <div class="phase-ring"><span class="phase-icon">🧪</span></div>
                   <span class="phase-name">Tester</span>
                   <span class="phase-label">构建验证</span>
                 </div>
@@ -439,98 +439,100 @@
                 </svg>
               </div>
               <p class="ai-welcome-title">你好，我是虎猫 AI</p>
-              <p class="ai-welcome-desc">选择一个模型并填入 API Key 即可开始。支持 DeepSeek、火山引擎、Ollama 等。</button>
-                <button class="quick-btn" data-action="config-ollama">閰嶇疆鏈湴 Ollama</button>
+              <p class="ai-welcome-desc">选择一个模型并填入 API Key 即可开始。支持 DeepSeek、火山引擎、Ollama 等。</p>
+              <div class="ai-welcome-actions">
+                <button class="quick-btn primary" data-action="config-deepseek">快速配置 DeepSeek</button>
+                <button class="quick-btn" data-action="config-ollama">配置本地 Ollama</button>
               </div>
               <div class="ai-welcome-prompts">
-                <p class="ai-prompts-label">璇曡瘯杩欐牱闂垜锛?/p>
-                <button class="ai-prompt-chip" data-prompt="甯垜鍐欎竴涓?REST API 鎺ュ彛">"甯垜鍐欎竴涓?REST API 鎺ュ彛"</button>
-                <button class="ai-prompt-chip" data-prompt="瑙ｉ噴涓€涓嬭繖涓枃浠剁殑浣滅敤">"瑙ｉ噴涓€涓嬭繖涓枃浠剁殑浣滅敤"</button>
-                <button class="ai-prompt-chip" data-prompt="浼樺寲杩欐浠ｇ爜鐨勬€ц兘">"浼樺寲杩欐浠ｇ爜鐨勬€ц兘"</button>
+                <p class="ai-prompts-label">试试这样问我：</p>
+                <button class="ai-prompt-chip" data-prompt="帮我写一个 REST API 接口">"帮我写一个 REST API 接口"</button>
+                <button class="ai-prompt-chip" data-prompt="解释一下这个文件的作用">"解释一下这个文件的作用"</button>
+                <button class="ai-prompt-chip" data-prompt="优化这段代码的性能">"优化这段代码的性能"</button>
               </div>
             </div>
           </div>
           <div id="chat-input-area" class="chat-input-area">
-            <!-- 闄勪欢棰勮鏍?-->
+            <!-- 附件预览栏 -->
             <div id="attachment-preview" class="attachment-preview hidden"></div>
-            <!-- 杈撳叆宸ュ叿鏍?-->
+            <!-- 输入工具栏 -->
             <div class="chat-input-row">
               <div class="chat-input-actions">
-                <button id="btn-attach" class="chat-tool-btn" title="娣诲姞闄勪欢 / 鍥剧墖">
+                <button id="btn-attach" class="chat-tool-btn" title="添加附件 / 图片">
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
                 </button>
-                <button id="btn-tools-toggle" class="chat-tool-btn" title="MCP 宸ュ叿: 寮€鍚椂 AI 鍙鍐欐枃浠?鎵ц鍛戒护">馃敡</button>
-                <button id="btn-chat-select" class="chat-tool-btn" title="澶氶€夋秷鎭垹闄?>鈽?/button>
+                <button id="btn-tools-toggle" class="chat-tool-btn" title="MCP 工具: 开启时 AI 可读写文件/执行命令">🔧</button>
+                <button id="btn-chat-select" class="chat-tool-btn" title="多选消息删除">☑</button>
               </div>
-              <textarea id="chat-input" placeholder="输入消息锛孲hift+Enter 鎹㈣锛孍nter 鍙戦€?.." rows="3"></textarea>
-              <button id="btn-send" class="send-btn" title="鍙戦€?(Enter)">
+              <textarea id="chat-input" placeholder="输入消息，Shift+Enter 换行，Enter 发送..." rows="3"></textarea>
+              <button id="btn-send" class="send-btn" title="发送 (Enter)">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
               </button>
-              <button id="btn-abort" class="abort-btn hidden" title="⏹ 终止鐢熸垚 (Esc)">
+              <button id="btn-abort" class="abort-btn hidden" title="终止生成 (Esc)">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><rect x="4" y="4" width="16" height="16" rx="2"/></svg>
               </button>
             </div>
             <div class="chat-input-footer">
-              <span class="chat-footer-model" id="chat-footer-model">鏈€夋嫨妯″瀷</span>
-              <span class="chat-footer-hint">Enter 鍙戦€?路 Shift+Enter 鎹㈣</span>
+              <span class="chat-footer-model" id="chat-footer-model">未选择模型</span>
+              <span class="chat-footer-hint">Enter 发送 · Shift+Enter 换行</span>
             </div>
           </div>
         </div>
 
-        <!-- 浠诲姟 Tab -->
+        <!-- 任务 Tab -->
         <div id="tab-tasks" class="ai-tab-content hidden">
           <div id="task-list" class="task-list">
             <div class="task-empty">
-              <img src="icons/brand/empty-tasks.png" alt="绌? class="empty-illustration" />
-              <p>鏆傛棤浠诲姟闃熷垪</p>
+              <img src="icons/brand/empty-tasks.png" alt="空" class="empty-illustration" />
+              <p>暂无任务队列</p>
             </div>
           </div>
         </div>
 
-        <!-- 澶х翰 Tab -->
+        <!-- 大纲 Tab -->
         <div id="tab-outline" class="ai-tab-content hidden">
           <div class="outline-panel">
             <div class="outline-search">
-              <input id="outline-filter" type="text" placeholder="搜索绗﹀彿..." />
+              <input id="outline-filter" type="text" placeholder="搜索符号..." />
             </div>
             <div id="outline-tree" class="outline-tree">
               <div class="outline-empty">
-                <img src="icons/brand/empty-files.png" alt="绌? class="empty-illustration" />
-                <p>鎵撳紑文件浠ユ煡鐪嬪ぇ绾?/p>
+                <img src="icons/brand/empty-files.png" alt="空" class="empty-illustration" />
+                <p>打开文件以查看大纲</p>
               </div>
             </div>
           </div>
         </div>
 
-        <!-- 鐢ㄩ噺缁熻 Tab -->
+        <!-- 用量统计 Tab -->
         <div id="tab-usage" class="ai-tab-content hidden">
           <div class="usage-panel">
-            <h3>鐢ㄩ噺缁熻</h3>
+            <h3>用量统计</h3>
             <div class="usage-summary-cards">
               <div class="usage-card" id="usage-today-card">
-                <div class="usage-card-title">浠婃棩</div>
+                <div class="usage-card-title">今日</div>
                 <div class="usage-card-value" id="usage-today-tokens">--</div>
                 <div class="usage-card-label">tokens</div>
-                <div class="usage-card-cost" id="usage-today-cost">-- 鍏?/div>
+                <div class="usage-card-cost" id="usage-today-cost">-- 元</div>
               </div>
               <div class="usage-card" id="usage-total-card">
-                <div class="usage-card-title">绱</div>
+                <div class="usage-card-title">累计</div>
                 <div class="usage-card-value" id="usage-total-tokens">--</div>
                 <div class="usage-card-label">tokens</div>
-                <div class="usage-card-cost" id="usage-total-cost">-- 鍏?/div>
+                <div class="usage-card-cost" id="usage-total-cost">-- 元</div>
               </div>
             </div>
             <div class="usage-detail-section">
               <div class="usage-detail-header">
-                <h4>鎸夐」鐩粺璁?/h4>
+                <h4>按项目统计</h4>
                 <button class="usage-refresh-btn" id="btn-refresh-usage">刷新</button>
               </div>
               <div class="usage-project-list" id="usage-project-list">
-                <div class="usage-empty">鏆傛棤鏁版嵁</div>
+                <div class="usage-empty">暂无数据</div>
               </div>
             </div>
             <div class="usage-detail-section">
-              <h4>鏈€杩?30 澶╄秼鍔?/h4>
+              <h4>最近 30 天趋势</h4>
               <div class="usage-chart" id="usage-chart">
                 <div class="usage-chart-bars" id="usage-chart-bars"></div>
               </div>
@@ -538,69 +540,71 @@
           </div>
         </div>
 
-        <!-- 璁剧疆 Tab -->
+        <!-- 设置 Tab -->
         <div id="tab-settings" class="ai-tab-content hidden">
           <div class="settings-panel">
             <div class="settings-tabs">
-              <button class="settings-tab active" data-settings-tab="providers">模型服务商<button class="settings-tab" data-settings-tab="custom">自定义配置<button class="settings-tab" data-settings-tab="changelog">馃搵 版本记录</button>
-                            <button class="settings-tab" data-settings-tab="dream">🧠 梦境日志</button>
-              <button class="settings-tab" data-settings-tab="services">智能服务</button>
+              <button class="settings-tab active" data-settings-tab="providers">模型服务商</button>
+              <button class="settings-tab" data-settings-tab="custom">自定义配置</button>
+              <button class="settings-tab" data-settings-tab="changelog">📋 版本记录</button>
+              <button class="settings-tab" data-settings-tab="dream">梦境日志</button>
+              <button class="settings-tab" data-settings-tab="services">⚡ 智能服务</button>
             </div>
             <div id="settings-providers" class="settings-tab-content active">
               <div class="provider-list" id="provider-list">
                 <div class="provider-section">
-                  <div class="provider-section-title">宸叉敞鍐屾ā鍨?/div>
+                  <div class="provider-section-title">已注册模型</div>
                   <div id="model-list-container">
-                    <div class="model-list-loading">鍔犺浇涓?..</div>
+                    <div class="model-list-loading">加载中...</div>
                   </div>
                 </div>
                 <div class="provider-section">
-                  <div class="provider-section-title">鑷畾涔?/div>
+                  <div class="provider-section-title">自定义</div>
                   <div id="custom-models-list"></div>
-                  <button class="add-model-btn" id="btn-add-model">+ 娣诲姞妯″瀷</button>
+                  <button class="add-model-btn" id="btn-add-model">+ 添加模型</button>
                 </div>
               </div>
             </div>
             <div id="settings-custom" class="settings-tab-content hidden">
               <div class="model-config-form">
-                <h4>缂栬緫妯″瀷</h4>
+                <h4>编辑模型</h4>
                 <div class="form-row">
                   <div class="form-group required">
-                    <label>鏈嶅姟鍟?/label>
+                    <label>服务商</label>
                     <select id="cfg-provider">
                       <option value="deepseek">DeepSeek</option>
-                      <option value="huoshan">鐏北寮曟搸 Plan</option>
-                      <option value="ollama">Ollama (鏈湴)</option>
+                      <option value="huoshan">火山引擎 Plan</option>
+                      <option value="ollama">Ollama (本地)</option>
                       <option value="anthropic">Anthropic Claude</option>
-                      <option value="custom">鑷畾涔?OpenAI 鎺ュ彛</option>
+                      <option value="custom">自定义 OpenAI 接口</option>
                     </select>
                   </div>
                 </div>
                 <div class="form-row">
                   <div class="form-group required">
-                    <label>妯″瀷 ID</label>
+                    <label>模型 ID</label>
                     <div class="input-with-hint">
-                      <input id="cfg-model" type="text" placeholder="濡傦細deepseek-chat" />
+                      <input id="cfg-model" type="text" placeholder="如：deepseek-chat" />
                       <span class="input-hint" id="hint-model-id"></span>
-                      <a href="#" class="input-link" id="link-provider-docs" target="_blank">馃摉 鏌ョ湅鏂囨。</a>
+                      <a href="#" class="input-link" id="link-provider-docs" target="_blank">📖 查看文档</a>
                     </div>
                   </div>
                 </div>
                 <div class="form-row">
                   <div class="form-group required">
-                    <label>API 瀵嗛挜</label>
+                    <label>API 密钥</label>
                     <div class="input-with-hint">
-                      <input id="cfg-api-key" type="password" placeholder="杈撳叆鎮ㄧ殑 API Key" />
-                      <a href="#" class="input-link" id="link-get-api-key" target="_blank">鑾峰彇 API 瀵嗛挜</a>
+                      <input id="cfg-api-key" type="password" placeholder="输入您的 API Key" />
+                      <a href="#" class="input-link" id="link-get-api-key" target="_blank">获取 API 密钥</a>
                     </div>
                   </div>
                 </div>
                 <div class="form-row" id="cfg-base-url-row">
                   <div class="form-group">
-                    <label>API 鍗忚</label>
+                    <label>API 协议</label>
                     <select id="cfg-api-protocol">
-                      <option value="openai-compatible">OpenAI 鍏煎 (Chat Completions)</option>
-                      <option value="ollama">Ollama 鍘熺敓</option>
+                      <option value="openai-compatible">OpenAI 兼容 (Chat Completions)</option>
+                      <option value="ollama">Ollama 原生</option>
                       <option value="anthropic">Anthropic Messages</option>
                     </select>
                   </div>
@@ -613,107 +617,108 @@
                 </div>
                 <div class="form-row" id="cfg-meta-row">
                   <div class="form-group">
-                    <label>妯″瀷淇℃伅</label>
+                    <label>模型信息</label>
                     <div class="model-meta-display" id="cfg-meta-display">
-                      <span class="meta-item">涓婁笅鏂? <strong id="meta-context">-</strong></span>
-                      <span class="meta-item">鏈€澶ц緭鍑? <strong id="meta-max-tokens">-</strong></span>
-                      <span class="meta-item">璐圭敤: <strong id="meta-cost">-</strong></span>
-                      <span class="meta-item" id="meta-reasoning-badge" style="display:none">馃 鏀寔鎺ㄧ悊</span>
+                      <span class="meta-item">上下文: <strong id="meta-context">-</strong></span>
+                      <span class="meta-item">最大输出: <strong id="meta-max-tokens">-</strong></span>
+                      <span class="meta-item">费用: <strong id="meta-cost">-</strong></span>
+                      <span class="meta-item" id="meta-reasoning-badge" style="display:none">🧠 支持推理</span>
                     </div>
                   </div>
                 </div>
                 <div class="form-row">
                   <div class="form-group">
-                    <label>妯″瀷鑳藉姏</label>
+                    <label>模型能力</label>
                     <div class="model-roles">
-                      <label class="role-checkbox"><input type="checkbox" id="cfg-role-chat" checked /><span>瀵硅瘽</span></label>
-                      <label class="role-checkbox"><input type="checkbox" id="cfg-role-builder" /><span>鏋舵瀯 (Builder)</span></label>
-                      <label class="role-checkbox"><input type="checkbox" id="cfg-role-coder" checked /><span>缂栫爜 (Coder)</span></label>
+                      <label class="role-checkbox"><input type="checkbox" id="cfg-role-chat" checked /><span>对话</span></label>
+                      <label class="role-checkbox"><input type="checkbox" id="cfg-role-builder" /><span>架构 (Builder)</span></label>
+                      <label class="role-checkbox"><input type="checkbox" id="cfg-role-coder" checked /><span>编码 (Coder)</span></label>
                     </div>
                   </div>
                 </div>
                 <div class="form-row" style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border-subtle)">
                   <div class="form-group" style="flex:1">
-                    <label>馃 浣犵殑鏄电О</label>
-                    <input id="cfg-user-name" type="text" placeholder="濡傦細灏忔槑銆侀甯懜楸煎畼" maxlength="12" />
+                    <label>🧑 你的昵称</label>
+                    <input id="cfg-user-name" type="text" placeholder="如：小明、首席摸鱼官" maxlength="12" />
                   </div>
                   <div class="form-group" style="width:80px">
-                    <label>澶村儚</label>
+                    <label>头像</label>
                     <div class="avatar-picker" id="user-avatar-picker">
-                      <input id="cfg-user-avatar" type="text" placeholder="馃" maxlength="2" style="width:100%;text-align:center;font-size:24px" />
+                      <input id="cfg-user-avatar" type="text" placeholder="🧑" maxlength="2" style="width:100%;text-align:center;font-size:24px" />
                       <div class="avatar-emoji-grid hidden" id="user-emoji-grid"></div>
                     </div>
                   </div>
                 </div>
                 <div class="form-row">
                   <div class="form-group" style="flex:1">
-                    <label>馃惎 AI 鏄电О</label>
-                    <input id="cfg-ai-name" type="text" placeholder="濡傦細铏庣尗銆佸皬鍔╂墜" maxlength="12" />
+                    <label>🐯 AI 昵称</label>
+                    <input id="cfg-ai-name" type="text" placeholder="如：虎猫、小助手" maxlength="12" />
                   </div>
                   <div class="form-group" style="width:80px">
-                    <label>澶村儚</label>
+                    <label>头像</label>
                     <div class="avatar-picker" id="ai-avatar-picker">
-                      <input id="cfg-ai-avatar" type="text" placeholder="馃惎" maxlength="2" style="width:100%;text-align:center;font-size:24px" />
+                      <input id="cfg-ai-avatar" type="text" placeholder="🐯" maxlength="2" style="width:100%;text-align:center;font-size:24px" />
                       <div class="avatar-emoji-grid hidden" id="ai-emoji-grid"></div>
                     </div>
                   </div>
                 </div>
                 <div class="form-actions">
                   <button id="btn-test-config" class="test-btn">测试连接</button>
-                  <button id="btn-save-config" class="save-btn">保存閰嶇疆</button>
+                  <button id="btn-save-config" class="save-btn">保存配置</button>
                 </div>
-                <!-- 已保存 API 閰嶇疆 -->
+                <!-- 已保存的 API 配置 -->
                 <div class="saved-configs-section" style="margin-top:16px">
-                  <label style="color:var(--text-secondary);font-size:12px;margin-bottom:6px;display:block">馃捑 宸蹭繚瀛樼殑 API 閰嶇疆</label>
+                  <label style="color:var(--text-secondary);font-size:12px;margin-bottom:6px;display:block">💾 已保存的 API 配置</label>
                   <div id="saved-configs-list" class="saved-configs-list">
-                    <div class="saved-configs-empty">鏆傛棤宸蹭繚瀛樼殑閰嶇疆</div>
+                    <div class="saved-configs-empty">暂无已保存的配置</div>
                   </div>
                 </div>
                 <div class="form-actions" style="margin-top:12px;">
-                  <button id="btn-export-config" class="test-btn">馃摛 瀵煎嚭閰嶇疆</button>
-                  <button id="btn-import-config" class="test-btn">馃摜 瀵煎叆閰嶇疆</button>
-                  <button id="btn-shortcuts-editor" class="test-btn">鈱?蹇嵎閿?/button>
-                  <button id="btn-snippets-viewer" class="test-btn">馃搵 浠ｇ爜鐗囨</button>
+                  <button id="btn-export-config" class="test-btn">📤 导出配置</button>
+                  <button id="btn-import-config" class="test-btn">📥 导入配置</button>
+                  <button id="btn-shortcuts-editor" class="test-btn">⌨ 快捷键</button>
+                  <button id="btn-snippets-viewer" class="test-btn">📋 代码片段</button>
                 </div>
                 <div id="cfg-status" class="cfg-status"></div>
               </div>
             </div>
             <div id="settings-changelog" class="settings-tab-content hidden">
               <div class="changelog-header">
-                <h4>馃悈 铏庣尗 TCIDE 版本记录</h4>
-                <p class="changelog-subtitle">浠庣涓€鐗堣嚦浠婄殑瀹屾暣杩唬鍘嗙▼</p>
+                <h4>🐅 虎猫 TCIDE 版本记录</h4>
+                <p class="changelog-subtitle">从第一版至今的完整迭代历程</p>
               </div>
               <div class="changelog-timeline" id="changelog-timeline">
-                <div class="changelog-loading">鍔犺浇涓?..</div>
+                <div class="changelog-loading">加载中...</div>
               </div>
             </div>
                         <div id="settings-dream" class="settings-tab-content hidden">
               <div style="padding:12px">
                 <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px">
-                  <h4 style="margin:0;color:var(--tc-orange);font-size:13px">🧠 梦境引擎</h4>
-                  <span id="dream-status" style="font-size:10px;padding:2px 8px;border-radius:10px;background:rgba(255,165,0,0.1);color:var(--tc-orange)">💤 待命中</span>
-                  <button id="btn-dream-trigger" style="margin-left:auto;padding:6px 14px;border:1px solid var(--tc-orange);border-radius:4px;background:rgba(255,165,0,0.05);color:var(--tc-orange);cursor:pointer;font-size:11px">🌙 手动做梦</button>
+                  <h4 style="margin:0;color:var(--tc-orange);font-size:13px">梦境引擎</h4>
+                  <span id="dream-status" style="font-size:10px;padding:2px 8px;border-radius:10px;background:rgba(255,165,0,0.1);color:var(--tc-orange)">待命中</span>
+                  <button id="btn-dream-trigger" style="margin-left:auto;padding:6px 14px;border:1px solid var(--tc-orange);border-radius:4px;background:rgba(255,165,0,0.05);color:var(--tc-orange);cursor:pointer;font-size:11px">手动做梦</button>
                 </div>
-                <p style="font-size:11px;color:var(--text-secondary);margin:0 0 12px">做梦引擎在后台分析你的操作模式，凝练专属专家记忆。空闲超过5分钟自动触发。</p>
+                <p style="font-size:11px;color:var(--text-secondary);margin:0 0 12px">梦境引擎在后台分析你的操作模式，凝练专属专家记忆。空闲超过5分钟自动触发。</p>
                 <div id="dream-journal-list" style="max-height:400px;overflow-y:auto;display:flex;flex-direction:column;gap:6px">
-                  <div style="text-align:center;color:var(--text-secondary);padding:24px;font-size:12px">📖 加载梦境日志中...</div>
+                  <div style="text-align:center;color:var(--text-secondary);padding:24px;font-size:12px">加载梦境日志中...</div>
                 </div>
                 <div style="margin-top:12px;border-top:1px solid var(--border-subtle);padding-top:12px">
-                  <h4 style="margin:0 0 6px;color:var(--text-primary);font-size:12px">📋 专家记忆卡 (<span id="mem-card-count">0</span>)</h4>
+                  <h4 style="margin:0 0 6px;color:var(--text-primary);font-size:12px">专家记忆卡 (<span id="mem-card-count">0</span>)</h4>
                   <div id="dream-memory-cards" style="display:flex;flex-direction:column;gap:4px;max-height:300px;overflow-y:auto">
                     <div style="text-align:center;color:var(--text-secondary);padding:16px;font-size:11px">暂无记忆卡，触发一次做梦生成</div>
                   </div>
                 </div>
               </div>
             </div>
-            <div id="settings-services" class="settings-tab-content hidden">
+
+<div id="settings-services" class="settings-tab-content hidden">
               <div style="padding:12px">
-                <h4 style="margin:0 0 8px;color:var(--tc-orange);font-size:13px">鈿?鏅鸿兘鏈嶅姟绠＄悊</h4>
-                <p style="font-size:11px;color:var(--text-secondary);margin:0 0 12px">鍚敤鎴栧叧闂悇鏅鸿兘鏈嶅姟妯″潡銆傚叧闂彲鍑忓皯璧勬簮娑堣€椼€?/p>
+                <h4 style="margin:0 0 8px;color:var(--tc-orange);font-size:13px">⚡ 智能服务管理</h4>
+                <p style="font-size:11px;color:var(--text-secondary);margin:0 0 12px">启用或关闭各智能服务模块。关闭可减少资源消耗。</p>
                 <div id="service-toggles" style="display:flex;flex-direction:column;gap:4px">
                 </div>
-                <button id="btn-services-refresh-all" style="margin-top:12px;padding:6px 12px;border:1px solid var(--tc-orange);border-radius:4px;background:rgba(255,165,0,0.1);color:var(--tc-orange);cursor:pointer;font-size:11px">馃攧 閲嶆柊鍒濆鍖栨墍鏈夋湇鍔?/button>
-                <button id="btn-services-gc" style="margin-left:8px;padding:6px 12px;border:1px solid var(--border-subtle);border-radius:4px;background:transparent;color:var(--text-secondary);cursor:pointer;font-size:11px">馃棏 鎵嬪姩 GC 鍥炴敹</button>
+                <button id="btn-services-refresh-all" style="margin-top:12px;padding:6px 12px;border:1px solid var(--tc-orange);border-radius:4px;background:rgba(255,165,0,0.1);color:var(--tc-orange);cursor:pointer;font-size:11px">🔄 重新初始化所有服务</button>
+                <button id="btn-services-gc" style="margin-left:8px;padding:6px 12px;border:1px solid var(--border-subtle);border-radius:4px;background:transparent;color:var(--text-secondary);cursor:pointer;font-size:11px">🗑 手动 GC 回收</button>
               </div>
             </div>
           </div>
@@ -722,10 +727,10 @@
     </aside>
   </div>
 
-  <!-- 鈺愨晲鈺?搴曢儴鐘舵€佹爮 鈺愨晲鈺?-->
+  <!-- ═══ 底部状态栏 ═══ -->
   <footer id="status-bar" class="status-bar">
-    <span id="status-git" class="status-item" style="display:none">馃攢 main</span>
-    <span id="status-dirty" class="status-item" style="display:none" title="宸茶嚜鍔ㄤ繚瀛?>鈼?宸蹭慨鏀?/span>
+    <span id="status-git" class="status-item" style="display:none">🔀 main</span>
+    <span id="status-dirty" class="status-item" style="display:none" title="已自动保存">● 已修改</span>
     <span id="status-encoding" class="status-item">UTF-8</span>
     <span id="status-language" class="status-item">Kotlin</span>
     <span id="status-gradle" class="status-item gradle-badges" style="display:none">
@@ -734,158 +739,158 @@
       <button class="gradle-badge" data-gradle="clean">Clean</button>
     </span>
     <span class="status-spacer"></span>
-    <span id="perf-status" class="status-item" title="鍐呭瓨鐢ㄩ噺"></span>
-    <span id="health-score" class="status-item" title="椤圭洰鍋ュ悍搴?></span>
-    <span id="status-usage" class="status-item status-usage" title="浠婃棩 token 鐢ㄩ噺 / 璐圭敤">-- tokens / -- 鍏?/span>
-    <span id="status-position" class="status-item">琛?1, 鍒?1</span>
+    <span id="perf-status" class="status-item" title="内存用量"></span>
+    <span id="health-score" class="status-item" title="项目健康度"></span>
+    <span id="status-usage" class="status-item status-usage" title="今日 token 用量 / 费用">-- tokens / -- 元</span>
+    <span id="status-position" class="status-item">行 1, 列 1</span>
     <span id="status-model" class="status-item">DeepSeek</span>
-    <span id="status-panel-toggle" class="status-item status-terminal" title="鍒囨崲闈㈡澘 (Ctrl+J)">鈻竉</span>
-    <span id="status-help" class="status-item status-help" title="甯姪涓庡揩鎹烽敭">?</span>
+    <span id="status-panel-toggle" class="status-item status-terminal" title="切换面板 (Ctrl+J)">▸_</span>
+    <span id="status-help" class="status-item status-help" title="帮助与快捷键">?</span>
   </footer>
 
-  <!-- 鈺愨晲鈺?Zen Mode 杩蜂綘鐘舵€佹爮 鈺愨晲鈺?-->
+  <!-- ═══ Zen Mode 迷你状态栏 ═══ -->
   <footer id="zen-status-bar" class="zen-status-bar hidden">
     <span id="zen-language" class="status-item">Kotlin</span>
     <span class="status-spacer"></span>
-    <span id="zen-position" class="status-item">琛?1, 鍒?1</span>
-    <span class="zen-hint">Zen Mode 路 Ctrl+Shift+M 閫€鍑?/span>
+    <span id="zen-position" class="status-item">行 1, 列 1</span>
+    <span class="zen-hint">Zen Mode · Ctrl+Shift+M 退出</span>
   </footer>
 
-  <!-- 鈺愨晲鈺?鏍囩椤典笂涓嬫枃鑿滃崟 鈺愨晲鈺?-->
+  <!-- ═══ 标签页上下文菜单 ═══ -->
   <div id="tab-context-menu" class="context-menu hidden">
-    <div class="ctx-item" data-action="tab-close">鉁?关闭</div>
-    <div class="ctx-item" data-action="tab-close-others">鈯?关闭鍏朵粬</div>
-    <div class="ctx-item" data-action="tab-close-right">鈫?关闭鍙充晶</div>
-    <div class="ctx-item" data-action="tab-close-all">鈯?关闭鍏ㄩ儴</div>
+    <div class="ctx-item" data-action="tab-close">✕ 关闭</div>
+    <div class="ctx-item" data-action="tab-close-others">⊟ 关闭其他</div>
+    <div class="ctx-item" data-action="tab-close-right">→ 关闭右侧</div>
+    <div class="ctx-item" data-action="tab-close-all">⊠ 关闭全部</div>
     <div class="ctx-divider"></div>
-    <div class="ctx-item" data-action="tab-copy-path">馃搵 澶嶅埗璺緞</div>
-    <div class="ctx-item" data-action="tab-reveal">馃搨 鍦ㄦ枃浠跺す涓樉绀?/div>
+    <div class="ctx-item" data-action="tab-copy-path">📋 复制路径</div>
+    <div class="ctx-item" data-action="tab-reveal">📂 在文件夹中显示</div>
     <div class="ctx-divider"></div>
-    <div class="ctx-item" data-action="tab-split-right">鈼?鍚戝彸鎷嗗垎</div>
+    <div class="ctx-item" data-action="tab-split-right">◫ 向右拆分</div>
   </div>
 
-  <!-- 鈺愨晲鈺?文件鏍戜笂涓嬫枃鑿滃崟 鈺愨晲鈺?-->
+  <!-- ═══ 文件树上下文菜单 ═══ -->
   <div id="context-menu" class="context-menu hidden">
-    <div class="ctx-item" data-action="new-file">馃搫 新建文件</div>
-    <div class="ctx-item" data-action="new-folder">馃搧 新建文件澶?/div>
+    <div class="ctx-item" data-action="new-file">📄 新建文件</div>
+    <div class="ctx-item" data-action="new-folder">📁 新建文件夹</div>
     <div class="ctx-divider"></div>
-    <div class="ctx-item" data-action="rename">鉁忥笍 閲嶅懡鍚?/div>
-    <div class="ctx-item" data-action="delete">馃棏锔?鍒犻櫎</div>
+    <div class="ctx-item" data-action="rename">✏️ 重命名</div>
+    <div class="ctx-item" data-action="delete">🗑️ 删除</div>
     <div class="ctx-divider"></div>
-    <div class="ctx-item" data-action="copy-path">馃搵 澶嶅埗璺緞</div>
-    <div class="ctx-item" data-action="show-in-folder">馃搨 鍦ㄦ枃浠跺す涓樉绀?/div>
+    <div class="ctx-item" data-action="copy-path">📋 复制路径</div>
+    <div class="ctx-item" data-action="show-in-folder">📂 在文件夹中显示</div>
     <div class="ctx-divider"></div>
-    <div class="ctx-item warning" data-action="restore-snapshot">鈴?鎭㈠涓婃 AI 淇敼鍓?/div>
+    <div class="ctx-item warning" data-action="restore-snapshot">⏪ 恢复上次 AI 修改前</div>
   </div>
 
-  <!-- 鈺愨晲鈺?鍛戒护闈㈡澘 鈺愨晲鈺?-->
+  <!-- ═══ 命令面板 ═══ -->
   <div id="command-palette" class="command-palette hidden">
     <div class="cmd-palette-backdrop" id="cmd-palette-backdrop"></div>
     <div class="cmd-palette-panel">
       <div class="cmd-palette-input-wrap">
-        <span class="cmd-palette-prefix">鈻?/span>
-        <input id="cmd-palette-input" type="text" placeholder="杈撳叆鍛戒护..." autocomplete="off" />
+        <span class="cmd-palette-prefix">▸</span>
+        <input id="cmd-palette-input" type="text" placeholder="输入命令..." autocomplete="off" />
       </div>
       <div id="cmd-palette-results" class="cmd-palette-results"></div>
     </div>
   </div>
 
-  <!-- 鈺愨晲鈺?甯姪/蹇嵎閿脊绐?鈺愨晲鈺?-->
+  <!-- ═══ 帮助/快捷键弹窗 ═══ -->
   <div id="help-dialog" class="help-dialog hidden">
     <div class="help-content">
-      <h3>鈱?蹇嵎閿€熸煡琛?/h3>
+      <h3>⌨ 快捷键速查表</h3>
       <table>
-        <tr><td><kbd>Ctrl+O</kbd></td><td>鎵撳紑椤圭洰</td></tr>
+        <tr><td><kbd>Ctrl+O</kbd></td><td>打开项目</td></tr>
         <tr><td><kbd>Ctrl+N</kbd></td><td>新建文件</td></tr>
         <tr><td><kbd>Ctrl+S</kbd></td><td>保存文件</td></tr>
-        <tr><td><kbd>Ctrl+W</kbd></td><td>关闭鏍囩</td></tr>
-        <tr><td><kbd>Ctrl+\\</kbd></td><td>鍒囨崲 AI 闈㈡澘</td></tr>
-        <tr><td><kbd>Ctrl+Shift+M</kbd></td><td>Zen 涓撴敞妯″紡</td></tr>
-        <tr><td><kbd>Ctrl+Shift+B</kbd></td><td>Builder 鏋舵瀯妯″紡</td></tr>
-        <tr><td><kbd>Ctrl+Shift+C</kbd></td><td>Coder 缂栫▼妯″紡</td></tr>
-        <tr><td><kbd>Ctrl+Shift+X</kbd></td><td>⏹ 终止 AI 浠诲姟</td></tr>
-        <tr><td><kbd>Ctrl+Shift+I</kbd></td><td>AI 鐢熸垚/鏀硅繘浠ｇ爜</td></tr>
-        <tr><td><kbd>Ctrl+Shift+E</kbd></td><td>AI 瑙ｉ噴浠ｇ爜</td></tr>
-        <tr><td><kbd>Ctrl+Enter</kbd></td><td>鍙戦€?AI 娑堟伅</td></tr>
-        <tr><td><kbd>Esc</kbd></td><td>鍋滄娴佸紡杈撳嚭</td></tr>
-        <tr><td><kbd>Ctrl+,</kbd></td><td>鎵撳紑璁剧疆</td></tr>
+        <tr><td><kbd>Ctrl+W</kbd></td><td>关闭标签</td></tr>
+        <tr><td><kbd>Ctrl+\\</kbd></td><td>切换 AI 面板</td></tr>
+        <tr><td><kbd>Ctrl+Shift+M</kbd></td><td>Zen 专注模式</td></tr>
+        <tr><td><kbd>Ctrl+Shift+B</kbd></td><td>Builder 架构模式</td></tr>
+        <tr><td><kbd>Ctrl+Shift+C</kbd></td><td>Coder 编程模式</td></tr>
+        <tr><td><kbd>Ctrl+Shift+X</kbd></td><td>终止 AI 任务</td></tr>
+        <tr><td><kbd>Ctrl+Shift+I</kbd></td><td>AI 生成/改进代码</td></tr>
+        <tr><td><kbd>Ctrl+Shift+E</kbd></td><td>AI 解释代码</td></tr>
+        <tr><td><kbd>Ctrl+Enter</kbd></td><td>发送 AI 消息</td></tr>
+        <tr><td><kbd>Esc</kbd></td><td>停止流式输出</td></tr>
+        <tr><td><kbd>Ctrl+,</kbd></td><td>打开设置</td></tr>
       </table>
       <button class="help-close" onclick="document.getElementById('help-dialog').classList.add('hidden')">关闭</button>
     </div>
   </div>
 
-  <!-- 鈺愨晲鈺?鍏充簬瀵硅瘽妗?鈺愨晲鈺?-->
+  <!-- ═══ 关于对话框 ═══ -->
   <div id="about-dialog" class="about-dialog hidden">
     <div class="about-content">
       <div class="about-header">
-        <img src="icons/brand/mascot-happy.png" alt="铏庣尗" class="about-logo-img" />
-        <h2>铏庣尗 TCIDE</h2>
-        <p class="about-version" id="about-version">鐗堟湰 1.1.0</p>
+        <img src="icons/brand/mascot-happy.png" alt="虎猫" class="about-logo-img" />
+        <h2>虎猫 TCIDE</h2>
+        <p class="about-version" id="about-version">版本 1.1.0</p>
       </div>
       <div class="about-body">
-        <p class="about-desc">涓汉涓撳睘 AI 缂栫▼鍔╂墜</p>
+        <p class="about-desc">个人专属 AI 编程助手</p>
         <div class="about-features">
-          <h3>鏍稿績鐗规€?/h3>
+          <h3>核心特性</h3>
           <ul>
-            <li><img src="tcide://icon-16.png" alt="" class="about-li-icon" /> <strong>鍙屾櫤鑳戒綋鏋舵瀯</strong> - Builder 璐熻矗浠诲姟瑙勫垝锛孋oder 璐熻矗浠ｇ爜鎵ц</li>
-            <li><img src="tcide://icon-16.png" alt="" class="about-li-icon" /> <strong>瀹屽叏绉佹湁鍖?/strong> - 鎵€鏈夋暟鎹湰鍦板瓨鍌紝鏀寔鏈湴妯″瀷</li>
-            <li><img src="tcide://icon-16.png" alt="" class="about-li-icon" /> <strong>椤圭洰绾х悊瑙?/strong> - 绱㈠紩鏁翠釜椤圭洰锛岀簿鍑嗙悊瑙ｄ笂涓嬫枃</li>
-            <li><img src="tcide://icon-16.png" alt="" class="about-li-icon" /> <strong>澶氭ā鍨嬫敮鎸?/strong> - DeepSeek銆丱llama銆佺伀灞辨柟鑸熺伒娲诲垏鎹?/li>
-            <li><img src="tcide://icon-16.png" alt="" class="about-li-icon" /> <strong>浠诲姟闂幆</strong> - 鑷姩鍒嗚В銆佹墽琛屻€侀獙璇併€佷慨澶?/li>
-            <li><img src="tcide://icon-16.png" alt="" class="about-li-icon" /> <strong>鐣岄潰浼樺寲</strong> - 鏆楄壊涓婚銆佽檸鐚厤鑹层€佹祦鐣呭姩鐢?/li>
+            <li><img src="tcide://icon-16.png" alt="" class="about-li-icon" /> <strong>双智能体架构</strong> - Builder 负责任务规划，Coder 负责代码执行</li>
+            <li><img src="tcide://icon-16.png" alt="" class="about-li-icon" /> <strong>完全私有化</strong> - 所有数据本地存储，支持本地模型</li>
+            <li><img src="tcide://icon-16.png" alt="" class="about-li-icon" /> <strong>项目级理解</strong> - 索引整个项目，精准理解上下文</li>
+            <li><img src="tcide://icon-16.png" alt="" class="about-li-icon" /> <strong>多模型支持</strong> - DeepSeek、Ollama、火山方舟灵活切换</li>
+            <li><img src="tcide://icon-16.png" alt="" class="about-li-icon" /> <strong>任务闭环</strong> - 自动分解、执行、验证、修复</li>
+            <li><img src="tcide://icon-16.png" alt="" class="about-li-icon" /> <strong>界面优化</strong> - 暗色主题、虎猫配色、流畅动画</li>
           </ul>
         </div>
         <div class="about-tech">
-          <h3>鎶€鏈爤</h3>
-          <p>Electron 路 Monaco Editor 路 xterm.js 路 SQLite 路 Tree-sitter</p>
+          <h3>技术栈</h3>
+          <p>Electron · Monaco Editor · xterm.js · SQLite · Tree-sitter</p>
         </div>
         <div class="about-footer">
-          <p>浣滆€咃細鏂囨．鐗归獑</p>
-          <p>鍏紬鍙凤細鏂囨．鐗归獑 | PyClaw浣滆€呴獑鎴＄殑鐖哥埜</p>
-          <p>漏 2026 Guanist, Inc. 淇濈暀鎵€鏈夋潈鍒┿€?/p>
+          <p>作者：文森特骆</p>
+          <p>公众号：文森特骆 | PyClaw作者骆戡的爸爸</p>
+          <p>© 2026 Guanist, Inc. 保留所有权利。</p>
         </div>
       </div>
       <button class="about-close" onclick="document.getElementById('about-dialog').classList.add('hidden')">关闭</button>
     </div>
   </div>
 
-  <!-- 鈺愨晲鈺?浣欓涓嶈冻寮圭獥 鈺愨晲鈺?-->
+  <!-- ═══ 余额不足弹窗 ═══ -->
   <div id="balance-warning-dialog" class="balance-warning-dialog hidden">
     <div class="balance-warning-content">
-      <div class="balance-warning-icon">鈿狅笍</div>
-      <h3>API 浣欓涓嶈冻</h3>
-      <p class="balance-warning-msg" id="balance-warning-msg">鎮ㄧ殑 API 浣欓涓嶈冻锛岃鍏呭€煎悗缁х画浣跨敤銆?/p>
+      <div class="balance-warning-icon">⚠️</div>
+      <h3>API 余额不足</h3>
+      <p class="balance-warning-msg" id="balance-warning-msg">您的 API 余额不足，请充值后继续使用。</p>
       <div class="balance-warning-actions">
-        <button class="balance-warning-btn" id="btn-dismiss-warning">鎴戠煡閬撲簡</button>
+        <button class="balance-warning-btn" id="btn-dismiss-warning">我知道了</button>
       </div>
     </div>
   </div>
 
-  <!-- 鈺愨晲鈺?Diff 棰勮寮圭獥 鈺愨晲鈺?-->
+  <!-- ═══ Diff 预览弹窗 ═══ -->
   <div id="diff-modal" class="diff-modal" style="display:none;">
     <div class="diff-backdrop" onclick="closeDiffModal()"></div>
     <div class="diff-panel">
       <div class="diff-panel-header">
-        <span>馃攧 AI 浠ｇ爜鍙樻洿棰勮</span>
+        <span>🔄 AI 代码变更预览</span>
         <div>
-          <button id="diff-accept" class="diff-btn-accept" onclick="acceptDiff()">鉁?鎺ュ彈 (Enter)</button>
-          <button id="diff-reject" class="diff-btn-reject" onclick="closeDiffModal()">鉁?鎷掔粷 (Esc)</button>
+          <button id="diff-accept" class="diff-btn-accept" onclick="acceptDiff()">✓ 接受 (Enter)</button>
+          <button id="diff-reject" class="diff-btn-reject" onclick="closeDiffModal()">✗ 拒绝 (Esc)</button>
         </div>
       </div>
       <div class="diff-panel-body">
         <div class="diff-column">
-          <div class="diff-col-header diff-col-orig">鈥?鍘熷浠ｇ爜</div>
+          <div class="diff-col-header diff-col-orig">— 原始代码</div>
           <div id="diff-original-content" class="diff-code"></div>
         </div>
         <div class="diff-column">
-          <div class="diff-col-header diff-col-mod">+ AI 寤鸿</div>
+          <div class="diff-col-header diff-col-mod">+ AI 建议</div>
           <div id="diff-modified-content" class="diff-code"></div>
         </div>
       </div>
     </div>
   </div>
 
-  <!-- 鈺愨晲鈺?Toast 閫氱煡瀹瑰櫒 鈺愨晲鈺?-->
+  <!-- ═══ Toast 通知容器 ═══ -->
   <div id="toast-container" class="toast-container"></div>
 
   <script src="./assets/p0-modules.js"></script>
@@ -893,34 +898,34 @@
   <script src="./assets/p2-modules.js"></script>
 
 
-  <!-- 蹇嵎閿紪杈戝櫒寮圭獥 -->
+  <!-- 快捷键编辑器弹窗 -->
   <div id="shortcuts-modal" class="modal-overlay hidden">
     <div class="modal-content" style="max-width:560px;max-height:80vh">
       <div class="modal-header">
-        <h3>鈱?蹇嵎閿缃?/h3>
-        <button class="modal-close" onclick="$id('shortcuts-modal').classList.add('hidden')">鉁?/button>
+        <h3>⌨ 快捷键设置</h3>
+        <button class="modal-close" onclick="$id('shortcuts-modal').classList.add('hidden')">✕</button>
       </div>
       <div class="modal-body" style="max-height:55vh;overflow-y:auto">
         <table class="shortcuts-table" id="shortcuts-table">
-          <thead><tr><th>鎿嶄綔</th><th>蹇嵎閿?/th><th>鎿嶄綔</th></tr></thead>
+          <thead><tr><th>操作</th><th>快捷键</th><th>操作</th></tr></thead>
           <tbody id="shortcuts-tbody"></tbody>
         </table>
         <div style="margin-top:8px;text-align:right">
-          <button id="btn-shortcuts-reset" class="test-btn" style="font-size:11px">馃攧 鎭㈠榛樿</button>
+          <button id="btn-shortcuts-reset" class="test-btn" style="font-size:11px">🔄 恢复默认</button>
         </div>
       </div>
     </div>
   </div>
 
-  <!-- 浠ｇ爜鐗囨鏌ョ湅鍣?-->
+  <!-- 代码片段查看器 -->
   <div id="snippets-modal" class="modal-overlay hidden">
     <div class="modal-content" style="max-width:640px;max-height:80vh">
       <div class="modal-header">
-        <h3>馃搵 浠ｇ爜鐗囨</h3>
-        <button class="modal-close" onclick="$id('snippets-modal').classList.add('hidden')">鉁?/button>
+        <h3>📋 代码片段</h3>
+        <button class="modal-close" onclick="$id('snippets-modal').classList.add('hidden')">✕</button>
       </div>
       <div class="modal-body" style="max-height:55vh;overflow-y:auto">
-        <div id="snippets-content">鍔犺浇涓?..</div>
+        <div id="snippets-content">加载中...</div>
       </div>
     </div>
   </div>
