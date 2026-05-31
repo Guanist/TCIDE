@@ -1,7 +1,7 @@
 {
     "name":  "tcide",
     "productName":  "虎猫 TCIDE",
-    "version":  "1.7.0",
+    "version":  "0.17.0",
     "description":  "虎猫 TCIDE — 个人专属 AI 编程 IDE",
     "main":  "dist/main/index.js",
     "author":  "虎猫团队",

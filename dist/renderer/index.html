@@ -337,7 +337,7 @@
         </div>
         <div class="ai-header-actions">
           <button id="btn-new-chat" class="icon-btn" title="鏂板缓瀵硅瘽">+</button>
-          <button id="btn-chat-history" class="icon-btn" title="瀵硅瘽鍘嗗彶">鈽?/button>
+          <button id="btn-chat-history" class="icon-btn" title="对话历史">鈽?/button>
         </div>
       </div>
 
@@ -359,22 +359,22 @@
         </button>
         <button class="agent-mode-btn" data-mode="builder" title="Builder 串行：AI 拆解需求 → 逐步执行 → 自动修复">
           <span class="mode-dot builder"></span>
-          <span>Builder</span>
+          <span>构建</span>
         </button>
         <button class="agent-mode-btn" data-mode="pipeline" title="全流水线：Builder → 并行 Coder(×4) → Reviewer → Tester">
           <span class="mode-dot pipeline"></span>
-          <span>Pipeline</span>
+          <span>流水线</span>
         </button>
       </div>
 
       <!-- 瀵硅瘽鍒楄〃瑙嗗浘锛堝垏鎹㈠巻鍙插璇濇椂锛?-->
       <div id="chat-list-view" class="chat-list-view hidden">
         <div class="chat-list-header">
-          <span>瀵硅瘽鍘嗗彶</span>
-          <button id="btn-back-to-chat" class="icon-btn" title="杩斿洖瀵硅瘽">鈫?/button>
+          <span>对话历史</span>
+          <button id="btn-back-to-chat" class="icon-btn" title="返回对话">鈫?/button>
         </div>
         <div id="chat-list" class="chat-list">
-          <div class="chat-list-empty">鏆傛棤鍘嗗彶瀵硅瘽</div>
+          <div class="chat-list-empty">暂无历史对话</div>
         </div>
       </div>
 
@@ -388,7 +388,7 @@
               <span class="select-count">宸查€?0 鏉?/span>
               <button id="btn-select-all" class="select-action-btn">鈽?鍏ㄩ€?/button>
               <button id="btn-delete-selected" class="select-action-btn">馃棏 鍒犻櫎鎵€閫?/button>
-              <button id="btn-delete-all" class="select-action-btn" style="background:rgba(244,71,71,0.15);border-color:rgba(244,71,71,0.4);">馃敟 娓呯┖鍏ㄩ儴</button>
+              <button id="btn-delete-all" class="select-action-btn" style="background:rgba(244,71,71,0.15);border-color:rgba(244,71,71,0.4);">🔥 清空全部</button>
               <button id="btn-clear-select" class="select-action-btn">鉁?鍙栨秷</button>
             </div>
             <!-- Agent Pipeline 杩涘害闈㈡澘 -->
@@ -438,7 +438,7 @@
                   <path d="M8 13c0 2 2 3 4 3s4-1 4-3"/>
                 </svg>
               </div>
-              <p class="ai-welcome-title">浣犲ソ锛屾垜鏄檸鐚?AI</p>
+              <p class="ai-welcome-title">你好，我是虎猫 AI</p>
               <p class="ai-welcome-desc">閫夋嫨涓€涓ā鍨嬪苟濉叆 API Key 鍗冲彲寮€濮嬨€傛敮鎸?DeepSeek銆佺伀灞卞紩鎿庛€丱llama 绛夈€?/p>
               <div class="ai-welcome-actions">
                 <button class="quick-btn primary" data-action="config-deepseek">蹇€熼厤缃?DeepSeek</button>
@@ -468,7 +468,7 @@
               <button id="btn-send" class="send-btn" title="鍙戦€?(Enter)">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
               </button>
-              <button id="btn-abort" class="abort-btn hidden" title="缁堟鐢熸垚 (Esc)">
+              <button id="btn-abort" class="abort-btn hidden" title="⏹ 终止鐢熸垚 (Esc)">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><rect x="4" y="4" width="16" height="16" rx="2"/></svg>
               </button>
             </div>
@@ -807,7 +807,7 @@
         <tr><td><kbd>Ctrl+Shift+M</kbd></td><td>Zen 涓撴敞妯″紡</td></tr>
         <tr><td><kbd>Ctrl+Shift+B</kbd></td><td>Builder 鏋舵瀯妯″紡</td></tr>
         <tr><td><kbd>Ctrl+Shift+C</kbd></td><td>Coder 缂栫▼妯″紡</td></tr>
-        <tr><td><kbd>Ctrl+Shift+X</kbd></td><td>缁堟 AI 浠诲姟</td></tr>
+        <tr><td><kbd>Ctrl+Shift+X</kbd></td><td>⏹ 终止 AI 浠诲姟</td></tr>
         <tr><td><kbd>Ctrl+Shift+I</kbd></td><td>AI 鐢熸垚/鏀硅繘浠ｇ爜</td></tr>
         <tr><td><kbd>Ctrl+Shift+E</kbd></td><td>AI 瑙ｉ噴浠ｇ爜</td></tr>
         <tr><td><kbd>Ctrl+Enter</kbd></td><td>鍙戦€?AI 娑堟伅</td></tr>

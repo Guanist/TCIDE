@@ -119,7 +119,7 @@ function showAboutDialog() {
     const aboutIconPath = isDev
         ? path.join(__dirname, '..', '..', 'resources', 'about-icon.png')
         : path.join(process.resourcesPath, 'about-icon.png');
-    let appVersion = 'v1.5.0-p0';
+    let appVersion = 'v0.17.0';
     try {
         const pkgPath = isDev
             ? path.join(__dirname, '..', '..', 'package.json')
