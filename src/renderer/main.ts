@@ -3580,6 +3580,21 @@ const VERSION_HISTORY: Array<{ version: string; date: string; emoji: string; tit
     philosophy: '从Demo到生产。18个模块一次交付,57个IPC通道全部接通。'
   },
   {
+    version: 'v1.6.0',
+    date: '2026-05-31',
+    emoji: '🎨',
+    title: '个性蜕变 — Markdown预览/无气泡对话/自定义形象',
+    features: [
+      '📝 Markdown预览: .md文件自动渲染,源码/预览一键切换',
+      '🎨 AI回复去气泡: 对齐Claude/Trae风格,用户消息保留气泡',
+      '🧑 自定义头像昵称: 用户/AI名称+头像emoji自由设置',
+      '📦 代码块折叠 + 聊天气泡限高 + 关闭保存确认',
+      '🐛 HTML/SVG预览串位 / 设置子标签 / 消息重复 / AI截断',
+      '🐯 虎猫思考动画 + AI统计栏',
+    ],
+    philosophy: 'IDE不止是工具，也是个性。Markdown让它能读文档，无气泡让它会聊天。'
+  },
+  {
     version: 'v1.5.1',
     date: '2026-05-30',
     emoji: '🐯',
