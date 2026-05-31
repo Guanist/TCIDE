@@ -217,6 +217,10 @@ const state = {
     model: 'deepseek-v4-pro',
     builderModel: 'deepseek-reasoner',
     coderModel: 'deepseek-v4-pro',
+    userName: '',
+    aiName: '',
+    userAvatar: '',
+    aiAvatar: '',
   },
 };
 
@@ -1692,10 +1696,11 @@ function appendStreamChunk(chunk: string): void {
     lastMsg = document.createElement('div');
     lastMsg.className = 'chat-message assistant';
     lastMsg.setAttribute('data-role', 'assistant');
+    const aiName = state.config.aiName || '虎猫 AI';
     lastMsg.innerHTML = `
       <div class="msg-body">
         <div class="msg-header">
-          <span class="msg-role">虎猫 AI</span>
+          <span class="msg-role">${aiName}</span>
           <span class="msg-time">${new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })}</span>
         </div>
         <div class="msg-content"></div>
@@ -2436,8 +2441,11 @@ function renderChatMessage(msg: ChatMessage): void {
   el.setAttribute('data-role', msg.role);
   el.setAttribute('data-msg-id', msg.id);
 
-  const avatars: Record<string, string> = { user: '🧑', assistant: '', system: '⚙' };
-  const labels: Record<string, string> = { user: '你', assistant: '虎猫 AI', system: '系统' };
+  const userName = state.config.userName || '你';
+  const aiName = state.config.aiName || '虎猫 AI';
+  const userAvatar = state.config.userAvatar || '🧑';
+  const avatars: Record<string, string> = { user: userAvatar, assistant: '', system: '⚙' };
+  const labels: Record<string, string> = { user: userName, assistant: aiName, system: '系统' };
   const timeStr = new Date(msg.timestamp).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
   let attachHtml = '';
   if (msg.attachments?.length) {
@@ -2476,6 +2484,26 @@ function renderChatMessage(msg: ChatMessage): void {
   wireMsgActions(el, msg);
   container.appendChild(el);
   container.scrollTop = container.scrollHeight;
+}
+
+// ── 更新聊天中所有角色标签（个性化配置变更时调用）──
+function updateChatLabels(): void {
+  const userName = state.config.userName || '你';
+  const aiName = state.config.aiName || '虎猫 AI';
+  const userAvatar = state.config.userAvatar || '🧑';
+  const aiAvatar = state.config.aiAvatar || '🐯';
+  document.querySelectorAll('.chat-message').forEach(el => {
+    const role = (el as HTMLElement).dataset.role;
+    const roleEl = el.querySelector('.msg-role') as HTMLElement | null;
+    const avatarEl = el.querySelector('.msg-avatar') as HTMLElement | null;
+    if (!roleEl) return;
+    if (role === 'user') { roleEl.textContent = userName; if (avatarEl) avatarEl.textContent = userAvatar; }
+    else if (role === 'assistant') { roleEl.textContent = aiName; if (avatarEl) avatarEl.textContent = aiAvatar; }
+    else if (role === 'system') { roleEl.textContent = '系统'; if (avatarEl) avatarEl.textContent = '⚙'; }
+  });
+  // 更新底部统计栏中的 AI 名称
+  const statsEl = document.getElementById('ai-stats-text');
+  if (statsEl) statsEl.textContent = `${aiName} 就绪`;
 }
 
 // ── 解析思考过程 ──
@@ -3261,6 +3289,10 @@ async function loadConfig(): Promise<void> {
       state.config.model = config.model || 'deepseek-v4-pro';
       state.config.builderModel = config.builderModel || 'deepseek-reasoner';
       state.config.coderModel = config.coderModel || 'deepseek-v4-pro';
+      state.config.userName = config.userName || '';
+      state.config.aiName = config.aiName || '';
+      state.config.userAvatar = config.userAvatar || '';
+      state.config.aiAvatar = config.aiAvatar || '';
       updateSettingsUI();
       updateModelListSelection();
       updateModelIndicator();
@@ -3290,6 +3322,15 @@ function updateSettingsUI(): void {
   updateProviderDefaults();
   // 显示模型元数据
   updateModelMetaDisplay();
+  // ── 个性化 ──
+  const userNameEl = document.getElementById('cfg-user-name') as HTMLInputElement;
+  if (userNameEl) userNameEl.value = state.config.userName;
+  const aiNameEl = document.getElementById('cfg-ai-name') as HTMLInputElement;
+  if (aiNameEl) aiNameEl.value = state.config.aiName;
+  const userAvatarEl = document.getElementById('cfg-user-avatar') as HTMLInputElement;
+  if (userAvatarEl) userAvatarEl.value = state.config.userAvatar || '🧑';
+  const aiAvatarEl = document.getElementById('cfg-ai-avatar') as HTMLInputElement;
+  if (aiAvatarEl) aiAvatarEl.value = state.config.aiAvatar || '🐯';
 }
 
 // ── 动态模型列表(从注册表加载) ──
@@ -3759,6 +3800,10 @@ async function saveConfig(): Promise<void> {
     model: model.trim(),
     builderModel: state.config.builderModel,
     coderModel: state.config.coderModel,
+    userName: (document.getElementById('cfg-user-name') as HTMLInputElement)?.value.trim() || '',
+    aiName: (document.getElementById('cfg-ai-name') as HTMLInputElement)?.value.trim() || '',
+    userAvatar: (document.getElementById('cfg-user-avatar') as HTMLInputElement)?.value.trim() || '',
+    aiAvatar: (document.getElementById('cfg-ai-avatar') as HTMLInputElement)?.value.trim() || '',
   };
 
   try {
@@ -3969,6 +4014,20 @@ function initSettingsEvents(): void {
 
   // 保存配置
   document.getElementById('btn-save-config')?.addEventListener('click', saveConfig);
+
+  // ── 个性化自动保存 ──
+  function saveProfileConfig(): void {
+    state.config.userName = (document.getElementById('cfg-user-name') as HTMLInputElement).value.trim();
+    state.config.aiName = (document.getElementById('cfg-ai-name') as HTMLInputElement).value.trim();
+    state.config.userAvatar = (document.getElementById('cfg-user-avatar') as HTMLInputElement).value.trim();
+    state.config.aiAvatar = (document.getElementById('cfg-ai-avatar') as HTMLInputElement).value.trim();
+    window.api.saveModelConfig(state.config);
+    // 更新当前聊天中的名称
+    updateChatLabels();
+  }
+  ['cfg-user-name','cfg-ai-name','cfg-user-avatar','cfg-ai-avatar'].forEach(id => {
+    document.getElementById(id)?.addEventListener('input', saveProfileConfig);
+  });
 
   // 导出配置
   document.getElementById('btn-export-config')?.addEventListener('click', async () => {
