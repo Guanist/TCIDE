@@ -1693,7 +1693,6 @@ function appendStreamChunk(chunk: string): void {
     lastMsg.className = 'chat-message assistant';
     lastMsg.setAttribute('data-role', 'assistant');
     lastMsg.innerHTML = `
-      <div class="msg-avatar">🐯</div>
       <div class="msg-body">
         <div class="msg-header">
           <span class="msg-role">虎猫 AI</span>
@@ -2437,7 +2436,7 @@ function renderChatMessage(msg: ChatMessage): void {
   el.setAttribute('data-role', msg.role);
   el.setAttribute('data-msg-id', msg.id);
 
-  const avatars: Record<string, string> = { user: '🧑', assistant: '🐯', system: '⚙' };
+  const avatars: Record<string, string> = { user: '🧑', assistant: '', system: '⚙' };
   const labels: Record<string, string> = { user: '你', assistant: '虎猫 AI', system: '系统' };
   const timeStr = new Date(msg.timestamp).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
   let attachHtml = '';
