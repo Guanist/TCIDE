@@ -1400,6 +1400,13 @@ function detectLanguage(name) {
     return langs[ext || ''] || 'plainText';
 }
 let gitDiffDeco = null;
+// ── 自诊断：文件切换时自动运行 ──
+function refreshFileDiagnostics() {
+    const file = state.openFiles[state.activeFileIndex];
+    if (!file || !['typescript', 'javascript', 'ts', 'js', 'jsx', 'tsx', 'python', 'py', 'go', 'java', 'kt', 'kotlin', 'cs', 'csharp', 'rs', 'rust'].includes(file.language)) return;
+    const issues = runSelfDiagnostic(file);
+    renderDiagnosticResults(issues);
+}
 async function showGitDiffDecorations(filePath) {
     if (!editor || !state.projectPath) {
         clearGitDecorations();
@@ -1734,7 +1741,7 @@ function renderMarkdown(text) {
     html = html.replace(/(<li>.*<\/li>)/s, '<ul>$1</ul>');
     html = html.replace(/\n\n/g, '<br><br>');
     html = html.replace(/\n/g, '<br>');
-    // 还原代码块：带语言标签 + 复制按钮 + 打开编辑 + 预览
+    // 还原代码块：带语言标签 + 复制按钮 + 长代码折叠
     html = html.replace(/___CODEBLOCK_(\d+)___/g, (_m, idx) => {
         const block = codeBlocks[parseInt(idx)];
         if (!block)
@@ -1745,15 +1752,11 @@ function renderMarkdown(text) {
         const langLabel = block.lang ? `<span class="code-lang">${block.lang}</span>` : '';
         const codeId = 'cb_' + Math.random().toString(36).slice(2, 8);
         const langLower = (block.lang || '').toLowerCase();
-        // 可预览的语言
         const previewable = ['html', 'htm', 'xml', 'svg', 'css', 'javascript', 'js', 'typescript', 'ts'];
         const canPreview = previewable.includes(langLower);
-        // 可运行的语言
         const runnable = ['python', 'py', 'javascript', 'js', 'typescript', 'ts', 'shell', 'bash', 'bat', 'cmd'];
         const canRun = runnable.includes(langLower);
-        // 构建代码属性，用于打开编辑
         const escapedLang = block.lang.replace(/'/g, "\\'");
-        const escapedCode = block.code.replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/\n/g, '\\n');
         const actionsHtml = `
       <button class="code-action-btn code-open-btn" title="在编辑器中打开" 
         onclick="event.stopPropagation();(function(){const el=document.getElementById('${codeId}');const code=el?el.textContent:'';window.__openCodeInEditor__('${escapedLang}',code)})()">📂 打开</button>
@@ -1764,10 +1767,25 @@ function renderMarkdown(text) {
       <button class="code-action-btn code-save-btn" title="保存到项目"
         onclick="event.stopPropagation();(function(){const el=document.getElementById('${codeId}');const code=el?el.textContent:'';window.__saveCodeToProject__('${escapedLang}',code)})()">💾 保存</button>
     `;
-        return `<div class="code-block-wrapper">
+        const lineCount = (block.code.match(/\n/g) || []).length + 1;
+        const FOLD_THRESHOLD = 10;
+        const FOLD_LINES = 8;
+        const needsFold = lineCount > FOLD_THRESHOLD;
+        let codeBlockHtml;
+        if (needsFold) {
+            const foldEscaped = escaped.split('\n').slice(0, FOLD_LINES).join('\n');
+            codeBlockHtml = `<div class="code-block-wrapper code-block-folded" id="${codeId}_wrap">
+      <div class="code-block-header">${langLabel}<span class="code-block-spacer"></span>${actionsHtml}<button class="copy-code-btn" onclick="var t=this.parentElement.parentElement.querySelector('code').textContent;navigator.clipboard.writeText(t).then(()=>{this.textContent='✓已复制';setTimeout(()=>{this.textContent='📋 复制'},2000)})">📋 复制</button></div>
+      <pre class="code-block-pre folded"><code id="${codeId}" class="lang-${block.lang}">${foldEscaped}</code></pre>
+      <div class="code-fold-bar" onclick="event.stopPropagation();var w=document.getElementById('${codeId}_wrap');var p=w.querySelector('.code-block-pre');var b=w.querySelector('.code-fold-bar');if(p.classList.contains('folded')){p.classList.remove('folded');p.querySelector('code').textContent=decodeURIComponent('${encodeURIComponent(block.code).replace(/'/g, "\\'")}');b.innerHTML='🔼 收起 (${lineCount}行)'}else{p.classList.add('folded');p.querySelector('code').textContent=decodeURIComponent('${encodeURIComponent(block.code.split('\\n').slice(0,FOLD_LINES).join('\\n'))}');b.innerHTML='🔽 展开全部 (${lineCount}行)'}">🔽 展开全部 (${lineCount}行)</div>
+    </div>`;
+        } else {
+            codeBlockHtml = `<div class="code-block-wrapper">
       <div class="code-block-header">${langLabel}<span class="code-block-spacer"></span>${actionsHtml}<button class="copy-code-btn" onclick="var t=this.parentElement.parentElement.querySelector('code').textContent;navigator.clipboard.writeText(t).then(()=>{this.textContent='✓已复制';setTimeout(()=>{this.textContent='📋 复制'},2000)})">📋 复制</button></div>
       <pre class="code-block-pre"><code id="${codeId}" class="lang-${block.lang}">${escaped}</code></pre>
     </div>`;
+        }
+        return codeBlockHtml;
     });
     return html;
 }
@@ -2676,15 +2694,39 @@ async function sendToAI() {
         return;
     }
     input.value = '';
-    // ── /task 命令:Builder → Coder 自动执行循环 ──
+    // ── 模式路由：Builder / Pipeline 模式自动触发任务执行 ──
+    if (state.projectPath && !text.startsWith('/')) {
+        if (currentAgentMode === 'builder') {
+            addChatMessage('user', text);
+            await executeTaskAgentLoop(text);
+            return;
+        }
+        if (currentAgentMode === 'pipeline') {
+            addChatMessage('user', text);
+            await executeOrchestratorLoop(text);
+            return;
+        }
+    }
+    // ── /task 命令：Builder → Coder 自动执行循环 ──
     if (text.startsWith('/task') && state.projectPath) {
         const desc = text.replace(/^\/task\s*/, '').trim();
         if (!desc) {
-            addChatMessage('assistant', '命令列表:\n/task <描述> - Builder 架构模式,自动拆分任务并执行\n/file - 发送当前文件给 AI(超大文件自动生成大纲)\n/lines N-M - 发送指定行范围,如 /lines 100-200');
+            addChatMessage('assistant', '命令列表:\n/task <描述> - Builder 串行模式，自动拆分任务并执行\n/orch <描述> - 🚀 全流水线：Builder→并行Coder→Reviewer→Tester→自动修复\n/file - 发送当前文件给 AI(超大文件自动生成大纲)\n/lines N-M - 发送指定行范围，如 /lines 100-200');
             return;
         }
         addChatMessage('user', text);
         await executeTaskAgentLoop(desc);
+        return;
+    }
+    // ── /orch 命令：AgentOrchestrator 🧱 Builder → 🔧并行 Coder池 → 🔍Reviewer → 🧪Tester ──
+    if (text.startsWith('/orch') && state.projectPath) {
+        const desc = text.replace(/^\/orch\s*/, '').trim();
+        if (!desc) {
+            addChatMessage('assistant', '/orch <描述> - 全流水线模式\n🧱 Builder 拆解 → 🔧 并行 Coder(最多4个) → 🔍 Reviewer审查 → 🧪 Tester构建验证 → 自动修复');
+            return;
+        }
+        addChatMessage('user', text);
+        await executeOrchestratorLoop(desc);
         return;
     }
     // ── /file 命令:发送当前文件给 AI(超大文件自动生成大纲)──
@@ -2813,6 +2855,21 @@ async function sendToAI() {
         else {
             userMessage = { role: 'user', content: userContent };
         }
+        const toolInstructions = mcpToolsEnabled ? `
+## 🔧 工具模式已激活
+你现在可以调用以下函数来真正操作项目:
+• read_file(path) — 读取项目文件
+• write_file(path, content) — 创建/修改文件
+• list_files(path) — 列出目录
+• search_code(query) — grep 代码搜索
+• run_command(cmd) — 执行终端命令
+• git_status() / git_diff() — Git 操作
+
+使用工具时，每次调用前先解释你在做什么（用简洁的中文），然后调用工具。
+工具执行结果会自动反馈给你，你可以据此继续操作。
+最多可连续调用 3 轮工具。` : `
+## 💡 提示
+当前工具模式未开启。点击输入框左侧的 🔧 按钮开启后，我就可以直接读写文件和执行命令。`;
         const messages = [
             { role: 'system', content: `【绝对规则 - 必须遵守】
 你正在虎猫 TCIDE(本地 IDE)中运行,直接嵌在用户的编辑器中。
@@ -2823,6 +2880,7 @@ async function sendToAI() {
 • 分析项目代码结构
 • 生成/修改代码
 • 执行终端命令
+${toolInstructions}
 
 ## 当前 IDE 状态
 ${state.projectPath ? `项目: ${state.projectPath}` : '未打开项目'}
@@ -2843,7 +2901,11 @@ ${state.activeFileIndex >= 0 && state.openFiles[state.activeFileIndex] ? `当前
             ...session.chatHistory.slice(-20).map(m => ({ role: m.role, content: m.content })),
             userMessage,
         ];
-        window.api.sendToAIStream(messages, { model: state.config.model });
+        if (mcpToolsEnabled) {
+            window.api.sendToAIWithTools(messages, { model: state.config.model });
+        } else {
+            window.api.sendToAIStream(messages, { model: state.config.model });
+        }
         showTypingIndicator();
         // Note: user message already saved by addChatMessage() above
         // 首次对话自动命名为用户第一条消息
@@ -2870,65 +2932,125 @@ async function executeTaskAgentLoop(description) {
         addChatMessage('assistant', '⚠️ 请先打开一个项目文件夹');
         return;
     }
-    // Step 1: Builder 分解任务
-    addChatMessage('assistant', '🧱 **Builder 正在分析需求...**');
+    // 使用流水线面板
+    showPipelinePanel('🧱 Builder 串行执行');
+    setPipelinePhase('builder');
     let tasks;
     try {
         tasks = await window.api.runBuilder(description, { projectPath: state.projectPath });
         if (!tasks || tasks.length === 0) {
-            addChatMessage('assistant', '⚠️ Builder 未生成有效任务,请更具体地描述需求。');
+            showPipelineSummary(false, 'Builder 未生成有效任务');
+            addChatMessage('assistant', '⚠️ Builder 未生成有效任务，请更具体地描述需求。');
             return;
         }
-    }
-    catch (err) {
-        addChatMessage('assistant', `❌ Builder 出错: ${err?.message || err}`);
+    } catch (err) {
+        showPipelineSummary(false, `Builder 出错: ${err?.message || err}`);
         return;
     }
-    // 显示计划
-    const planLines = tasks.map((t, i) => `${i + 1}. ${t.title || t.name || t.description || `子任务 ${i + 1}`}`);
-    addChatMessage('assistant', `📋 **执行计划**(共 ${tasks.length} 个任务):
-
-${planLines.join('\n')}`);
-    // Step 2: Coder 逐个执行 + 自动修复
+    setPipelinePhase('coder');
+    // 预建任务卡片
+    tasks.forEach((t, i) => {
+        const name = t.title || t.name || t.desc || `任务 ${i + 1}`;
+        addPipelineTask(t.id || `t${i}`, name, (t.files || []).join(', '));
+    });
     let successCount = 0;
     for (let i = 0; i < tasks.length; i++) {
         const task = tasks[i];
-        const title = task.title || task.name || `任务 ${i + 1}`;
-        addChatMessage('assistant', `🔧 **[${i + 1}/${tasks.length}] ${title}**`);
+        const tid = task.id || `t${i}`;
+        const title = task.title || task.name || task.desc || `任务 ${i + 1}`;
+        updatePipelineTask(tid, 'running');
         try {
             let result = await window.api.runCoder(task, state.projectPath);
             let retries = 0;
-            const maxRetries = 2;
-            // 自动修复循环
-            while (!result.success && retries < maxRetries) {
+            while (!result.success && retries < 2) {
                 retries++;
-                addChatMessage('assistant', `⚠️ ${title} 失败(第 ${retries} 次尝试),自动分析错误...`);
-                const fixTask = {
-                    ...task,
-                    description: task.description || task.title || '',
-                    previousError: result.output?.slice(0, 800) || '',
-                };
-                try {
-                    result = await window.api.runCoder(fixTask, state.projectPath);
-                }
-                catch {
-                    break;
-                }
+                const fixTask = { ...task, description: task.description || task.title || task.desc || '', previousError: result.output?.slice(0, 800) || '' };
+                try { result = await window.api.runCoder(fixTask, state.projectPath); } catch { break; }
             }
             if (result.success) {
                 successCount++;
-                const preview = result.output?.slice(0, 250) || '';
-                addChatMessage('assistant', `✅ ${title} 完成${preview ? '\n\n\`\`\`\n' + preview + '\n\`\`\`' : ''}`);
+                updatePipelineTask(tid, 'done');
+                addChatMessage('assistant', `✅ ${title} 完成`);
+            } else {
+                updatePipelineTask(tid, 'failed');
+                addChatMessage('assistant', `❌ ${title} 失败`);
             }
-            else {
-                addChatMessage('assistant', `❌ ${title} 未能完成: ${result.output?.slice(0, 200) || '未知错误'}`);
-            }
-        }
-        catch (err) {
-            addChatMessage('assistant', `❌ ${title} 异常: ${err?.message || err}`);
+        } catch (err) {
+            updatePipelineTask(tid, 'failed');
         }
     }
-    addChatMessage('assistant', `🏁 **全部完成!** ${successCount}/${tasks.length} 个任务成功。`);
+    showPipelineSummary(successCount === tasks.length, `${successCount}/${tasks.length} 任务完成`);
+    addChatMessage('assistant', `🏁 Builder 完成: ${successCount}/${tasks.length} 个任务成功。`);
+    if (successCount > 0) loadFileTree(state.projectPath);
+}
+// ═══ AgentOrchestrator 全流水线模式 ═══
+async function executeOrchestratorLoop(description) {
+    if (!state.projectPath) {
+        addChatMessage('assistant', '⚠️ 请先打开一个项目文件夹');
+        return;
+    }
+    showPipelinePanel('🚀 Pipeline 全流水线');
+    setPipelinePhase('builder');
+    document.getElementById('pipeline-abort-btn')?.addEventListener('click', () => {
+        window.api.orchestratorAbort?.();
+        showPipelineSummary(false, '用户终止');
+    }, { once: true });
+    try {
+        await window.api.orchestratorInit(state.projectPath);
+        const context = {
+            projectType: state.activeFileIndex >= 0 ? state.openFiles[state.activeFileIndex]?.language || 'unknown' : 'unknown',
+            fileTree: state.fileTree?.slice(0, 30) || [],
+            modules: [],
+        };
+        const result = await window.api.orchestratorRun(description, context);
+        if (result.success) {
+            const fm = result.stats?.filesModified?.length || 0;
+            showPipelineSummary(true, `完成！${result.stats?.phases?.builder || 0} 任务, ${fm} 文件修改`);
+            addChatMessage('assistant', `✅ Pipeline 完成！${result.stats?.phases?.builder || 0} 个任务 | 修改 ${fm} 个文件 | 重试 ${result.stats?.retries || 0} 次`);
+            if (fm > 0) loadFileTree(state.projectPath);
+        } else {
+            showPipelineSummary(false, result.error || '流水线失败');
+            addChatMessage('assistant', `❌ Pipeline 失败: ${result.error || '未知错误'}`);
+        }
+    } catch (err) {
+        showPipelineSummary(false, `异常: ${err?.message || err}`);
+    }
+}
+// 废弃：不再需要 /task /orch 文本命令，由模式栏替代
+// 保留 executeTaskAgentLoop_legacy / executeOrchestratorLoop_legacy 作为兜底
+        // 初始化 Orchestrator
+        await window.api.orchestratorInit(state.projectPath);
+        // 构建项目上下文
+        const context = {
+            projectType: state.activeFileIndex >= 0
+                ? state.openFiles[state.activeFileIndex]?.language || 'unknown'
+                : 'unknown',
+            fileTree: state.fileTree?.slice(0, 30) || [],
+            modules: [],
+        };
+        // 运行流水线
+        const result = await window.api.orchestratorRun(description, context);
+        if (result.success) {
+            addChatMessage('assistant', `✅ **流水线完成！**\n` +
+                `📂 修改文件: ${result.stats?.filesModified?.length || 0}\n` +
+                `📊 Builder: ${result.stats?.phases?.builder || 0} 任务 | Coder: ${result.stats?.phases?.coder || 0} | Reviewer: ${result.stats?.phases?.reviewer || 0}\n` +
+                `🔁 重试: ${result.stats?.retries || 0} 次 | ⏱ 耗时: ${result.stats?.duration || '?'}`);
+            // 刷新文件树
+            if (result.stats?.filesModified?.length > 0) {
+                loadFileTree(state.projectPath);
+            }
+        } else {
+            addChatMessage('assistant', `❌ **流水线失败:** ${result.error || '未知错误'}`);
+            if (result.buildResult?.output) {
+                addChatMessage('assistant', `📋 构建输出:\n\`\`\`\n${result.buildResult.output.slice(0, 500)}\n\`\`\``);
+            }
+        }
+    } catch (err) {
+        addChatMessage('assistant', `❌ Orchestrator 异常: ${err?.message || err}`);
+    }
+    // 清理事件监听
+    window.api.onOrchestratorPhase?.(() => {});
+    window.api.onOrchestratorTaskProgress?.(() => {});
 }
 let toastQueue = [];
 let activeToasts = [];
@@ -3348,15 +3470,12 @@ const VERSION_HISTORY = [
         version: 'v1.3.0',
         date: '2026-05-30',
         emoji: '🐅',
-        title: '智能加持 - 模板系统 / AI 角色 / 项目搜索 / 自诊断',
+        title: '智能加持 — 项目搜索 / 欢迎页 / 通知系统',
         features: [
-            '📝 模板系统:5 内置代码模板(React/Express/Python/Go/Kotlin)、自定义创建',
-            '🎭 AI 角色系统:4 内置角色(开发/审查/架构师/测试)、自定义参数',
             '🔍 项目级搜索(Ctrl+Shift+F):跨文件文本搜索、正则支持、类型过滤',
             '🌳 文件树搜索(Ctrl+F):树中快速过滤、Escape 清除',
             '🏠 欢迎页:最近项目列表、一键打开、新建/打开快捷入口',
             '🔔 Toast 通知系统:成功/错误/警告/信息、右下角弹出',
-            '🩺 自诊断引擎:规则检测(console.log/any 类型等)、代码异味',
             '🐛 修复:图标路径 / DOC 提取 / CSP 策略 / 编码乱码',
         ],
         philosophy: '不只是编辑器,而是有判断力的 AI 搭档。角色切换让 AI 适配场景,模板系统消灭重复劳动。'
@@ -3365,11 +3484,10 @@ const VERSION_HISTORY = [
         version: 'v1.4.0',
         date: '2026-05-30',
         emoji: '🐉',
-        title: '专业完备 - LSP 多语言 / Emmet / Snippets / MCP 工具调用',
+        title: '专业完备 — LSP 多语言 / Emmet / Snippets / MCP 工具',
         features: [
             '🧠 LSP 语言服务:TS/JS 内置 + Python pyright + 5 语言自动检测',
             '⚠️ Problems 面板:实时诊断、按严重度排序、点击跳转、活动栏 Badge',
-            '📐 分屏编辑器:双 Monaco 实例、Ctrl+\ 垂直 / Alt+2 水平',
             '⚡ Emmet 展开:Tab 触发、HTML/CSS/JSX、自建内联解析器',
             '📦 Snippets 系统:50+ 预置片段(7 语言)、补全提示、分类查看',
             '🔧 MCP 工具集成:9 内置工具(read/write/search/run/git)、AI function calling',
@@ -3417,6 +3535,25 @@ const VERSION_HISTORY = [
             '🎨 showConfirm支持自定义按钮文字和取消回调',
         ],
         philosophy: '细节决定体验。思考动画让等待可感知，代码折叠让聊天不臃肿，保存提示减少误操作。每一个小改进都在让AI真正成为可靠的编程伙伴。'
+    },
+    {
+        version: 'v1.6.0',
+        date: '2026-05-31',
+        emoji: '🚀',
+        title: 'Agent 觉醒 — UI 重构 / 多 Agent 全流水线 / 真实可用的工具模式',
+        features: [
+            '🎛️ Agent 模式选择器:💬对话 🔧工具 🧱Builder 🚀Pipeline 四模式一键切换',
+            '📊 Pipeline 实时面板:阶段进度动画(Builder→Coder→Reviewer→Tester)、任务卡片、计时器',
+            '🔧 MCP 工具模式接入:sendToAI 根据开关自动路由到 function calling，AI 真正能读写文件',
+            '🧱 Builder 模式:直接输入需求自动拆解执行，无需 /task 命令',
+            '🚀 Pipeline 模式:AgentOrchestrator 全流水线接入 UI，并行 Coder 池 + 审查 + 构建',
+            '📦 长代码块折叠:>10 行自动折叠为~8 行，展开/收起按钮',
+            '⌨️ 快捷键编辑器完成:34 条命令可视化编辑、持久化到 localStorage',
+            '🩺 自诊断引擎:console.log 残留/any 类型/重复代码 6 项规则检测',
+            '🌐 CSP 放宽:允许 CDN 加载 (jsDelivr/unpkg/cdnjs/esm.sh)，three.js 等可正常使用',
+            '🔄 /orch 命令接入:保留文本命令作为兜底',
+        ],
+        philosophy: 'AI 不再是聊天框里的摆设。Builder 拆解需求，Pipeline 并行执行，工具模式真正读写文件——这是虎猫从对话助手到自主 Agent 的质变。'
     },
 ];
 function renderChangelog() {
@@ -4279,6 +4416,29 @@ function setupEventListeners() {
         taskEl.className = `task-item ${p.status}`;
         taskEl.querySelector('.task-desc').textContent = p.message;
     });
+    // Orchestrator 实时事件 → Pipeline 面板
+    window.api.onOrchestratorPhase?.((d) => {
+        const phase = d?.phase;
+        const data = d?.data;
+        if (phase === 'builder_done' && Array.isArray(data)) {
+            // 显示任务列表
+            data.forEach((t, i) => {
+                addPipelineTask(t.id || `o${i}`, t.desc || t.id, (t.files || []).join(', '));
+            });
+            setPipelinePhase('coder');
+        } else if (phase === 'coder') {
+            setPipelinePhase('coder');
+        } else if (phase === 'reviewer') {
+            setPipelinePhase('reviewer');
+        } else if (phase === 'tester') {
+            setPipelinePhase('tester');
+        } else if (phase === 'error') {
+            showPipelineSummary(false, data);
+        }
+    });
+    window.api.onOrchestratorTaskProgress?.((data) => {
+        updatePipelineTask(data.taskId, data.status === 'coding' || data.status === 'fixing' ? 'running' : data.status);
+    });
     // 菜单操作
     window.api.on('menu-action', (_event, action) => {
         switch (action) {
@@ -4623,6 +4783,7 @@ function setupEventListeners() {
                 document.getElementById('file-tree')?.classList.add('hidden');
                 document.getElementById('git-panel')?.classList.add('hidden');
                 document.getElementById('arch-panel')?.classList.add('hidden');
+                refreshFileDiagnostics();
             }
             else if (view === 'settings') {
                 // settings 打开设置弹窗,保持当前视图
@@ -4634,6 +4795,11 @@ function setupEventListeners() {
         });
     });
     // ═══ 主题切换(白虎 / 老虎) ═══
+    // ── Problems 刷新按钮 ──
+    document.getElementById('btn-problems-refresh')?.addEventListener('click', () => {
+        refreshFileDiagnostics();
+        showToast('已刷新诊断', 'info', 1500);
+    });
     const themeBtn = document.getElementById('btn-toggle-theme');
     function applyEditorTheme(isLight) {
         if (editor) {
@@ -5201,7 +5367,125 @@ const commandRegistry = [
     { id: 'fix-all-lint', label: '一键修复 Lint 问题', category: '编辑', action: async () => { if (state.projectPath) { const results = await window.api.lintFixAll(state.projectPath); const fixed = results.filter(r => r.fixed).length; showToast(`已修复 ${fixed}/${results.length} 个文件`, fixed === results.length ? 'success' : 'warning'); } } },
     { id: 'batch-search', label: '批量搜索替换', category: '编辑', shortcut: 'Ctrl+Shift+H', action: () => { openSearchPanel(); document.getElementById('search-replace')?.classList.remove('hidden'); } },
 ];
+// ═══ 快捷键编辑器 ═══
+let customShortcuts = {};
+try { customShortcuts = JSON.parse(localStorage.getItem('tcide-shortcuts') || '{}'); } catch {}
+function renderShortcutsEditor() {
+    const tbody = document.getElementById('shortcuts-tbody');
+    if (!tbody) return;
+    const categories = [...new Set(commandRegistry.map(c => c.category))];
+    let html = '';
+    categories.forEach(cat => {
+        const cmds = commandRegistry.filter(c => c.category === cat);
+        html += `<tr><td colspan="3" style="color:var(--tc-orange);font-size:11px;font-weight:600;padding:6px 0 2px 0">📂 ${cat}</td></tr>`;
+        cmds.forEach(cmd => {
+            const sid = customShortcuts[cmd.id] || cmd.shortcut || '';
+            html += `<tr>
+        <td style="padding:4px 8px;font-size:12px">${cmd.label}</td>
+        <td style="padding:4px 8px"><kbd style="background:var(--bg-secondary);padding:2px 6px;border-radius:3px;font-size:11px">${sid || '—'}</kbd></td>
+        <td style="padding:4px 8px"><button class="edit-shortcut-btn" data-cmd-id="${cmd.id}" style="background:transparent;border:1px solid var(--border-subtle);border-radius:4px;color:var(--text-secondary);cursor:pointer;font-size:11px;padding:2px 8px">✏️ 编辑</button></td>
+      </tr>`;
+        });
+    });
+    tbody.innerHTML = html;
+    // Bind edit buttons
+    tbody.querySelectorAll('.edit-shortcut-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const cmdId = btn.dataset.cmdId;
+            const cmd = commandRegistry.find(c => c.id === cmdId);
+            if (!cmd) return;
+            const current = customShortcuts[cmdId] || cmd.shortcut || '';
+            const newKey = prompt(`${cmd.label}\n当前快捷键: ${current || '无'}\n输入新快捷键 (如 Ctrl+Shift+K):`, current);
+            if (newKey === null) return; // cancelled
+            if (newKey === '') {
+                delete customShortcuts[cmdId];
+                showToast(`已清除 ${cmd.label} 快捷键`, 'info');
+            } else {
+                customShortcuts[cmdId] = newKey;
+                showToast(`${cmd.label} → ${newKey}`, 'success');
+            }
+            localStorage.setItem('tcide-shortcuts', JSON.stringify(customShortcuts));
+            renderShortcutsEditor();
+        });
+    });
+}
+document.getElementById('btn-shortcuts-reset')?.addEventListener('click', () => {
+    if (confirm('确定恢复所有快捷键为默认值？')) {
+        customShortcuts = {};
+        localStorage.removeItem('tcide-shortcuts');
+        renderShortcutsEditor();
+        showToast('已恢复默认快捷键', 'info');
+    }
+});
+document.getElementById('btn-shortcuts-editor')?.addEventListener('click', () => {
+    renderShortcutsEditor();
+    document.getElementById('shortcuts-modal')?.classList.remove('hidden');
+});
+document.querySelector('#shortcuts-modal .modal-close')?.addEventListener('click', () => {
+    document.getElementById('shortcuts-modal')?.classList.add('hidden');
+});
 let cmdPaletteSelectedIdx = 0;
+// ═══ 自诊断引擎 ═══
+function runSelfDiagnostic(file) {
+    if (!file || !file.content) return [];
+    const issues = [];
+    const lines = file.content.split('\n');
+    const lang = file.language || '';
+    // 通用规则
+    lines.forEach((line, i) => {
+        const ln = i + 1;
+        if (line.includes('console.log') && !line.includes('//'))
+            issues.push({ file: file.name, line: ln, severity: 'warning', message: 'console.log 残留', rule: 'no-console-log' });
+        if (line.includes('debugger') && !line.includes('//'))
+            issues.push({ file: file.name, line: ln, severity: 'error', message: 'debugger 语句残留', rule: 'no-debugger' });
+        if (line.match(/:\s*any\b/) && (lang === 'typescript' || lang === 'ts'))
+            issues.push({ file: file.name, line: ln, severity: 'warning', message: '使用了 any 类型', rule: 'no-explicit-any' });
+        if (line.match(/TODO|FIXME|HACK/) && !line.includes('//'))
+            issues.push({ file: file.name, line: ln, severity: 'info', message: `待办标记: ${line.match(/TODO|FIXME|HACK/)[0]}`, rule: 'todo-comment' });
+        if (line.length > 200)
+            issues.push({ file: file.name, line: ln, severity: 'info', message: `行过长 (${line.length} 字符)`, rule: 'max-line-length' });
+        if (line.match(/var\s+\w+/) && (lang === 'typescript' || lang === 'javascript' || lang === 'ts' || lang === 'js'))
+            issues.push({ file: file.name, line: ln, severity: 'info', message: '建议使用 const/let 替代 var', rule: 'no-var' });
+    });
+    // 重复代码检测（简易）
+    const lineMap = new Map();
+    lines.forEach(line => {
+        const trimmed = line.trim();
+        if (trimmed.length > 10 && !trimmed.startsWith('//') && !trimmed.startsWith('*')) {
+            lineMap.set(trimmed, (lineMap.get(trimmed) || 0) + 1);
+        }
+    });
+    lineMap.forEach((count, text) => {
+        if (count >= 3) {
+            issues.push({ file: file.name, line: lines.findIndex(l => l.includes(text)) + 1, severity: 'warning', message: `疑似重复代码 (出现 ${count} 次): ${text.slice(0, 60)}${text.length > 60 ? '...' : ''}`, rule: 'duplicate-code' });
+        }
+    });
+    return issues;
+}
+function renderDiagnosticResults(issues) {
+    const panel = document.getElementById('problems-list');
+    const empty = document.getElementById('problems-empty');
+    if (!panel || !empty) return;
+    if (issues.length === 0) {
+        empty.classList.remove('hidden');
+        panel.classList.add('hidden');
+        empty.innerHTML = '<p>✅ 未检测到代码问题</p>';
+        return;
+    }
+    empty.classList.add('hidden');
+    panel.classList.remove('hidden');
+    const severityOrder = { error: 0, warning: 1, info: 2 };
+    issues.sort((a, b) => severityOrder[a.severity] - severityOrder[b.severity]);
+    const icons = { error: '❌', warning: '⚠️', info: 'ℹ️' };
+    panel.innerHTML = issues.slice(0, 50).map(i => `<div class="problem-item problem-${i.severity}" style="padding:4px 8px;font-size:11px;border-bottom:1px solid var(--border-subtle)">
+    <span style="color:var(--text-secondary)">${i.file}:${i.line}</span>
+    <span style="margin-left:6px">${icons[i.severity] || '•'} ${i.message}</span>
+  </div>`).join('');
+    if (issues.length > 50) panel.innerHTML += `<div style="padding:4px 8px;font-size:11px;color:var(--text-secondary)">... 还有 ${issues.length - 50} 个问题</div>`;
+    // Update badge
+    const badge = document.getElementById('problems-badge');
+    if (badge) { badge.textContent = issues.length; badge.classList.remove('hidden'); }
+}
 let cmdPaletteFiltered = [];
 function openCommandPalette() {
     document.getElementById('command-palette').classList.remove('hidden');
@@ -6815,8 +7099,112 @@ if (toolsToggle) {
         showToast(mcpToolsEnabled ? '✅ 工具模式已开启: AI 可读写文件/执行命令' : '❌ 工具模式已关闭', 'info', 2000);
     });
 }
+// ── Agent 模式切换 ──
+let currentAgentMode = 'chat'; // chat | tools | builder | pipeline
+document.querySelectorAll('.agent-mode-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+        document.querySelectorAll('.agent-mode-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        currentAgentMode = btn.dataset.mode;
+        const input = document.getElementById('chat-input');
+        const footer = document.getElementById('chat-footer-hint');
+        const hints = {
+            chat: '输入消息，Shift+Enter 换行，Enter 发送...',
+            tools: '🔧 工具模式 — AI 可读写文件、搜索代码、执行命令',
+            builder: '🧱 Builder 模式 — 描述需求，AI 自动拆解并逐步执行',
+            pipeline: '🚀 Pipeline 模式 — 全流水线：并行 Coder + 审查 + 构建验证'
+        };
+        input.placeholder = hints[currentAgentMode] || hints.chat;
+        if (footer) {
+            if (currentAgentMode === 'builder' || currentAgentMode === 'pipeline') {
+                footer.textContent = 'Enter 启动 — AI 自主执行全流程';
+            } else {
+                footer.textContent = 'Enter 发送 · Shift+Enter 换行';
+            }
+        }
+        // 同步工具开关
+        mcpToolsEnabled = (currentAgentMode === 'tools' || currentAgentMode === 'pipeline');
+        if (toolsToggle) toolsToggle.classList.toggle('active', mcpToolsEnabled);
+        // 切出 Builder/Pipeline 时关闭面板
+        if (currentAgentMode !== 'builder' && currentAgentMode !== 'pipeline') {
+            hidePipelinePanel();
+        }
+        showToast(`已切换至 ${btn.textContent.trim()} 模式`, 'info', 1500);
+    });
+});
+// ── Pipeline 面板管理 ──
+let pipelineTimer = null;
+function showPipelinePanel(title) {
+    const panel = document.getElementById('agent-pipeline-panel');
+    const welcome = document.getElementById('ai-welcome');
+    const titleEl = document.getElementById('pipeline-title');
+    const summaryEl = document.getElementById('pipeline-summary');
+    const taskList = document.getElementById('pipeline-task-list');
+    const elapsed = document.getElementById('pipeline-elapsed');
+    // Hide welcome, show panel
+    if (welcome) welcome.style.display = 'none';
+    if (panel) panel.classList.remove('hidden');
+    if (titleEl) titleEl.textContent = title || '🚀 任务流水线';
+    if (taskList) taskList.innerHTML = '';
+    if (summaryEl) { summaryEl.classList.add('hidden'); summaryEl.innerHTML = ''; }
+    // Reset phases
+    document.querySelectorAll('#pipeline-phases .pipeline-phase').forEach(p => {
+        p.classList.remove('active', 'done');
+    });
+    // Timer
+    const startTime = Date.now();
+    if (elapsed) elapsed.textContent = '0:00';
+    if (pipelineTimer) clearInterval(pipelineTimer);
+    pipelineTimer = setInterval(() => {
+        const sec = Math.floor((Date.now() - startTime) / 1000);
+        const min = Math.floor(sec / 60);
+        const s = sec % 60;
+        if (elapsed) elapsed.textContent = `${min}:${String(s).padStart(2, '0')}`;
+    }, 1000);
+}
+function hidePipelinePanel() {
+    const panel = document.getElementById('agent-pipeline-panel');
+    const welcome = document.getElementById('ai-welcome');
+    if (panel) panel.classList.add('hidden');
+    if (welcome) welcome.style.display = '';
+    if (pipelineTimer) { clearInterval(pipelineTimer); pipelineTimer = null; }
+}
+function setPipelinePhase(phase) {
+    const phases = document.querySelectorAll('#pipeline-phases .pipeline-phase');
+    const phaseOrder = ['builder', 'coder', 'reviewer', 'tester'];
+    const idx = phaseOrder.indexOf(phase);
+    phases.forEach((p, i) => {
+        p.classList.remove('active', 'done');
+        if (i < idx) p.classList.add('done');
+        else if (i === idx) p.classList.add('active');
+    });
+}
+function addPipelineTask(taskId, name, files) {
+    const taskList = document.getElementById('pipeline-task-list');
+    if (!taskList) return;
+    const card = document.createElement('div');
+    card.className = 'pipeline-task-card pending';
+    card.id = `ptask-${taskId}`;
+    card.innerHTML = `<span class="pipeline-task-status">○</span><div class="pipeline-task-info"><div class="pipeline-task-name">${name || taskId}</div><div class="pipeline-task-files">${files || '—'}</div></div>`;
+    taskList.appendChild(card);
+}
+function updatePipelineTask(taskId, status) {
+    const card = document.getElementById(`ptask-${taskId}`);
+    if (!card) return;
+    card.className = `pipeline-task-card ${status}`;
+    const statusEl = card.querySelector('.pipeline-task-status');
+    const icons = { pending: '○', running: '◉', done: '✓', failed: '✗' };
+    if (statusEl) statusEl.textContent = icons[status] || '○';
+}
+function showPipelineSummary(success, message) {
+    const summary = document.getElementById('pipeline-summary');
+    if (!summary) return;
+    summary.classList.remove('hidden', 'success', 'failed');
+    summary.classList.add(success ? 'success' : 'failed');
+    summary.innerHTML = `<span>${success ? '✅' : '❌'} ${message}</span><button onclick="hidePipelinePanel()" style="padding:2px 8px;border:1px solid var(--border-subtle);border-radius:4px;background:transparent;color:var(--text-secondary);cursor:pointer;font-size:11px;font-family:inherit">关闭</button>`;
+    if (pipelineTimer) { clearInterval(pipelineTimer); pipelineTimer = null; }
+}
 // ── 多选模式 ──
-const selectToggleBtn = document.getElementById('btn-chat-select');
 if (selectToggleBtn) {
     selectToggleBtn.addEventListener('click', () => {
         toggleChatSelectMode();

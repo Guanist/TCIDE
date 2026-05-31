@@ -1475,8 +1475,11 @@ electron_1.ipcMain.handle('gitintel:getChangelog', async (_e, projectRoot, days)
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 electron_1.ipcMain.handle('orchestrator:init', async (_e, projectRoot) => {
     try {
+        const config = getModelConfig();
+        const adapter = createAdapterWithUsage(config);
+        adapter.setSystemRules(projectRules);
         const { agentOrchestrator } = require('../core/agent/agent-orchestrator');
-        agentOrchestrator.init(projectRoot);
+        agentOrchestrator.init(projectRoot, adapter);
         return { success: true };
     } catch (err) { return { success: false, error: err.message }; }
 });

@@ -1,98 +1,99 @@
 {
-  "name": "tcide",
-  "productName": "虎猫 TCIDE",
-  "version": "1.6.0",
-  "description": "虎猫 TCIDE — 个人专属 AI 编程 IDE",
-  "main": "dist/main/index.js",
-  "author": "虎猫团队",
-  "license": "MIT",
-  "scripts": {
-    "dev": "electron .",
-    "start": "electron .",
-    "build": "vite build",
-    "pack": "npm run build && electron-builder --dir",
-    "dist": "npm run build && electron-builder",
-    "dist:portable": "npm run build && electron-builder --win portable"
-  },
-  "dependencies": {
-    "@emmetio/expand-abbreviation": "^0.7.3",
-    "electron-store": "^8.2.0",
-    "monaco-editor": "^0.52.2",
-    "sql.js": "^1.14.1",
-    "xterm": "^5.3.0",
-    "xterm-addon-fit": "^0.8.0",
-    "xterm-addon-web-links": "^0.9.0"
-  },
-  "devDependencies": {
-    "electron": "^28.0.0",
-    "electron-builder": "^24.9.0",
-    "pyright": "^1.1.410",
-    "vite": "^5.4.21",
-    "vscode-jsonrpc": "^8.2.1"
-  },
-  "build": {
-    "appId": "com.tcide.app",
-    "productName": "虎猫 TCIDE",
-    "electronDist": "node_modules/electron/dist",
-    "electronVersion": "28.0.0",
-    "directories": {
-      "output": "release"
-    },
-    "files": [
-      "dist/**/*",
-      "resources/**/*",
-      "CLAUDE.md",
-      "package.json"
-    ],
-    "extraResources": [
-      {
-        "from": "resources/sql-wasm.wasm",
-        "to": "sql-wasm.wasm"
-      },
-      {
-        "from": "resources/about-icon.png",
-        "to": "about-icon.png"
-      },
-      {
-        "from": "resources/icon.png",
-        "to": "icon.png"
-      },
-      {
-        "from": "resources/tray-icon.png",
-        "to": "tray-icon.png"
-      },
-      {
-        "from": "resources/tray-icon@2x.png",
-        "to": "tray-icon@2x.png"
-      }
-    ],
-    "extraMetadata": {
-      "main": "dist/main/index.js"
-    },
-    "win": {
-      "target": [
-        {
-          "target": "nsis",
-          "arch": [
-            "x64"
-          ]
-        },
-        {
-          "target": "portable",
-          "arch": [
-            "x64"
-          ]
-        }
-      ],
-      "icon": "resources/icon.ico"
-    },
-    "nsis": {
-      "oneClick": false,
-      "allowToChangeInstallationDirectory": true,
-      "installerIcon": "resources/icon.ico",
-      "uninstallerIcon": "resources/icon.ico",
-      "installerHeaderIcon": "resources/icon.ico",
-      "installerSidebar": "resources/installer-sidebar.png"
-    }
-  }
+    "name":  "tcide",
+    "productName":  "铏庣尗 TCIDE",
+    "version":  "1.6.0",
+    "description":  "铏庣尗 TCIDE 鈥?涓汉涓撳睘 AI 缂栫▼ IDE",
+    "main":  "dist/main/index.js",
+    "author":  "铏庣尗鍥㈤槦",
+    "license":  "MIT",
+    "scripts":  {
+                    "dev":  "electron .",
+                    "start":  "electron .",
+                    "build":  "vite build",
+                    "pack":  "npm run build \u0026\u0026 electron-builder --dir",
+                    "dist":  "npm run build \u0026\u0026 electron-builder",
+                    "dist:direct":  "electron-builder",
+                    "dist:portable":  "npm run build \u0026\u0026 electron-builder --win portable"
+                },
+    "dependencies":  {
+                         "@emmetio/expand-abbreviation":  "^0.7.3",
+                         "electron-store":  "^8.2.0",
+                         "monaco-editor":  "^0.52.2",
+                         "sql.js":  "^1.14.1",
+                         "xterm":  "^5.3.0",
+                         "xterm-addon-fit":  "^0.8.0",
+                         "xterm-addon-web-links":  "^0.9.0"
+                     },
+    "devDependencies":  {
+                            "electron":  "^28.0.0",
+                            "electron-builder":  "^24.9.0",
+                            "pyright":  "^1.1.410",
+                            "vite":  "^5.4.21",
+                            "vscode-jsonrpc":  "^8.2.1"
+                        },
+    "build":  {
+                  "appId":  "com.tcide.app",
+                  "productName":  "铏庣尗 TCIDE",
+                  "electronDist":  "node_modules/electron/dist",
+                  "electronVersion":  "28.0.0",
+                  "directories":  {
+                                      "output":  "release"
+                                  },
+                  "files":  [
+                                "dist/**/*",
+                                "resources/**/*",
+                                "CLAUDE.md",
+                                "package.json"
+                            ],
+                  "extraResources":  [
+                                         {
+                                             "from":  "resources/sql-wasm.wasm",
+                                             "to":  "sql-wasm.wasm"
+                                         },
+                                         {
+                                             "from":  "resources/about-icon.png",
+                                             "to":  "about-icon.png"
+                                         },
+                                         {
+                                             "from":  "resources/icon.png",
+                                             "to":  "icon.png"
+                                         },
+                                         {
+                                             "from":  "resources/tray-icon.png",
+                                             "to":  "tray-icon.png"
+                                         },
+                                         {
+                                             "from":  "resources/tray-icon@2x.png",
+                                             "to":  "tray-icon@2x.png"
+                                         }
+                                     ],
+                  "extraMetadata":  {
+                                        "main":  "dist/main/index.js"
+                                    },
+                  "win":  {
+                              "target":  [
+                                             {
+                                                 "target":  "nsis",
+                                                 "arch":  [
+                                                              "x64"
+                                                          ]
+                                             },
+                                             {
+                                                 "target":  "portable",
+                                                 "arch":  [
+                                                              "x64"
+                                                          ]
+                                             }
+                                         ],
+                              "icon":  "resources/icon.ico"
+                          },
+                  "nsis":  {
+                               "oneClick":  false,
+                               "allowToChangeInstallationDirectory":  true,
+                               "installerIcon":  "resources/icon.ico",
+                               "uninstallerIcon":  "resources/icon.ico",
+                               "installerHeaderIcon":  "resources/icon.ico",
+                               "installerSidebar":  "resources/installer-sidebar.png"
+                           }
+              }
 }
