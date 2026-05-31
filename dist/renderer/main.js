@@ -4901,6 +4901,7 @@ function setupEventListeners() {
             }
         });
     });
+
     // ═══ 主题切换(白虎 / 老虎) ═══
     // ── 初始化所有智能服务 ──
     function initAllServices() {

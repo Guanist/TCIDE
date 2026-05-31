@@ -14,7 +14,7 @@
   <link rel="stylesheet" crossorigin href="./assets/vendor-monaco-core-D4zjdeIP.css">
   <link rel="stylesheet" crossorigin href="./assets/index-BpOg2DNo.css">
   <style>
-/* 鈺愨晲鈺?Agent Mode Selector 鈺愨晲鈺?*/
+/* /* Agent Mode Selector */*/
 .agent-mode-bar{display:flex;gap:2px;padding:4px 6px;background:var(--bg-secondary,#252526);border-bottom:1px solid var(--border-subtle,rgba(255,255,255,.06))}
 .agent-mode-btn{flex:1;display:flex;align-items:center;justify-content:center;gap:6px;padding:7px 8px;border:1px solid transparent;border-radius:6px;background:transparent;color:var(--text-secondary,#888);font-size:11px;cursor:pointer;transition:all .2s;font-family:inherit}
 .agent-mode-btn:hover{background:rgba(255,165,0,.08);color:var(--text-primary,#ccc)}
@@ -24,7 +24,7 @@
 .mode-dot.tools{background:#66bb6a}
 .mode-dot.builder{background:#ffa726}
 .mode-dot.pipeline{background:#ef5350}
-/* 鈺愨晲鈺?Pipeline Panel 鈺愨晲鈺?*/
+/* /* Pipeline Panel */*/
 .agent-pipeline-panel{margin:8px 10px;padding:12px;background:linear-gradient(135deg,rgba(30,30,30,.95),rgba(37,37,38,.95));border:1px solid rgba(255,165,0,.15);border-radius:10px}
 .pipeline-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}
 .pipeline-title{font-size:13px;font-weight:600;color:var(--tc-orange,#ffa500)}
@@ -349,19 +349,19 @@
 
       <!-- Agent 妯″紡閫夋嫨鍣?-->
       <div id="agent-mode-bar" class="agent-mode-bar">
-        <button class="agent-mode-btn active" data-mode="chat" title="鏅€氬璇濓細涓€闂竴绛?>
+        <button class="agent-mode-btn active" data-mode="chat" title="普通对话：一问一答">
           <span class="mode-dot chat"></span>
-          <span>瀵硅瘽</span>
+          <span>对话</span>
         </button>
-        <button class="agent-mode-btn" data-mode="tools" title="宸ュ叿妯″紡锛欰I 鍙鍐欐枃浠躲€佹墽琛岀粓绔懡浠ゃ€丟it 鎿嶄綔">
+        <button class="agent-mode-btn" data-mode="tools" title="工具模式：AI 可读写文件、执行终端命令、Git 操作">
           <span class="mode-dot tools"></span>
-          <span>宸ュ叿</span>
+          <span>工具</span>
         </button>
-        <button class="agent-mode-btn" data-mode="builder" title="Builder 涓茶锛欰I 鎷嗚В闇€姹?鈫?閫愭鎵ц 鈫?鑷姩淇">
+        <button class="agent-mode-btn" data-mode="builder" title="Builder 串行：AI 拆解需求 → 逐步执行 → 自动修复">
           <span class="mode-dot builder"></span>
           <span>Builder</span>
         </button>
-        <button class="agent-mode-btn" data-mode="pipeline" title="鍏ㄦ祦姘寸嚎锛欱uilder 鈫?骞惰 Coder(脳4) 鈫?Reviewer 鈫?Tester">
+        <button class="agent-mode-btn" data-mode="pipeline" title="全流水线：Builder → 并行 Coder(×4) → Reviewer → Tester">
           <span class="mode-dot pipeline"></span>
           <span>Pipeline</span>
         </button>
@@ -394,35 +394,35 @@
             <!-- Agent Pipeline 杩涘害闈㈡澘 -->
             <div id="agent-pipeline-panel" class="agent-pipeline-panel hidden">
               <div class="pipeline-header">
-                <span class="pipeline-title" id="pipeline-title">馃殌 浠诲姟娴佹按绾?/span>
+                <span class="pipeline-title" id="pipeline-title">🚀 任务流水线</span>
                 <div class="pipeline-header-actions">
                   <span class="pipeline-elapsed" id="pipeline-elapsed"></span>
-                  <button class="pipeline-abort-btn" id="pipeline-abort-btn" title="缁堟鎵ц">鈴?缁堟</button>
+                  <button class="pipeline-abort-btn" id="pipeline-abort-btn" title="终止执行">⏹ 终止</button>
                 </div>
               </div>
               <div class="pipeline-phases" id="pipeline-phases">
                 <div class="pipeline-phase" data-phase="builder">
-                  <div class="phase-ring"><span class="phase-icon">馃П</span></div>
+                  <div class="phase-ring"><span class="phase-icon">🧏</span></div>
                   <span class="phase-name">Builder</span>
-                  <span class="phase-label">鎷嗚В闇€姹?/span>
+                  <span class="phase-label">拆解需求</span>
                 </div>
                 <div class="pipeline-connector"><div class="connector-line"></div></div>
                 <div class="pipeline-phase" data-phase="coder">
-                  <div class="phase-ring"><span class="phase-icon">馃敡</span></div>
+                  <div class="phase-ring"><span class="phase-icon">🧩</span></div>
                   <span class="phase-name">Coder</span>
-                  <span class="phase-label">骞惰寮€鍙?/span>
+                  <span class="phase-label">并行开发</span>
                 </div>
                 <div class="pipeline-connector"><div class="connector-line"></div></div>
                 <div class="pipeline-phase" data-phase="reviewer">
-                  <div class="phase-ring"><span class="phase-icon">馃攳</span></div>
+                  <div class="phase-ring"><span class="phase-icon">🔎</span></div>
                   <span class="phase-name">Reviewer</span>
-                  <span class="phase-label">浠ｇ爜瀹℃煡</span>
+                  <span class="phase-label">代码审查</span>
                 </div>
                 <div class="pipeline-connector"><div class="connector-line"></div></div>
                 <div class="pipeline-phase" data-phase="tester">
-                  <div class="phase-ring"><span class="phase-icon">馃И</span></div>
+                  <div class="phase-ring"><span class="phase-icon">✅</span></div>
                   <span class="phase-name">Tester</span>
-                  <span class="phase-label">鏋勫缓楠岃瘉</span>
+                  <span class="phase-label">构建验证</span>
                 </div>
               </div>
               <div class="pipeline-task-list" id="pipeline-task-list"></div>
