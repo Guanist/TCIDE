@@ -3643,10 +3643,10 @@ const VERSION_HISTORY = [
         philosophy: '细节决定体验。思考动画让等待可感知，代码折叠让聊天不臃肿，保存提示减少误操作。每一个小改进都在让AI真正成为可靠的编程伙伴。'
     },
     {
-        version: 'v1.6.0',
+        version: 'v1.7.0',
         date: '2026-05-31',
-        emoji: '🚀',
-        title: 'Agent 觉醒 — UI 重构 / 多 Agent 全流水线 / 真实可用的工具模式',
+        emoji: '🧠',
+        title: '做梦引擎觉醒 — UI 重构 / 多 Agent 全流水线 / 真实可用的工具模式',
         features: [
             '🎛️ Agent 模式选择器:💬对话 🔧工具 🧱Builder 🚀Pipeline 四模式一键切换',
             '📊 Pipeline 实时面板:阶段进度动画(Builder→Coder→Reviewer→Tester)、任务卡片、计时器',
@@ -3656,6 +3656,7 @@ const VERSION_HISTORY = [
             '📦 长代码块折叠:>10 行自动折叠为~8 行，展开/收起按钮',
             '⌨️ 快捷键编辑器完成:34 条命令可视化编辑、持久化到 localStorage',
             '🩺 自诊断引擎:console.log 残留/any 类型/重复代码 6 项规则检测',
+            '🧠 自主做梦引擎:后台消化操作日志→凝练专家记忆卡、空闲自动触发、梦境日志面板',
             '🌐 CSP 放宽:允许 CDN 加载 (jsDelivr/unpkg/cdnjs/esm.sh)，three.js 等可正常使用',
             '🔄 /orch 命令接入:保留文本命令作为兜底',
         ],

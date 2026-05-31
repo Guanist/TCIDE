@@ -1,19 +1,19 @@
 {
     "name":  "tcide",
-    "productName":  "铏庣尗 TCIDE",
-    "version":  "1.6.0",
-    "description":  "铏庣尗 TCIDE 鈥?涓汉涓撳睘 AI 缂栫▼ IDE",
+    "productName":  "虎猫 TCIDE",
+    "version":  "1.7.0",
+    "description":  "虎猫 TCIDE — 个人专属 AI 编程 IDE",
     "main":  "dist/main/index.js",
-    "author":  "铏庣尗鍥㈤槦",
+    "author":  "虎猫团队",
     "license":  "MIT",
     "scripts":  {
                     "dev":  "electron .",
                     "start":  "electron .",
                     "build":  "vite build",
-                    "pack":  "npm run build \u0026\u0026 electron-builder --dir",
-                    "dist":  "npm run build \u0026\u0026 electron-builder",
+                    "pack":  "npm run build && electron-builder --dir",
+                    "dist":  "npm run build && electron-builder",
                     "dist:direct":  "electron-builder",
-                    "dist:portable":  "npm run build \u0026\u0026 electron-builder --win portable"
+                    "dist:portable":  "npm run build && electron-builder --win portable"
                 },
     "dependencies":  {
                          "@emmetio/expand-abbreviation":  "^0.7.3",
@@ -33,7 +33,7 @@
                         },
     "build":  {
                   "appId":  "com.tcide.app",
-                  "productName":  "铏庣尗 TCIDE",
+                  "productName":  "虎猫 TCIDE",
                   "electronDist":  "node_modules/electron/dist",
                   "electronVersion":  "28.0.0",
                   "directories":  {
