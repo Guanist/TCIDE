@@ -14,7 +14,7 @@
   <link rel="stylesheet" crossorigin href="./assets/vendor-monaco-core-D4zjdeIP.css">
   <link rel="stylesheet" crossorigin href="./assets/index-BpOg2DNo.css">
   <style>
-/* /* Agent Mode Selector */*/
+/* Agent Mode Selector */
 .agent-mode-bar{display:flex;gap:2px;padding:4px 6px;background:var(--bg-secondary,#252526);border-bottom:1px solid var(--border-subtle,rgba(255,255,255,.06))}
 .agent-mode-btn{flex:1;display:flex;align-items:center;justify-content:center;gap:6px;padding:7px 8px;border:1px solid transparent;border-radius:6px;background:transparent;color:var(--text-secondary,#888);font-size:11px;cursor:pointer;transition:all .2s;font-family:inherit}
 .agent-mode-btn:hover{background:rgba(255,165,0,.08);color:var(--text-primary,#ccc)}
@@ -80,14 +80,14 @@
       <div class="activity-top">
         <button class="activity-btn active" data-view="explorer" title="璧勬簮绠＄悊鍣?(Ctrl+Shift+E)">
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
-          <span class="activity-label">鏂囦欢</span>
+          <span class="activity-label">文件</span>
         </button>
-        <button class="activity-btn" data-view="search" title="鎼滅储 (Ctrl+Shift+F)">
+        <button class="activity-btn" data-view="search" title="搜索 (Ctrl+Shift+F)">
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
-          <span class="activity-label">鎼滅储</span>
+          <span class="activity-label">搜索</span>
         </button>
         <button class="activity-btn" data-view="git" title="Git 鐗堟湰鎺у埗">
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><circle cx="18" cy="6" r="3"/><path d="M6 6v3M18 6v3M12 6v9"/><line x1="6" y1="9" x2="12" y2="15"/><line x1="18" y1="9" x2="12" y2="15"/></svg>
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><circle cx="18" cy="6" r="3"/><path d="M6 6v0.17.0M18 6v0.17.0M12 6v0.17.0"/><line x1="6" y1="9" x2="12" y2="15"/><line x1="18" y1="9" x2="12" y2="15"/></svg>
           <span class="activity-label">Git</span>
         </button>
         <button class="activity-btn" data-view="arch" title="鏋舵瀯鍒嗘瀽">
@@ -108,22 +108,22 @@
       </div>
     </nav>
 
-    <!-- 鈺愨晲鈺?宸︿晶锛氭枃浠舵爲 / 鎼滅储 鈺愨晲鈺?-->
+    <!-- 鈺愨晲鈺?宸︿晶锛氭枃浠舵爲 / 搜索 鈺愨晲鈺?-->
     <aside id="sidebar" class="sidebar">
       <div class="sidebar-header">
         <span class="sidebar-title">EXPLORER</span>
         <div class="sidebar-actions">
-          <button id="btn-new-file" class="icon-btn" title="鏂板缓鏂囦欢 (Ctrl+N)">+</button>
-          <button id="btn-new-folder" class="icon-btn" title="鏂板缓鏂囦欢澶?>馃搧</button>
-          <button id="btn-collapse-all" class="icon-btn" title="鎶樺彔鍏ㄩ儴">鈯?/button>
+          <button id="btn-new-file" class="icon-btn" title="新建文件 (Ctrl+N)">+</button>
+          <button id="btn-new-folder" class="icon-btn" title="新建文件澶?>馃搧</button>
+          <button id="btn-collapse-all" class="icon-btn" title="折叠全部">鈯?/button>
           <span class="toolbar-sep">|</span>
           <button id="btn-open-terminal" class="icon-btn" title="鎵撳紑缁堢 (Ctrl+Shift+T)">馃捇</button>
           <button id="btn-open-browser" class="icon-btn" title="娴忚鍣ㄦ祴璇?(Ctrl+Shift+U)">馃寪</button>
-          <button id="btn-open-folder" class="icon-btn" title="鏂囦欢绠＄悊鍣?(Ctrl+Shift+O)">馃搨</button>
+          <button id="btn-open-folder" class="icon-btn" title="文件绠＄悊鍣?(Ctrl+Shift+O)">馃搨</button>
         </div>
       </div>
       <div class="sidebar-search" id="sidebar-search-explorer">
-        <input id="file-tree-search" type="text" placeholder="鎼滅储鏂囦欢..." />
+        <input id="file-tree-search" type="text" placeholder="搜索文件..." />
         <button id="btn-clear-search" class="search-clear hidden">鉁?/button>
       </div>
       <div id="file-tree" class="file-tree view-panel">
@@ -155,7 +155,7 @@
       <div id="arch-panel" class="view-panel hidden">
         <div class="arch-panel-header">
           <span class="arch-panel-title">馃搻 鏋舵瀯鍒嗘瀽</span>
-          <button id="btn-arch-refresh" class="icon-btn" title="鍒锋柊鍒嗘瀽">鈫?/button>
+          <button id="btn-arch-refresh" class="icon-btn" title="刷新鍒嗘瀽">鈫?/button>
         </div>
         <div id="arch-overview" class="arch-overview">
           <div class="arch-empty">鐐瑰嚮 鈫?寮€濮嬪垎鏋?/div>
@@ -176,11 +176,11 @@
           <span class="problems-panel-title">馃攳 闂</span>
           <div class="problems-actions">
             <button id="btn-problems-collapse" class="icon-btn" title="鍏ㄩ儴鎶樺彔">鈯?/button>
-            <button id="btn-problems-refresh" class="icon-btn" title="鍒锋柊">鈫?/button>
+            <button id="btn-problems-refresh" class="icon-btn" title="刷新">鈫?/button>
           </div>
         </div>
         <div id="problems-list" class="problems-list">
-          <div class="problems-empty">鏈墦寮€鏂囦欢鎴栨棤闂</div>
+          <div class="problems-empty">鏈墦寮€文件鎴栨棤闂</div>
         </div>
       </div>
     </aside>
@@ -195,10 +195,10 @@
         <span id="breadcrumb-path"></span>
         <span id="breadcrumb-symbol"></span>
       </div>
-      <!-- 椤圭洰鎼滅储闈㈡澘 -->
+      <!-- 椤圭洰搜索闈㈡澘 -->
       <div id="search-panel" class="search-panel hidden">
         <div class="search-panel-header">
-          <input id="search-input" type="text" placeholder="鎼滅储..." />
+          <input id="search-input" type="text" placeholder="搜索..." />
           <input id="search-replace" type="text" placeholder="鏇挎崲涓?.." class="hidden" />
           <select id="search-file-filter">
             <option value="*">鎵€鏈夋枃浠?/option>
@@ -212,11 +212,11 @@
             <button id="btn-toggle-replace" title="鍒囨崲鏇挎崲妯″紡">鈫?/button>
             <button id="btn-search-prev" title="涓婁竴涓?>鈫?/button>
             <button id="btn-search-next" title="涓嬩竴涓?>鈫?/button>
-            <button id="btn-search-close" title="鍏抽棴">鉁?/button>
+            <button id="btn-search-close" title="关闭">鉁?/button>
           </div>
         </div>
         <div id="search-results" class="search-results">
-          <div class="search-empty">杈撳叆鎼滅储鍐呭寮€濮嬫悳绱?/div>
+          <div class="search-empty">杈撳叆搜索鍐呭寮€濮嬫悳绱?/div>
         </div>
       </div>
       <!-- 娆㈣繋椤?-->
@@ -224,7 +224,7 @@
         <div class="welcome-hero">
           <img src="icons/brand/welcome-illustration.png" alt="铏庣尗" class="welcome-illustration" />
           <h1 class="welcome-title">铏庣尗 TCIDE</h1>
-          <p class="welcome-subtitle" id="welcome-subtitle">涓汉涓撳睘 AI 缂栫▼ IDE 路 v1.7.0</p>
+          <p class="welcome-subtitle" id="welcome-subtitle">涓汉涓撳睘 AI 缂栫▼ IDE 路 v0.17.0</p>
         </div>
         <div class="welcome-actions">
           <button id="welcome-open-project" class="welcome-btn primary">馃搨 鎵撳紑椤圭洰</button>
@@ -239,7 +239,7 @@
           <h3 class="welcome-section-title">蹇€熷紑濮?/h3>
           <ul class="welcome-tip-list">
             <li><kbd>Ctrl+O</kbd> 鎵撳紑宸叉湁椤圭洰</li>
-            <li><kbd>Ctrl+N</kbd> 鏂板缓鏂囦欢</li>
+            <li><kbd>Ctrl+N</kbd> 新建文件</li>
             <li>鍦?AI 闈㈡澘杈撳叆闇€姹傚紑濮嬬紪鐮?/li>
             <li>璁剧疆涓厤缃?API Key 瑙ｉ攣 AI 鍔熻兘</li>
           </ul>
@@ -286,7 +286,7 @@
           </button>
           <button class="panel-tab" data-panel="output">杈撳嚭</button>
           <div class="panel-tabs-spacer"></div>
-          <button class="panel-close" id="btn-panel-close" title="鍏抽棴闈㈡澘 (Ctrl+J)">鉁?/button>
+          <button class="panel-close" id="btn-panel-close" title="关闭闈㈡澘 (Ctrl+J)">鉁?/button>
         </div>
         <!-- 缁堢闈㈡澘 -->
         <div id="panel-terminal" class="panel-content active">
@@ -389,7 +389,7 @@
               <button id="btn-select-all" class="select-action-btn">鈽?鍏ㄩ€?/button>
               <button id="btn-delete-selected" class="select-action-btn">馃棏 鍒犻櫎鎵€閫?/button>
               <button id="btn-delete-all" class="select-action-btn" style="background:rgba(244,71,71,0.15);border-color:rgba(244,71,71,0.4);">🔥 清空全部</button>
-              <button id="btn-clear-select" class="select-action-btn">鉁?鍙栨秷</button>
+              <button id="btn-clear-select" class="select-action-btn">鉁?取消</button>
             </div>
             <!-- Agent Pipeline 杩涘害闈㈡澘 -->
             <div id="agent-pipeline-panel" class="agent-pipeline-panel hidden">
@@ -432,16 +432,14 @@
               <div class="ai-welcome-icon">
                 <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="var(--tc-orange)" stroke-width="1" stroke-linecap="round" stroke-linejoin="round">
                   <path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2Z"/>
-                  <path d="M12 6v6l4 2"/>
+                  <path d="M12 6v0.17.0l4 2"/>
                   <circle cx="8.5" cy="8.5" r="1.5"/>
                   <circle cx="15.5" cy="8.5" r="1.5"/>
                   <path d="M8 13c0 2 2 3 4 3s4-1 4-3"/>
                 </svg>
               </div>
               <p class="ai-welcome-title">你好，我是虎猫 AI</p>
-              <p class="ai-welcome-desc">閫夋嫨涓€涓ā鍨嬪苟濉叆 API Key 鍗冲彲寮€濮嬨€傛敮鎸?DeepSeek銆佺伀灞卞紩鎿庛€丱llama 绛夈€?/p>
-              <div class="ai-welcome-actions">
-                <button class="quick-btn primary" data-action="config-deepseek">蹇€熼厤缃?DeepSeek</button>
+              <p class="ai-welcome-desc">选择一个模型并填入 API Key 即可开始。支持 DeepSeek、火山引擎、Ollama 等。</button>
                 <button class="quick-btn" data-action="config-ollama">閰嶇疆鏈湴 Ollama</button>
               </div>
               <div class="ai-welcome-prompts">
@@ -464,7 +462,7 @@
                 <button id="btn-tools-toggle" class="chat-tool-btn" title="MCP 宸ュ叿: 寮€鍚椂 AI 鍙鍐欐枃浠?鎵ц鍛戒护">馃敡</button>
                 <button id="btn-chat-select" class="chat-tool-btn" title="澶氶€夋秷鎭垹闄?>鈽?/button>
               </div>
-              <textarea id="chat-input" placeholder="杈撳叆娑堟伅锛孲hift+Enter 鎹㈣锛孍nter 鍙戦€?.." rows="3"></textarea>
+              <textarea id="chat-input" placeholder="输入消息锛孲hift+Enter 鎹㈣锛孍nter 鍙戦€?.." rows="3"></textarea>
               <button id="btn-send" class="send-btn" title="鍙戦€?(Enter)">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
               </button>
@@ -493,12 +491,12 @@
         <div id="tab-outline" class="ai-tab-content hidden">
           <div class="outline-panel">
             <div class="outline-search">
-              <input id="outline-filter" type="text" placeholder="鎼滅储绗﹀彿..." />
+              <input id="outline-filter" type="text" placeholder="搜索绗﹀彿..." />
             </div>
             <div id="outline-tree" class="outline-tree">
               <div class="outline-empty">
                 <img src="icons/brand/empty-files.png" alt="绌? class="empty-illustration" />
-                <p>鎵撳紑鏂囦欢浠ユ煡鐪嬪ぇ绾?/p>
+                <p>鎵撳紑文件浠ユ煡鐪嬪ぇ绾?/p>
               </div>
             </div>
           </div>
@@ -525,7 +523,7 @@
             <div class="usage-detail-section">
               <div class="usage-detail-header">
                 <h4>鎸夐」鐩粺璁?/h4>
-                <button class="usage-refresh-btn" id="btn-refresh-usage">鍒锋柊</button>
+                <button class="usage-refresh-btn" id="btn-refresh-usage">刷新</button>
               </div>
               <div class="usage-project-list" id="usage-project-list">
                 <div class="usage-empty">鏆傛棤鏁版嵁</div>
@@ -544,11 +542,9 @@
         <div id="tab-settings" class="ai-tab-content hidden">
           <div class="settings-panel">
             <div class="settings-tabs">
-              <button class="settings-tab active" data-settings-tab="providers">妯″瀷鏈嶅姟鍟?/button>
-              <button class="settings-tab" data-settings-tab="custom">鑷畾涔夐厤缃?/button>
-              <button class="settings-tab" data-settings-tab="changelog">馃搵 鐗堟湰璁板綍</button>
+              <button class="settings-tab active" data-settings-tab="providers">模型服务商<button class="settings-tab" data-settings-tab="custom">自定义配置<button class="settings-tab" data-settings-tab="changelog">馃搵 版本记录</button>
                             <button class="settings-tab" data-settings-tab="dream">🧠 梦境日志</button>
-              <button class="settings-tab" data-settings-tab="services">鈿?鏅鸿兘鏈嶅姟</button>
+              <button class="settings-tab" data-settings-tab="services">智能服务</button>
             </div>
             <div id="settings-providers" class="settings-tab-content active">
               <div class="provider-list" id="provider-list">
@@ -663,10 +659,10 @@
                   </div>
                 </div>
                 <div class="form-actions">
-                  <button id="btn-test-config" class="test-btn">娴嬭瘯杩炴帴</button>
-                  <button id="btn-save-config" class="save-btn">淇濆瓨閰嶇疆</button>
+                  <button id="btn-test-config" class="test-btn">测试连接</button>
+                  <button id="btn-save-config" class="save-btn">保存閰嶇疆</button>
                 </div>
-                <!-- 宸蹭繚瀛樼殑 API 閰嶇疆 -->
+                <!-- 已保存 API 閰嶇疆 -->
                 <div class="saved-configs-section" style="margin-top:16px">
                   <label style="color:var(--text-secondary);font-size:12px;margin-bottom:6px;display:block">馃捑 宸蹭繚瀛樼殑 API 閰嶇疆</label>
                   <div id="saved-configs-list" class="saved-configs-list">
@@ -684,7 +680,7 @@
             </div>
             <div id="settings-changelog" class="settings-tab-content hidden">
               <div class="changelog-header">
-                <h4>馃悈 铏庣尗 TCIDE 鐗堟湰璁板綍</h4>
+                <h4>馃悈 铏庣尗 TCIDE 版本记录</h4>
                 <p class="changelog-subtitle">浠庣涓€鐗堣嚦浠婄殑瀹屾暣杩唬鍘嗙▼</p>
               </div>
               <div class="changelog-timeline" id="changelog-timeline">
@@ -757,10 +753,10 @@
 
   <!-- 鈺愨晲鈺?鏍囩椤典笂涓嬫枃鑿滃崟 鈺愨晲鈺?-->
   <div id="tab-context-menu" class="context-menu hidden">
-    <div class="ctx-item" data-action="tab-close">鉁?鍏抽棴</div>
-    <div class="ctx-item" data-action="tab-close-others">鈯?鍏抽棴鍏朵粬</div>
-    <div class="ctx-item" data-action="tab-close-right">鈫?鍏抽棴鍙充晶</div>
-    <div class="ctx-item" data-action="tab-close-all">鈯?鍏抽棴鍏ㄩ儴</div>
+    <div class="ctx-item" data-action="tab-close">鉁?关闭</div>
+    <div class="ctx-item" data-action="tab-close-others">鈯?关闭鍏朵粬</div>
+    <div class="ctx-item" data-action="tab-close-right">鈫?关闭鍙充晶</div>
+    <div class="ctx-item" data-action="tab-close-all">鈯?关闭鍏ㄩ儴</div>
     <div class="ctx-divider"></div>
     <div class="ctx-item" data-action="tab-copy-path">馃搵 澶嶅埗璺緞</div>
     <div class="ctx-item" data-action="tab-reveal">馃搨 鍦ㄦ枃浠跺す涓樉绀?/div>
@@ -768,10 +764,10 @@
     <div class="ctx-item" data-action="tab-split-right">鈼?鍚戝彸鎷嗗垎</div>
   </div>
 
-  <!-- 鈺愨晲鈺?鏂囦欢鏍戜笂涓嬫枃鑿滃崟 鈺愨晲鈺?-->
+  <!-- 鈺愨晲鈺?文件鏍戜笂涓嬫枃鑿滃崟 鈺愨晲鈺?-->
   <div id="context-menu" class="context-menu hidden">
-    <div class="ctx-item" data-action="new-file">馃搫 鏂板缓鏂囦欢</div>
-    <div class="ctx-item" data-action="new-folder">馃搧 鏂板缓鏂囦欢澶?/div>
+    <div class="ctx-item" data-action="new-file">馃搫 新建文件</div>
+    <div class="ctx-item" data-action="new-folder">馃搧 新建文件澶?/div>
     <div class="ctx-divider"></div>
     <div class="ctx-item" data-action="rename">鉁忥笍 閲嶅懡鍚?/div>
     <div class="ctx-item" data-action="delete">馃棏锔?鍒犻櫎</div>
@@ -800,9 +796,9 @@
       <h3>鈱?蹇嵎閿€熸煡琛?/h3>
       <table>
         <tr><td><kbd>Ctrl+O</kbd></td><td>鎵撳紑椤圭洰</td></tr>
-        <tr><td><kbd>Ctrl+N</kbd></td><td>鏂板缓鏂囦欢</td></tr>
-        <tr><td><kbd>Ctrl+S</kbd></td><td>淇濆瓨鏂囦欢</td></tr>
-        <tr><td><kbd>Ctrl+W</kbd></td><td>鍏抽棴鏍囩</td></tr>
+        <tr><td><kbd>Ctrl+N</kbd></td><td>新建文件</td></tr>
+        <tr><td><kbd>Ctrl+S</kbd></td><td>保存文件</td></tr>
+        <tr><td><kbd>Ctrl+W</kbd></td><td>关闭鏍囩</td></tr>
         <tr><td><kbd>Ctrl+\\</kbd></td><td>鍒囨崲 AI 闈㈡澘</td></tr>
         <tr><td><kbd>Ctrl+Shift+M</kbd></td><td>Zen 涓撴敞妯″紡</td></tr>
         <tr><td><kbd>Ctrl+Shift+B</kbd></td><td>Builder 鏋舵瀯妯″紡</td></tr>
@@ -814,7 +810,7 @@
         <tr><td><kbd>Esc</kbd></td><td>鍋滄娴佸紡杈撳嚭</td></tr>
         <tr><td><kbd>Ctrl+,</kbd></td><td>鎵撳紑璁剧疆</td></tr>
       </table>
-      <button class="help-close" onclick="document.getElementById('help-dialog').classList.add('hidden')">鍏抽棴</button>
+      <button class="help-close" onclick="document.getElementById('help-dialog').classList.add('hidden')">关闭</button>
     </div>
   </div>
 
@@ -849,7 +845,7 @@
           <p>漏 2026 Guanist, Inc. 淇濈暀鎵€鏈夋潈鍒┿€?/p>
         </div>
       </div>
-      <button class="about-close" onclick="document.getElementById('about-dialog').classList.add('hidden')">鍏抽棴</button>
+      <button class="about-close" onclick="document.getElementById('about-dialog').classList.add('hidden')">关闭</button>
     </div>
   </div>
 
