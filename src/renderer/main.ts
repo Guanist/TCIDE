@@ -5620,7 +5620,10 @@ init();draw();
 </html>`;
 
 function createSnakeDemo(): void {
-  if (!editor) return;
+  if (!editor) {
+    showToast('请先打开一个项目，编辑器就绪后再试', 'warn', 3000);
+    return;
+  }
   const model = editor.getModel();
   if (!model) return;
   model.setValue(SNAKE_GAME_HTML);
@@ -6854,30 +6857,32 @@ function initP2P3ProjectServices(projectPath: string): void {
 // ═══════════════════════════════════════════════
 // P2: Command — /orchestrate handler in chat
 // ═══════════════════════════════════════════════
-(function patchSendToAI() {
-  const origSend = (window as any).api.sendToAI;
-  if (!origSend) return;
-  (window as any).api.sendToAI = async function(messages: any[], options?: any) {
-    const lastUser = [...messages].reverse().find((m: any) => m.role === 'user');
-    if (lastUser?.content?.startsWith('/orchestrate')) {
-      const requirement = lastUser.content.replace('/orchestrate', '').trim();
-      await runOrchestrator(requirement);
-      return 'Orchestrator \u5DF2\u542F\u52A8\uFF0C\u8BF7\u67E5\u770B\u6267\u884C\u8BA1\u5212\u3002';
-    }
-    if (lastUser?.content?.startsWith('/runner')) {
-      const plan = lastUser.content.replace('/runner', '').trim();
-      await runUnattendedPlan(plan);
-      return 'Runner \u5DF2\u542F\u52A8\u3002';
-    }
-    if (lastUser?.content?.startsWith('/impact')) {
-      const file = lastUser.content.replace('/impact', '').trim();
-      const fp = file || state.openFiles[state.activeFileIndex]?.path;
-      if (fp) await showImpactAnalysis(fp);
-      return '\u5F71\u54CD\u5206\u6790\u5DF2\u5B8C\u6210\u3002';
-    }
-    return origSend.call((window as any).api, messages, options);
-  };
-})();
+try {
+  (function patchSendToAI() {
+    const origSend = (window as any).api.sendToAI;
+    if (!origSend) return;
+    (window as any).api.sendToAI = async function(messages: any[], options?: any) {
+      const lastUser = [...messages].reverse().find((m: any) => m.role === 'user');
+      if (lastUser?.content?.startsWith('/orchestrate')) {
+        const requirement = lastUser.content.replace('/orchestrate', '').trim();
+        await runOrchestrator(requirement);
+        return 'Orchestrator \u5DF2\u542F\u52A8\uFF0C\u8BF7\u67E5\u770B\u6267\u884C\u8BA1\u5212\u3002';
+      }
+      if (lastUser?.content?.startsWith('/runner')) {
+        const plan = lastUser.content.replace('/runner', '').trim();
+        await runUnattendedPlan(plan);
+        return 'Runner \u5DF2\u542F\u52A8\u3002';
+      }
+      if (lastUser?.content?.startsWith('/impact')) {
+        const file = lastUser.content.replace('/impact', '').trim();
+        const fp = file || state.openFiles[state.activeFileIndex]?.path;
+        if (fp) await showImpactAnalysis(fp);
+        return '\u5F71\u54CD\u5206\u6790\u5DF2\u5B8C\u6210\u3002';
+      }
+      return origSend.call((window as any).api, messages, options);
+    };
+  })();
+} catch(e) { console.warn('[patchSendToAI] skipped (read-only)'); }
 
 // 初始化用量相关事件
 function initUsageEvents(): void {
@@ -6921,9 +6926,34 @@ initLintListener();
 setTimeout(() => { mountDebugPanel(); }, 500);
 setInterval(() => { updateStatusBarPerf(); }, 30000);
 updateStatusBarPerf();
-setupAutoHealForTerminal();
+try { setupAutoHealForTerminal(); } catch (e) { console.warn('[AutoHeal] skipped:', e); }
 try { setupBatchSearchIntegration(); } catch (e) { console.warn('[P0] Batch:', e); }
 setTimeout(() => { registerSemanticCompletion(); }, 1000);
+
+// ── Agent 模式切换 ──
+let agentMode: string = 'chat';
+document.querySelectorAll('.agent-mode-btn').forEach((btn) => {
+  btn.addEventListener('click', () => {
+    const mode = (btn as HTMLElement).dataset.mode;
+    if (!mode) return;
+    document.querySelectorAll('.agent-mode-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    agentMode = mode;
+    const pipelinePanel = document.getElementById('agent-pipeline-panel');
+    if (pipelinePanel) pipelinePanel.classList.toggle('hidden', mode !== 'pipeline');
+    if (mode === 'tools' && !mcpToolsEnabled) {
+      mcpToolsEnabled = true;
+      const tt = document.getElementById('btn-tools-toggle');
+      if (tt) { tt.classList.add('active'); tt.style.background = 'rgba(255,165,0,0.2)'; }
+    }
+    if (mode !== 'tools' && mcpToolsEnabled) {
+      mcpToolsEnabled = false;
+      const tt2 = document.getElementById('btn-tools-toggle');
+      if (tt2) { tt2.classList.remove('active'); tt2.style.background = ''; }
+    }
+    showToast('已切换到 ' + ({chat:'对话',tools:'工具',builder:'Builder',pipeline:'流水线'} as any)[mode] + ' 模式', 'info', 2000);
+  });
+});
 
 // ── MCP 工具切换 ──
 let mcpToolsEnabled = false;
@@ -6991,12 +7021,13 @@ document.addEventListener('contextmenu', (e) => {
 });
 
 // ── 重写 sendToAI 支持工具调用 ──
-const _originalStreamToAI = (window as any).__streamToAI;
-(window as any).__streamToAIWithTools = async function(messages: Array<{ role: string; content: string }>, ctx?: string) {
-  if (mcpToolsEnabled && ctx) {
-    const toolResult = await window.api.sendToAIWithTools(messages);
-    // 结果已通过 stream-chunk 发送
-    return toolResult;
-  }
-  (window as any).__tcide_originalSendToAI?.(messages, ctx);
-};
+try {
+  const _originalStreamToAI = (window as any).__streamToAI;
+  (window as any).__streamToAIWithTools = async function(messages: Array<{ role: string; content: string }>, ctx?: string) {
+    if (mcpToolsEnabled && ctx) {
+      const toolResult = await window.api.sendToAIWithTools(messages);
+      return toolResult;
+    }
+    (window as any).__tcide_originalSendToAI?.(messages, ctx);
+  };
+} catch (e) { console.warn('[MCP] sendToAI override skipped (read-only in dev mode)'); }

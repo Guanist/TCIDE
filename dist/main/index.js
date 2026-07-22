@@ -47,11 +47,11 @@ const isDev = !electron_1.app.isPackaged;
 let mainWindow = null;
 let tray = null;
 let isQuitting = false;
-// 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
-// 绐楀彛鍒涘缓
-// 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
+// ─────────────────────────────────────────
+// 窗口创建
+// ─────────────────────────────────────────
 function createWindow() {
-    // 鍔犺浇绐楀彛鍥炬爣
+    // 加载窗口图标
     const iconPath = isDev
         ? path.join(__dirname, '..', '..', 'resources', 'icon.png')
         : path.join(process.resourcesPath, 'icon.png');
@@ -61,13 +61,13 @@ function createWindow() {
         minWidth: 960,
         minHeight: 600,
         backgroundColor: '#1E1E1E',
-        title: '铏庣尗 TCIDE',
+        title: '虎猫 TCIDE',
         show: false,
         icon: iconPath,
         webPreferences: {
             preload: path.join(__dirname, 'preload.js'),
-            contextIsolation: false,
-            nodeIntegration: true,
+            contextIsolation: true,
+            nodeIntegration: false,
             sandbox: false,
             webSecurity: true,
             allowRunningInsecureContent: false,
@@ -103,13 +103,13 @@ function createWindow() {
         console.error('[Main] Renderer process gone:', details.reason);
     });
 }
-// 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
-// 搴旂敤鑿滃崟
-// 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
+// ─────────────────────────────────────────
+// 应用菜单
+// ─────────────────────────────────────────
 async function openProjectDialog() {
     const result = await electron_1.dialog.showOpenDialog(mainWindow, {
         properties: ['openDirectory'],
-        title: '閫夋嫨椤圭洰鐩綍',
+        title: '选择项目目录',
     });
     if (!result.canceled && result.filePaths[0]) {
         mainWindow?.webContents.send('project-opened', result.filePaths[0]);
@@ -119,7 +119,7 @@ function showAboutDialog() {
     const aboutIconPath = isDev
         ? path.join(__dirname, '..', '..', 'resources', 'about-icon.png')
         : path.join(process.resourcesPath, 'about-icon.png');
-    let appVersion = 'v0.17.0';
+    let appVersion = 'v1.5.0-p0';
     try {
         const pkgPath = isDev
             ? path.join(__dirname, '..', '..', 'package.json')
@@ -127,81 +127,82 @@ function showAboutDialog() {
         if (fs.existsSync(pkgPath)) {
             appVersion = 'v' + JSON.parse(fs.readFileSync(pkgPath, 'utf-8')).version;
         }
-    } catch { /* fallback to default */ }
+    }
+    catch { /* fallback */ }
     electron_1.dialog.showMessageBox(mainWindow, {
         type: 'info',
-        title: '鍏充簬 铏庣尗 TCIDE',
-        message: '铏庣尗 TCIDE ' + appVersion,
-        detail: '浣滆€咃細鏂囨．鐗归獑\n鍏紬鍙凤細鏂囨．鐗归獑\n澶囨敞锛歅yClaw 浣滆€呴獑鎴＄殑鐖哥埜\n\n涓汉涓撳睘瓒呯骇 AI 缂栫▼ IDE',
+        title: '关于 虎猫 TCIDE',
+        message: '虎猫 TCIDE ' + appVersion,
+        detail: '作者：文森特骆\n公众号：文森特骆\n备注：PyClaw 作者骆戡的爸爸\n\n个人专属超级 AI 编程 IDE',
         icon: electron_1.nativeImage.createFromPath(aboutIconPath),
     });
 }
 function createAppMenu() {
     const template = [
         {
-            label: '鏂囦欢',
+            label: '文件',
             submenu: [
-                { label: '鎵撳紑椤圭洰...', accelerator: 'CmdOrCtrl+O', click: () => openProjectDialog() },
+                { label: '打开项目...', accelerator: 'CmdOrCtrl+O', click: () => openProjectDialog() },
                 { type: 'separator' },
-                { label: '鏂板缓鏂囦欢', accelerator: 'CmdOrCtrl+N', click: () => mainWindow?.webContents.send('menu-action', 'new-file') },
-                { label: '鏂板缓鏂囦欢澶?, accelerator: 'CmdOrCtrl+Shift+N', click: () => mainWindow?.webContents.send('menu-action', 'new-folder') },
+                { label: '新建文件', accelerator: 'CmdOrCtrl+N', click: () => mainWindow?.webContents.send('menu-action', 'new-file') },
+                { label: '新建文件夹', accelerator: 'CmdOrCtrl+Shift+N', click: () => mainWindow?.webContents.send('menu-action', 'new-folder') },
                 { type: 'separator' },
-                { label: '淇濆瓨', accelerator: 'CmdOrCtrl+S', click: () => mainWindow?.webContents.send('menu-action', 'save') },
+                { label: '保存', accelerator: 'CmdOrCtrl+S', click: () => mainWindow?.webContents.send('menu-action', 'save') },
                 { type: 'separator' },
-                { label: '閫€鍑?, accelerator: 'CmdOrCtrl+Q', click: () => { isQuitting = true; electron_1.app.quit(); } },
+                { label: '退出', accelerator: 'CmdOrCtrl+Q', click: () => { isQuitting = true; electron_1.app.quit(); } },
             ],
         },
         {
-            label: '缂栬緫',
+            label: '编辑',
             submenu: [
-                { label: '鎾ら攢', accelerator: 'CmdOrCtrl+Z', role: 'undo' },
-                { label: '閲嶅仛', accelerator: 'CmdOrCtrl+Shift+Z', role: 'redo' },
+                { label: '撤销', accelerator: 'CmdOrCtrl+Z', role: 'undo' },
+                { label: '重做', accelerator: 'CmdOrCtrl+Shift+Z', role: 'redo' },
                 { type: 'separator' },
-                { label: '鍓垏', accelerator: 'CmdOrCtrl+X', role: 'cut' },
-                { label: '澶嶅埗', accelerator: 'CmdOrCtrl+C', role: 'copy' },
-                { label: '绮樿创', accelerator: 'CmdOrCtrl+V', role: 'paste' },
+                { label: '剪切', accelerator: 'CmdOrCtrl+X', role: 'cut' },
+                { label: '复制', accelerator: 'CmdOrCtrl+C', role: 'copy' },
+                { label: '粘贴', accelerator: 'CmdOrCtrl+V', role: 'paste' },
                 { type: 'separator' },
-                { label: '鏌ユ壘', accelerator: 'CmdOrCtrl+F', click: () => mainWindow?.webContents.send('menu-action', 'find') },
-                { label: '鏇挎崲', accelerator: 'CmdOrCtrl+H', click: () => mainWindow?.webContents.send('menu-action', 'replace') },
+                { label: '查找', accelerator: 'CmdOrCtrl+F', click: () => mainWindow?.webContents.send('menu-action', 'find') },
+                { label: '替换', accelerator: 'CmdOrCtrl+H', click: () => mainWindow?.webContents.send('menu-action', 'replace') },
                 { type: 'separator' },
-                { label: '鍏ㄩ€?, accelerator: 'CmdOrCtrl+A', role: 'selectAll' },
+                { label: '全选', accelerator: 'CmdOrCtrl+A', role: 'selectAll' },
             ],
         },
         {
-            label: '瑙嗗浘',
+            label: '视图',
             submenu: [
-                { label: '鍒囨崲 AI 闈㈡澘', accelerator: 'CmdOrCtrl+\\', click: () => mainWindow?.webContents.send('menu-action', 'toggle-ai-panel') },
+                { label: '切换 AI 面板', accelerator: 'CmdOrCtrl+\\', click: () => mainWindow?.webContents.send('menu-action', 'toggle-ai-panel') },
                 { label: 'Zen Mode', accelerator: 'CmdOrCtrl+Shift+M', click: () => mainWindow?.webContents.send('menu-action', 'zen-mode') },
                 { type: 'separator' },
-                { label: '缁堢', accelerator: 'Ctrl+`', click: () => mainWindow?.webContents.send('menu-action', 'toggle-terminal') },
+                { label: '终端', accelerator: 'Ctrl+`', click: () => mainWindow?.webContents.send('menu-action', 'toggle-terminal') },
                 { type: 'separator' },
-                { label: '閲嶆柊鍔犺浇', accelerator: 'CmdOrCtrl+R', role: 'reload' },
-                { label: '寮€鍙戣€呭伐鍏?, accelerator: 'F12', role: 'toggleDevTools' },
+                { label: '重新加载', accelerator: 'CmdOrCtrl+R', role: 'reload' },
+                { label: '开发者工具', accelerator: 'F12', role: 'toggleDevTools' },
             ],
         },
         {
             label: 'AI',
             submenu: [
-                { label: '鍙戦€佽嚦 Builder', accelerator: 'CmdOrCtrl+Enter', click: () => mainWindow?.webContents.send('menu-action', 'send-to-builder') },
-                { label: '缁堟浠诲姟', accelerator: 'Escape', click: () => mainWindow?.webContents.send('menu-action', 'abort-task') },
+                { label: '发送至 Builder', accelerator: 'CmdOrCtrl+Enter', click: () => mainWindow?.webContents.send('menu-action', 'send-to-builder') },
+                { label: '终止任务', accelerator: 'Escape', click: () => mainWindow?.webContents.send('menu-action', 'abort-task') },
                 { type: 'separator' },
-                { label: '娓呴櫎瀵硅瘽', click: () => mainWindow?.webContents.send('menu-action', 'clear-chat') },
+                { label: '清除对话', click: () => mainWindow?.webContents.send('menu-action', 'clear-chat') },
                 { type: 'separator' },
-                { label: '璁剧疆...', accelerator: 'F1', click: () => mainWindow?.webContents.send('menu-action', 'open-settings') },
+                { label: '设置...', accelerator: 'F1', click: () => mainWindow?.webContents.send('menu-action', 'open-settings') },
             ],
         },
         {
-            label: '甯姪',
-            submenu: [{ label: '鍏充簬', click: () => showAboutDialog() }],
+            label: '帮助',
+            submenu: [{ label: '关于', click: () => showAboutDialog() }],
         },
     ];
     electron_1.Menu.setApplicationMenu(electron_1.Menu.buildFromTemplate(template));
 }
-// 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
-// 绯荤粺鎵樼洏
-// 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
+// ─────────────────────────────────────────
+// 系统托盘
+// ─────────────────────────────────────────
 function createTray() {
-    // 灏濊瘯澶氱骇鍥為€€鍔犺浇鎵樼洏鍥炬爣
+    // 尝试多级回退加载托盘图标
     const candidates = isDev
         ? [
             path.join(__dirname, '..', '..', 'resources', 'tray-icon.png'),
@@ -235,11 +236,11 @@ function createTray() {
         icon.setTemplateImage(true);
     }
     tray = new electron_1.Tray(icon);
-    tray.setToolTip('铏庣尗 TCIDE');
+    tray.setToolTip('虎猫 TCIDE');
     tray.setContextMenu(electron_1.Menu.buildFromTemplate([
-        { label: '鏄剧ず绐楀彛', click: () => mainWindow?.show() },
+        { label: '显示窗口', click: () => mainWindow?.show() },
         { type: 'separator' },
-        { label: '閫€鍑?, click: () => { isQuitting = true; electron_1.app.quit(); } },
+        { label: '退出', click: () => { isQuitting = true; electron_1.app.quit(); } },
     ]));
     tray.on('double-click', () => mainWindow?.show());
 }
@@ -260,9 +261,9 @@ function scheduleMemoryCleanup() {
         }
     }, 30 * 60 * 1000);
 }
-// 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
-// 鍗曞疄渚嬮攣 + 鎵樼洏閫€鍑?
-// 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
+// ─────────────────────────────────────────
+// 单实例锁 + 托盘退出
+// ─────────────────────────────────────────
 if (process.platform === 'win32') {
     electron_1.app.setAppUserModelId('com.tcide.personal-ide');
 }
@@ -280,9 +281,9 @@ else {
         }
     });
 }
-// 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
-// 搴旂敤鐢熷懡鍛ㄦ湡
-// 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
+// ─────────────────────────────────────────
+// 应用生命周期
+// ─────────────────────────────────────────
 electron_1.app.whenReady().then(async () => {
     try {
         fs.writeFileSync(path.join(electron_1.app.getPath('userData'), 'tcide-debug.log'), 'START\n');
@@ -293,8 +294,8 @@ electron_1.app.whenReady().then(async () => {
     }
     catch { } }
     dlog('[Main] STEP: whenReady entered');
-    // 鈹€鈹€ 鑷畾涔夊崗璁?鈹€鈹€
-    // Electron 33+ 瑕佹眰鍦?whenReady 鍚庢敞鍐?protocol
+    // ── 自定义协议 ──
+    // Electron 33+ 要求在 whenReady 后注册 protocol
     electron_1.protocol.handle('tcide', (request) => {
         try {
             const requestUrl = new URL(request.url);

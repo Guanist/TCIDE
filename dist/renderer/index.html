@@ -3,72 +3,13 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' blob: https://cdn.jsdelivr.net https://unpkg.com https://cdnjs.cloudflare.com https://esm.sh https://*.jsdelivr.net https://cdn.skypack.dev; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://unpkg.com https://cdnjs.cloudflare.com https://esm.sh https://*.jsdelivr.net; font-src 'self' data: https://cdn.jsdelivr.net https://cdnjs.cloudflare.com; img-src 'self' data: blob: https:; frame-src data: blob:; connect-src 'self' localhost:* 127.0.0.1:* https://api.deepseek.com https://api.openai.com https://*.volces.com https://cdn.jsdelivr.net https://unpkg.com https://esm.sh https://*.jsdelivr.net blob:;">
-  <title>虎猫 TCIDE</title>
-
-
-
-  
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; font-src 'self' data:; img-src 'self' data: blob:; frame-src data: blob:; connect-src 'self' localhost:* 127.0.0.1:* https://api.deepseek.com https://api.openai.com https://*.volces.com;">
+  <title>虎猫 TCIDE</title>
+  <script type="module" crossorigin src="./assets/index-DHaVbzGe.js"></script>
+  <link rel="modulepreload" crossorigin href="./assets/vendor-monaco-core-DxxFViFA.js">
+  <link rel="modulepreload" crossorigin href="./assets/vendor-xterm-BGR9Rpur.js">
   <link rel="stylesheet" crossorigin href="./assets/vendor-monaco-core-D4zjdeIP.css">
   <link rel="stylesheet" crossorigin href="./assets/index-BpOg2DNo.css">
-  <style>
-/* ═══ Agent Mode Selector ═══ */
-.agent-mode-bar{display:flex;gap:2px;padding:4px 6px;background:var(--bg-secondary,#252526);border-bottom:1px solid var(--border-subtle,rgba(255,255,255,.06))}
-.agent-mode-btn{flex:1;display:flex;align-items:center;justify-content:center;gap:6px;padding:7px 8px;border:1px solid transparent;border-radius:6px;background:transparent;color:var(--text-secondary,#888);font-size:11px;cursor:pointer;transition:all .2s;font-family:inherit}
-.agent-mode-btn:hover{background:rgba(255,165,0,.08);color:var(--text-primary,#ccc)}
-.agent-mode-btn.active{background:rgba(255,165,0,.12);border-color:rgba(255,165,0,.25);color:var(--tc-orange,#ffa500)}
-.mode-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
-.mode-dot.chat{background:#4fc3f7}
-.mode-dot.tools{background:#66bb6a}
-.mode-dot.builder{background:#ffa726}
-.mode-dot.pipeline{background:#ef5350}
-/* ═══ Pipeline Panel ═══ */
-.agent-pipeline-panel{margin:8px 10px;padding:12px;background:linear-gradient(135deg,rgba(30,30,30,.95),rgba(37,37,38,.95));border:1px solid rgba(255,165,0,.15);border-radius:10px}
-.pipeline-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}
-.pipeline-title{font-size:13px;font-weight:600;color:var(--tc-orange,#ffa500)}
-.pipeline-header-actions{display:flex;align-items:center;gap:8px}
-.pipeline-elapsed{font-size:10px;color:var(--text-secondary,#666);font-variant-numeric:tabular-nums;font-family:monospace}
-.pipeline-abort-btn{padding:3px 10px;border:1px solid rgba(244,67,54,.4);border-radius:4px;background:rgba(244,67,54,.1);color:#f44336;font-size:11px;cursor:pointer;transition:all .2s;font-family:inherit}
-.pipeline-abort-btn:hover{background:rgba(244,67,54,.2)}
-.pipeline-phases{display:flex;align-items:center;justify-content:center;gap:0;margin-bottom:12px;padding:8px 0}
-.pipeline-phase{display:flex;flex-direction:column;align-items:center;gap:4px;min-width:60px;opacity:.35;transition:all .3s}
-.pipeline-phase.active{opacity:1}
-.pipeline-phase.done{opacity:.75}
-.phase-ring{width:36px;height:36px;border-radius:50%;background:rgba(255,255,255,.04);border:2px solid rgba(255,255,255,.1);display:flex;align-items:center;justify-content:center;transition:all .3s;position:relative}
-.pipeline-phase.active .phase-ring{border-color:var(--tc-orange,#ffa500);background:rgba(255,165,0,.15);box-shadow:0 0 14px rgba(255,165,0,.2);animation:pulse-ring 1.5s infinite}
-.pipeline-phase.done .phase-ring{border-color:#4caf50;background:rgba(76,175,80,.12)}
-@keyframes pulse-ring{0%,100%{box-shadow:0 0 8px rgba(255,165,0,.2)}50%{box-shadow:0 0 22px rgba(255,165,0,.4)}}
-.phase-icon{font-size:15px;line-height:1}
-.phase-name{font-size:10px;font-weight:600;color:var(--text-primary,#ccc)}
-.phase-label{font-size:8px;color:var(--text-secondary,#666)}
-.pipeline-connector{flex:0 0 20px;display:flex;align-items:center;padding:0 2px}
-.connector-line{width:100%;height:1.5px;background:rgba(255,255,255,.08);transition:all .4s}
-.pipeline-phase.done+.pipeline-connector .connector-line,.pipeline-phase.active+.pipeline-connector .connector-line{background:rgba(76,175,80,.35);height:2px}
-/* ═══ Task Cards ═══ */
-.pipeline-task-list{display:flex;flex-direction:column;gap:4px;max-height:200px;overflow-y:auto}
-.pipeline-task-card{display:flex;align-items:flex-start;gap:8px;padding:7px 9px;background:rgba(255,255,255,.02);border-radius:6px;border-left:3px solid rgba(255,255,255,.06);font-size:11px;transition:all .3s}
-.pipeline-task-card.running{border-left-color:var(--tc-orange,#ffa500);background:rgba(255,165,0,.05)}
-.pipeline-task-card.done{border-left-color:#4caf50;background:rgba(76,175,80,.04)}
-.pipeline-task-card.failed{border-left-color:#f44336;background:rgba(244,67,54,.04)}
-.pipeline-task-status{width:18px;height:18px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:10px;flex-shrink:0;margin-top:1px}
-.pipeline-task-card.pending .pipeline-task-status{background:rgba(255,255,255,.06);color:var(--text-secondary,#666)}
-.pipeline-task-card.running .pipeline-task-status{background:rgba(255,165,0,.15);color:var(--tc-orange,#ffa500);animation:pulse-ring 1.5s infinite}
-.pipeline-task-card.done .pipeline-task-status{background:rgba(76,175,80,.15);color:#4caf50}
-.pipeline-task-card.failed .pipeline-task-status{background:rgba(244,67,54,.15);color:#f44336}
-.pipeline-task-info{flex:1;min-width:0}
-.pipeline-task-name{color:var(--text-primary,#ccc);margin-bottom:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.pipeline-task-card.running .pipeline-task-name{color:var(--tc-orange,#ffa500)}
-.pipeline-task-files{font-size:10px;color:var(--text-secondary,#666);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.pipeline-summary{margin-top:10px;padding:10px 12px;border-radius:6px;background:rgba(255,255,255,.03);font-size:11px;color:var(--text-primary,#ccc);display:flex;align-items:center;justify-content:space-between}
-.pipeline-summary.success{border:1px solid rgba(76,175,80,.2);background:rgba(76,175,80,.05)}
-.pipeline-summary.failed{border:1px solid rgba(244,67,54,.2);background:rgba(244,67,54,.05)}
-/* ═══ Code Block Folding ═══ */
-.code-block-pre.folded{max-height:200px;overflow:hidden;position:relative}
-.code-block-pre.folded::after{content:'';position:absolute;bottom:0;left:0;right:0;height:40px;background:linear-gradient(transparent,var(--bg-secondary,#1e1e1e))}
-.code-fold-bar{padding:6px 12px;text-align:center;font-size:11px;color:var(--tc-orange,#ffa500);cursor:pointer;border-top:1px solid rgba(255,165,0,.1);background:rgba(255,165,0,.05);transition:all .2s;user-select:none}
-.code-fold-bar:hover{background:rgba(255,165,0,.1);color:#ffb74d}
-.code-block-folded{border:1px solid var(--border-subtle,rgba(255,255,255,.06));border-radius:6px}
-  </style>
 </head>
 <body>
   <div id="app">
@@ -85,7 +26,7 @@
           <span class="activity-label">搜索</span>
         </button>
         <button class="activity-btn" data-view="git" title="Git 版本控制">
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><circle cx="18" cy="6" r="3"/><path d="M6 6v0.17.0M18 6v0.17.0M12 6v0.17.0"/><line x1="6" y1="9" x2="12" y2="15"/><line x1="18" y1="9" x2="12" y2="15"/></svg>
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><circle cx="18" cy="6" r="3"/><path d="M6 6v3M18 6v3M12 6v9"/><line x1="6" y1="9" x2="12" y2="15"/><line x1="18" y1="9" x2="12" y2="15"/></svg>
           <span class="activity-label">Git</span>
         </button>
         <button class="activity-btn" data-view="arch" title="架构分析">
@@ -222,7 +163,7 @@
         <div class="welcome-hero">
           <img src="icons/brand/welcome-illustration.png" alt="虎猫" class="welcome-illustration" />
           <h1 class="welcome-title">虎猫 TCIDE</h1>
-          <p class="welcome-subtitle" id="welcome-subtitle">个人专属 AI 编程 IDE · v0.17.0</p>
+          <p class="welcome-subtitle" id="welcome-subtitle">个人专属 AI 编程 IDE · v1.1.0</p>
         </div>
         <div class="welcome-actions">
           <button id="welcome-open-project" class="welcome-btn primary">📂 打开项目</button>
@@ -345,26 +286,6 @@
         <button class="ai-tab" data-tab="settings">⚙ 设置</button>
       </div>
 
-      <!-- Agent 模式选择器 -->
-      <div id="agent-mode-bar" class="agent-mode-bar">
-        <button class="agent-mode-btn active" data-mode="chat" title="普通对话：一问一答">
-          <span class="mode-dot chat"></span>
-          <span>对话</span>
-        </button>
-        <button class="agent-mode-btn" data-mode="tools" title="工具模式：AI 可读写文件、执行终端命令、Git 操作">
-          <span class="mode-dot tools"></span>
-          <span>工具</span>
-        </button>
-        <button class="agent-mode-btn" data-mode="builder" title="Builder 串行：AI 拆解需求 → 逐步执行 → 自动修复">
-          <span class="mode-dot builder"></span>
-          <span>Builder</span>
-        </button>
-        <button class="agent-mode-btn" data-mode="pipeline" title="全流水线：Builder → 并行 Coder(×4) → Reviewer → Tester">
-          <span class="mode-dot pipeline"></span>
-          <span>Pipeline</span>
-        </button>
-      </div>
-
       <!-- 对话列表视图（切换历史对话时） -->
       <div id="chat-list-view" class="chat-list-view hidden">
         <div class="chat-list-header">
@@ -389,48 +310,11 @@
               <button id="btn-delete-all" class="select-action-btn" style="background:rgba(244,71,71,0.15);border-color:rgba(244,71,71,0.4);">🔥 清空全部</button>
               <button id="btn-clear-select" class="select-action-btn">✕ 取消</button>
             </div>
-            <!-- Agent Pipeline 进度面板 -->
-            <div id="agent-pipeline-panel" class="agent-pipeline-panel hidden">
-              <div class="pipeline-header">
-                <span class="pipeline-title" id="pipeline-title">🚀 任务流水线</span>
-                <div class="pipeline-header-actions">
-                  <span class="pipeline-elapsed" id="pipeline-elapsed"></span>
-                  <button class="pipeline-abort-btn" id="pipeline-abort-btn" title="终止执行">⏹ 终止</button>
-                </div>
-              </div>
-              <div class="pipeline-phases" id="pipeline-phases">
-                <div class="pipeline-phase" data-phase="builder">
-                  <div class="phase-ring"><span class="phase-icon">🧱</span></div>
-                  <span class="phase-name">Builder</span>
-                  <span class="phase-label">拆解需求</span>
-                </div>
-                <div class="pipeline-connector"><div class="connector-line"></div></div>
-                <div class="pipeline-phase" data-phase="coder">
-                  <div class="phase-ring"><span class="phase-icon">🔧</span></div>
-                  <span class="phase-name">Coder</span>
-                  <span class="phase-label">并行开发</span>
-                </div>
-                <div class="pipeline-connector"><div class="connector-line"></div></div>
-                <div class="pipeline-phase" data-phase="reviewer">
-                  <div class="phase-ring"><span class="phase-icon">🔍</span></div>
-                  <span class="phase-name">Reviewer</span>
-                  <span class="phase-label">代码审查</span>
-                </div>
-                <div class="pipeline-connector"><div class="connector-line"></div></div>
-                <div class="pipeline-phase" data-phase="tester">
-                  <div class="phase-ring"><span class="phase-icon">🧪</span></div>
-                  <span class="phase-name">Tester</span>
-                  <span class="phase-label">构建验证</span>
-                </div>
-              </div>
-              <div class="pipeline-task-list" id="pipeline-task-list"></div>
-              <div class="pipeline-summary hidden" id="pipeline-summary"></div>
-            </div>
             <div id="ai-welcome" class="ai-welcome-section">
               <div class="ai-welcome-icon">
                 <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="var(--tc-orange)" stroke-width="1" stroke-linecap="round" stroke-linejoin="round">
                   <path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2Z"/>
-                  <path d="M12 6v0.17.0l4 2"/>
+                  <path d="M12 6v6l4 2"/>
                   <circle cx="8.5" cy="8.5" r="1.5"/>
                   <circle cx="15.5" cy="8.5" r="1.5"/>
                   <path d="M8 13c0 2 2 3 4 3s4-1 4-3"/>
@@ -545,8 +429,6 @@
               <button class="settings-tab active" data-settings-tab="providers">模型服务商</button>
               <button class="settings-tab" data-settings-tab="custom">自定义配置</button>
               <button class="settings-tab" data-settings-tab="changelog">📋 版本记录</button>
-              <button class="settings-tab" data-settings-tab="dream">梦境日志</button>
-              <button class="settings-tab" data-settings-tab="services">⚡ 智能服务</button>
             </div>
             <div id="settings-providers" class="settings-tab-content active">
               <div class="provider-list" id="provider-list">
@@ -689,17 +571,6 @@
                 <div class="changelog-loading">加载中...</div>
               </div>
             </div>
-            <div id="settings-dream" class="settings-tab-content hidden"><div style="padding:12px"><div style="display:flex;align-items:center;gap:12px;margin-bottom:12px"><h4 style="margin:0;color:var(--tc-orange);font-size:13px">梦境引擎</h4><span id="dream-status" style="font-size:10px;padding:2px 8px;border-radius:10px;background:rgba(255,165,0,0.1);color:var(--tc-orange)">待命中</span><button id="btn-dream-trigger" style="margin-left:auto;padding:6px 14px;border:1px solid var(--tc-orange);border-radius:4px;background:rgba(255,165,0,0.05);color:var(--tc-orange);cursor:pointer;font-size:11px">手动做梦</button></div><p style="font-size:11px;color:var(--text-secondary);margin:0 0 12px">梦境引擎在后台分析你的操作模式，凝练专属专家记忆。空闲超过5分钟自动触发。</p><div id="dream-journal-list" style="max-height:400px;overflow-y:auto;display:flex;flex-direction:column;gap:6px"><div style="text-align:center;color:var(--text-secondary);padding:24px;font-size:12px">加载梦境日志中...</div></div><div style="margin-top:12px;border-top:1px solid var(--border-subtle);padding-top:12px"><h4 style="margin:0 0 6px;color:var(--text-primary);font-size:12px">专家记忆卡 (<span id="mem-card-count">0</span>)</h4><div id="dream-memory-cards" style="display:flex;flex-direction:column;gap:4px;max-height:300px;overflow-y:auto"><div style="text-align:center;color:var(--text-secondary);padding:16px;font-size:11px">暂无记忆卡，触发一次做梦生成</div></div></div></div></div>
-<div id="settings-services" class="settings-tab-content hidden">
-              <div style="padding:12px">
-                <h4 style="margin:0 0 8px;color:var(--tc-orange);font-size:13px">⚡ 智能服务管理</h4>
-                <p style="font-size:11px;color:var(--text-secondary);margin:0 0 12px">启用或关闭各智能服务模块。关闭可减少资源消耗。</p>
-                <div id="service-toggles" style="display:flex;flex-direction:column;gap:4px">
-                </div>
-                <button id="btn-services-refresh-all" style="margin-top:12px;padding:6px 12px;border:1px solid var(--tc-orange);border-radius:4px;background:rgba(255,165,0,0.1);color:var(--tc-orange);cursor:pointer;font-size:11px">🔄 重新初始化所有服务</button>
-                <button id="btn-services-gc" style="margin-left:8px;padding:6px 12px;border:1px solid var(--border-subtle);border-radius:4px;background:transparent;color:var(--text-secondary);cursor:pointer;font-size:11px">🗑 手动 GC 回收</button>
-              </div>
-            </div>
           </div>
         </div>
       </div>
@@ -718,8 +589,6 @@
       <button class="gradle-badge" data-gradle="clean">Clean</button>
     </span>
     <span class="status-spacer"></span>
-    <span id="perf-status" class="status-item" title="内存用量"></span>
-    <span id="health-score" class="status-item" title="项目健康度"></span>
     <span id="status-usage" class="status-item status-usage" title="今日 token 用量 / 费用">-- tokens / -- 元</span>
     <span id="status-position" class="status-item">行 1, 列 1</span>
     <span id="status-model" class="status-item">DeepSeek</span>
@@ -874,8 +743,7 @@
 
   <script src="./assets/p0-modules.js"></script>
   <script src="./assets/p1-modules.js"></script>
-  <script src="./assets/p2-modules.js"></script>
-
+  <script src="./assets/p2-modules.js"></script>
 
   <!-- 快捷键编辑器弹窗 -->
   <div id="shortcuts-modal" class="modal-overlay hidden">
@@ -908,6 +776,5 @@
       </div>
     </div>
   </div>
-<script src="./main.js"></script>
 </body>
 </html>

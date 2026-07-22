@@ -13,6 +13,7 @@ import { configManager } from '../core/config/config-manager';
 import { ProjectCompatManager } from '../core/compat/project-compat';
 import { queryDb, runDb, insertUsage, queryUsage } from './db/sqlite';
 import { getStore } from './store';
+const store = getStore();
 import * as zlib from 'zlib';
 import * as path from 'path';
 import { lspManager, LspLanguage } from './lsp-manager';
