@@ -1253,15 +1253,29 @@ ipcMain.handle('ai:send-with-tools', async (event, messages: Array<{ role: strin
   const config = getModelConfig();
   const adapter = createAdapterWithUsage(config);
   adapter.setSystemRules(projectRules);
-  const window = BrowserWindow.fromWebContents(event.sender)!;
-  const MAX_TOOL_ROUNDS = 3;
+  const win = BrowserWindow.fromWebContents(event.sender)!;
+
+  // 自主 Agent 循环：最多 8 轮工具调用（Claude Code 默认是 5-7）
+  const MAX_TOOL_ROUNDS = 8;
+  // 单个工具结果最大 token（~3000 token ≈ 8000 字符代码）
+  const MAX_TOOL_RESULT_CHARS = 8000;
 
   // Add tools to the request
   const tools = listTools().map(t => ({ type: 'function' as const, function: { name: t.name, description: t.description, parameters: t.parameters } }));
 
   let conversation = [...messages];
 
+  // 通知渲染进程：自主循环开始
+  if (!win.isDestroyed()) {
+    win.webContents.send('ai-stream-chunk', JSON.stringify({ type: 'agent_loop_start', maxRounds: MAX_TOOL_ROUNDS }));
+  }
+
   for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
+    // 通知渲染进程当前轮次
+    if (!win.isDestroyed()) {
+      win.webContents.send('ai-stream-chunk', JSON.stringify({ type: 'agent_round', round: round + 1, maxRounds: MAX_TOOL_ROUNDS }));
+    }
+
     // Build request body
     const body = JSON.stringify({
       model: options?.model || config.model || 'deepseek-v4-pro',
@@ -1291,7 +1305,7 @@ ipcMain.handle('ai:send-with-tools', async (event, messages: Array<{ role: strin
     // Check for tool_calls
     if (msg.tool_calls && msg.tool_calls.length > 0) {
       // Add assistant message with tool_calls to conversation
-      conversation.push({ role: 'assistant', content: msg.content, tool_calls: msg.tool_calls });
+      conversation.push({ role: 'assistant', content: msg.content || '', tool_calls: msg.tool_calls });
 
       // Execute each tool call
       for (const tc of msg.tool_calls) {
@@ -1301,17 +1315,36 @@ ipcMain.handle('ai:send-with-tools', async (event, messages: Array<{ role: strin
           arguments: JSON.parse(tc.function.arguments || '{}'),
         };
 
-        // Notify renderer about tool call
-        if (!window.isDestroyed()) {
-          window.webContents.send('ai-stream-chunk', JSON.stringify({ type: 'tool_call', name: toolCall.name, args: toolCall.arguments, id: toolCall.id }));
+        // Notify renderer: tool call start
+        if (!win.isDestroyed()) {
+          win.webContents.send('ai-stream-chunk', JSON.stringify({
+            type: 'tool_call',
+            name: toolCall.name,
+            args: toolCall.arguments,
+            id: toolCall.id,
+            round: round + 1,
+          }));
         }
 
-        // Execute
+        // Execute tool
         const result = await executeTool(toolCall, currentProjectPath || process.cwd());
 
-        // Notify renderer about tool result
-        if (!window.isDestroyed()) {
-          window.webContents.send('ai-stream-chunk', JSON.stringify({ type: 'tool_result', id: toolCall.id, result: result.result.slice(0, 1000), error: result.error }));
+        // Truncate result to avoid token overflow, but keep enough context
+        const truncatedResult = result.result.length > MAX_TOOL_RESULT_CHARS
+          ? result.result.slice(0, MAX_TOOL_RESULT_CHARS) + '\n\n[输出已截断以节省 token，如需查看完整结果请单独调用工具]'
+          : result.result;
+
+        // Notify renderer: tool result
+        if (!win.isDestroyed()) {
+          win.webContents.send('ai-stream-chunk', JSON.stringify({
+            type: 'tool_result',
+            id: toolCall.id,
+            name: toolCall.name,
+            result: truncatedResult,
+            error: result.error,
+            wasTruncated: result.result.length > MAX_TOOL_RESULT_CHARS,
+            round: round + 1,
+          }));
         }
 
         // Add tool result to conversation
@@ -1319,7 +1352,7 @@ ipcMain.handle('ai:send-with-tools', async (event, messages: Array<{ role: strin
           role: 'tool',
           tool_call_id: tc.id,
           name: tc.function.name,
-          content: result.error || result.result,
+          content: result.error || truncatedResult,
         });
       }
 
@@ -1328,15 +1361,22 @@ ipcMain.handle('ai:send-with-tools', async (event, messages: Array<{ role: strin
 
     // Final response (no more tool calls)
     const finalContent = msg.content || '';
-    if (!window.isDestroyed()) {
-      window.webContents.send('ai-stream-chunk', finalContent);
-      window.webContents.send('ai-stream-end', '');
+    if (!win.isDestroyed()) {
+      // 先发送结束信号，再发送内容（渲染进程可区分）
+      win.webContents.send('ai-stream-chunk', JSON.stringify({ type: 'agent_loop_end', rounds: round + 1 }));
+      win.webContents.send('ai-stream-chunk', finalContent);
+      win.webContents.send('ai-stream-end', '');
     }
     return finalContent;
   }
 
   // Max rounds reached
-  throw new Error('AI 工具调用超过最大轮数');
+  const warning = '[⚠️ 工具调用已达到最大轮数（8轮），请检查是否存在循环调用问题]\n';
+  if (!win.isDestroyed()) {
+    win.webContents.send('ai-stream-chunk', warning);
+    win.webContents.send('ai-stream-end', '');
+  }
+  throw new Error('AI 工具调用超过最大轮数（8轮），可能存在循环');
 });
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━

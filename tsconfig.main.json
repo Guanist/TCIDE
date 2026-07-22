@@ -11,7 +11,8 @@
     "forceConsistentCasingInFileNames": true,
     "resolveJsonModule": true,
     "declaration": false,
-    "moduleResolution": "node"
+    "moduleResolution": "node",
+    "noEmitOnError": false
   },
   "include": ["src/main/**/*", "src/core/**/*"],
   "exclude": ["node_modules", "src/renderer"]

@@ -2842,8 +2842,10 @@ async function sendToAI(): Promise<void> {
       userMessage = { role: 'user', content: userContent };
     }
     
-    const messages = [
-      { role: 'system' as const, content: `【绝对规则 - 必须遵守】
+    // ── 构建系统提示词 ──
+    // 工具模式下：adapter.injectSystemRules() 会将 projectRules 注入
+    // 非工具模式：渲染进程内嵌系统提示词
+    const systemPromptIDE = `【绝对规则 - 必须遵守】
 你正在虎猫 TCIDE(本地 IDE)中运行,直接嵌在用户的编辑器中。
 
 ## 你的真实能力
@@ -2868,11 +2870,50 @@ ${state.activeFileIndex >= 0 && state.openFiles[state.activeFileIndex] ? `当前
 • 用户问「左边是什么文件」→ 看上面已打开文件列表,直接回答
 • 用户问「帮我改这个文件」→ 直接给出修改后的完整代码
 • 用户问项目结构 → 描述你知道的上下文
-• 用户说「继续」→ 继续之前的工作` },
+• 用户说「继续」→ 继续之前的工作`;
+
+    // 注入 projectRules（CLAUDE.md）
+    // adapter.injectSystemRules() 会将此内容与 projectRules 合并注入
+    const systemPrompt = projectRules
+      ? `${projectRules}\n\n---\n${systemPromptIDE}`
+      : systemPromptIDE;
+
+    const messages = [
+      { role: 'system' as const, content: systemPrompt },
       ...session.chatHistory.slice(-20).map(m => ({ role: m.role, content: m.content })),
       userMessage as any,
     ];
 
+    // ── 自主 Agent 模式：工具调用循环 ──
+    if (mcpToolsEnabled) {
+      // 标记流式状态（sendToAIWithTools 通过 IPC 事件驱动 UI）
+      state.isStreaming = true;
+      state.currentStreamContent = '';
+      document.getElementById('btn-send')!.classList.add('hidden');
+      document.getElementById('btn-abort')!.classList.remove('hidden');
+      resetAiStats();
+      showTypingIndicator('🧠 自主执行中...');
+
+      try {
+        const result = await window.api.sendToAIWithTools(messages, { model: state.config.model });
+        // sendToAIWithTools 通过 ai-stream-chunk/ai-stream-end 事件驱动 UI
+        // result 已在 ai-stream-end handler 中保存到 chatHistory
+        // 这里不需要额外处理
+      } catch (err: any) {
+        hideTypingIndicator();
+        addChatMessage('assistant', `❌ 工具调用出错: ${err?.message || err}`);
+        stopStreaming();
+      }
+
+      // 首次对话自动命名
+      if (session.name.startsWith('对话 ') && session.chatHistory.filter(m => m.role === 'user').length === 1) {
+        session.name = text.slice(0, 30) + (text.length > 30 ? '...' : '');
+        renderChatList();
+      }
+      return;
+    }
+
+    // ── 普通聊天模式（无自主循环）──
     window.api.sendToAIStream(messages, { model: state.config.model });
     resetAiStats();
     showTypingIndicator('分析中');
@@ -4416,7 +4457,8 @@ function setupEventListeners(): void {
     try {
       const rules = await window.api.getProjectRules(state.projectPath);
       window.api.setProjectRules(rules);
-    } catch (_) { /* 无规则文件,使用内置默认 */ }
+      projectRules = rules || '';
+    } catch (_) { projectRules = ''; }
     // 清除欢迎消息
     const container = document.getElementById('chat-messages')!;
     container.innerHTML = '';
@@ -4444,19 +4486,48 @@ function setupEventListeners(): void {
   // AI 流式响应
   window.api.on('ai-stream-chunk', (_event, chunk) => {
     const text = chunk as string;
-    // 检测工具调用 JSON (来自 ai:send-with-tools)
-    if (text.startsWith('{') && text.includes('"type":"tool_')) {
+    // 检测结构化 JSON 事件 (来自 ai:send-with-tools 自主循环)
+    if (text.startsWith('{')) {
       try {
-        const toolMsg = JSON.parse(text);
-        if (toolMsg.type === 'tool_call') {
-          addToolCallMessage(toolMsg.name, toolMsg.args, toolMsg.id);
-          incrementToolCalls();
-        } else if (toolMsg.type === 'tool_result') {
-          updateToolCallResult(toolMsg.id, toolMsg.result, toolMsg.error);
+        const msg = JSON.parse(text);
+
+        // ── 自主 Agent 循环控制事件 ──
+        if (msg.type === 'agent_loop_start') {
+          agentLoopRound = 0;
+          showTypingIndicator(`🤖 启动自主 Agent（最多 ${msg.maxRounds} 轮）`);
+          return;
         }
-        return;
-      } catch { /* not JSON, regular text */ }
+
+        if (msg.type === 'agent_round') {
+          agentLoopRound = msg.round;
+          showTypingIndicator(`🤖 自主执行中 [${msg.round}/${msg.maxRounds}] …`);
+          return;
+        }
+
+        if (msg.type === 'agent_loop_end') {
+          agentLoopRound = 0;
+          showTypingIndicator('📝 整理最终回复…');
+          return;
+        }
+
+        // ── 工具调用事件 ──
+        if (msg.type === 'tool_call') {
+          addToolCallMessage(msg.name, msg.args, msg.id);
+          incrementToolCalls();
+          // 更新 typing 指示器显示当前工具
+          showTypingIndicator(`🔧 ${msg.name}…`);
+          return;
+        }
+
+        if (msg.type === 'tool_result') {
+          updateToolCallResult(msg.id, msg.result, msg.error);
+          const label = document.getElementById('typing-indicator');
+          if (label) label.textContent = `✅ 工具完成，准备下一轮…`;
+          return;
+        }
+      } catch { /* not JSON, treat as regular text */ }
     }
+
     appendStreamChunk(text);
     // 检测流中的深度思考标记
     if (text.includes('[reasoning]') && !state.currentStreamContent.includes('[reasoning]')) {
@@ -5313,7 +5384,8 @@ async function openProjectDialog(): Promise<void> {
     try {
       const rules = await window.api.getProjectRules(path);
       window.api.setProjectRules(rules);
-    } catch (_) { /* 无规则文件,使用内置默认 */ }
+      projectRules = rules || '';
+    } catch (_) { projectRules = ''; }
 
     // ⏯ 检查断点续做
     try {
@@ -6957,6 +7029,10 @@ document.querySelectorAll('.agent-mode-btn').forEach((btn) => {
 
 // ── MCP 工具切换 ──
 let mcpToolsEnabled = false;
+// 当前项目的 CLAUDE.md 规则内容（由 getProjectRules 填充）
+let projectRules: string = '';
+// 自主 Agent 循环轮次（用于 UI 显示）
+let agentLoopRound = 0;
 const toolsToggle = document.getElementById('btn-tools-toggle');
 if (toolsToggle) {
   toolsToggle.addEventListener('click', () => {
