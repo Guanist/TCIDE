@@ -3651,6 +3651,36 @@ const VERSION_HISTORY: Array<{ version: string; date: string; emoji: string; tit
     ],
     philosophy: '细节决定体验。思考动画让等待可感知,代码折叠让聊天不臃肿。'
   },
+  {
+    version: 'v1.6.1',
+    date: '2026-07-22',
+    emoji: '🐛',
+    title: '安全修复 & 历史问题清理',
+    features: [
+      '🔒 安全修复: contextIsolation=true, nodeIntegration=false',
+      '🐛 中文编码修复: 虎猫 TCIDE 标题不再显示 ???',
+      '📦 版本号对齐: package.json 与 Git tag 一致',
+      '🧹 清理历史技术债: StoreSchema 类型 / CRLF 换行符',
+      '✅ 17/17 自动化 GUI 测试全部通过',
+    ],
+    philosophy: '安全是基石，编码是尊严。每一个细节都不将就。'
+  },
+  {
+    version: 'v1.7.0',
+    date: '2026-07-22',
+    emoji: '🤖',
+    title: '自治 Agent 引擎 + 像素宠物',
+    features: [
+      '🧠 ContextTrimmer: 滑动窗口压缩 + 历史归档 + 去重',
+      '🔄 自主 Agent 循环: AI 自动多轮工具调用 (max 3 rounds)',
+      '📊 Agent 进度追踪: IPC agent_round 事件实时显示',
+      '📄 projectRules 自动注入系统提示词',
+      '🐱 像素宠物: 9 状态 PNG 精灵 + 透明叠加窗 + 拖拽漫步',
+      '🪟 独立宠物窗口: frameless/transparent/alwaysOnTop/穿透点击',
+      '🎨 Macot 吉祥物: 5 种状态(happy/working/thinking/done/sleeping)',
+    ],
+    philosophy: '让 AI 自己多跑一圈，你就少点一下。宠物不是摆设，是在线的陪伴。'
+  },
 ];
 
 function renderChangelog(): void {
