@@ -132,6 +132,7 @@ const api = {
             'task-complete',
             'memory-cleanup',
             'usage:balance-warning',
+            'pet-state-change',
         ];
         if (validChannels.includes(channel)) {
             electron_1.ipcRenderer.on(channel, callback);
@@ -170,5 +171,30 @@ const api = {
     mcpListTools: () => electron_1.ipcRenderer.invoke('mcp:listTools'),
     mcpCallTool: (call, projectPath, extraContext) => electron_1.ipcRenderer.invoke('mcp:callTool', call, projectPath, extraContext),
     sendToAIWithTools: (messages, options) => electron_1.ipcRenderer.invoke('ai:send-with-tools', messages, options),
+    // ── 像素宠物 ──
+    petSetState: (state, label) => electron_1.ipcRenderer.send('pet-set-state', state, label),
+    petHitTest: (x, y) => electron_1.ipcRenderer.invoke('pet-hit-test', x, y),
+    petMove: (dx, dy) => electron_1.ipcRenderer.send('pet-move', dx, dy),
+    petWander: (dx, dy) => electron_1.ipcRenderer.send('pet-wander', dx, dy),
+    getMascotUri: (state) => {
+        // Serve mascot PNGs as file:// data URIs for pet window
+        // Mascot files are in src/renderer/public/icons/brand/
+        // Map state → filename
+        const map = {
+            idle: 'mascot-happy.png',
+            wave: 'mascot-happy.png',
+            run: 'mascot-working.png',
+            failed: 'mascot-sleeping.png',
+            review: 'mascot-thinking.png',
+            jump: 'mascot-done.png',
+            extra1: 'mascot-working.png',
+            extra2: 'mascot-happy.png',
+            extra3: 'mascot-thinking.png',
+        };
+        const file = map[state] || 'mascot-happy.png';
+        // Use IPC to get the data URL from main process
+        // For now return empty string — the main process will serve via ipc
+        return '';
+    },
 };
 electron_1.contextBridge.exposeInMainWorld('api', api);

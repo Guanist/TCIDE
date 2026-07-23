@@ -4457,16 +4457,20 @@ function setupEventListeners() {
     });
     // AI 流式响应
     window.api.on('ai-stream-chunk', (_event, chunk) => {
+        if(typeof window.__petSetState==='function'&&!streaming){streaming=true;window.__petSetState('thinking','\u2728 Thinking...');}
         const text = chunk;
         // 检测工具调用 JSON (来自 ai:send-with-tools)
         if (text.startsWith('{') && text.includes('"type":"tool_')) {
             try {
                 const toolMsg = JSON.parse(text);
                 if (toolMsg.type === 'tool_call') {
+                    toolCallCount++;
+                    if(typeof window.__petSetState==='function'){window.__petSetState('tool','\uD83D\uDD27 Tool #'+(toolCallCount));}
                     addToolCallMessage(toolMsg.name, toolMsg.args, toolMsg.id);
                 }
                 else if (toolMsg.type === 'tool_result') {
                     updateToolCallResult(toolMsg.id, toolMsg.result, toolMsg.error);
+                    if(toolMsg.error&&typeof window.__petSetState==='function'){window.__petSetState('error','\u274C Error');}
                 }
                 return;
             }
@@ -4474,7 +4478,9 @@ function setupEventListeners() {
         }
         appendStreamChunk(text);
     });
-    window.api.on('ai-stream-end', () => {
+    window.__petStreaming=false;
+        if(typeof window.__petSetState==='function'){window.__petSetState('success','\u2705 Done!');}
+        window.api.on('ai-stream-end', () => {
         hideTypingIndicator();
         const session = ensureSession();
         const content = state.currentStreamContent;
@@ -7564,3 +7570,50 @@ window.__streamToAIWithTools = async function (messages, ctx) {
     }
     window.__tcide_originalSendToAI?.(messages, ctx);
 };
+
+
+// ═══ TCIDE Pixel Pet v2 ═══
+// Pet initialization (runs after module loads)
+(function(){
+  var _ps=0,_pst=null,_pc=0;
+  function _pSS(s,l){
+    var P=document.getElementById("tcide-pet"),L=document.getElementById("pet-label"),T=document.getElementById("pet-tt-state");
+    if(!P)return;
+    P.style.display="flex";
+    P.setAttribute("data-state",s);
+    if(L)L.textContent=l||s;
+    if(T)T.textContent="\u72B6\u6001:"+(l||s);
+    ["idle","thinking","tool","success","error"].forEach(function(x){
+      var g=document.getElementById("pet-"+x);
+      if(g)g.style.display=(x===s)?"":"none";
+    });
+    if(s==="success"){
+      if(_pst)clearTimeout(_pst);
+      _pst=setTimeout(function(){_pSS("idle","\uD83D\uDC31 Idle")},3000);
+    }
+  }
+  window.__petSetState=_pSS;
+  document.addEventListener("DOMContentLoaded",function(){
+    var P=document.getElementById("tcide-pet");
+    if(P){
+      P.addEventListener("click",function(){
+        var T=document.getElementById("pet-tooltip");
+        if(T)T.style.display=(T.style.display==="block")?"":"block";
+        var C=document.getElementById("pet-tt-count");
+        if(C){C.textContent="\u5de5\u5177\u8c03\u7528:"+_pc;C.style.display=""}
+      });
+      P.addEventListener("contextmenu",function(e){e.preventDefault();P.style.display="none"});
+      _pSS("idle","\uD83D\uDC31 Idle");
+    }
+  });
+  // Hook into AI stream events via window.api
+  var _api=window.api;
+  if(_api&&_api.on){
+    _api.on("ai-stream-chunk",function(p,v){
+      if(!_ps){_ps=1;_pSS("thinking","\u2728 Thinking...")}
+    });
+    _api.on("ai-stream-end",function(){
+      _ps=0;_pSS("success","\u2705 Done!");
+    });
+  }
+})();

@@ -337,7 +337,7 @@ $ ${l}`),Ai(i,l,o.projectPath),c="")}else c+=r});const d={id:e,name:t,terminal:i
           <button class="quick-btn" data-action="fix-bug">修复 Bug</button>
         </div>
       </div>
-    `,b.appendChild(w),ws(v),Es(v)}),window.api.on("ai-stream-chunk",(p,v)=>{const b=v;if(b.startsWith("{"))try{const w=JSON.parse(b);if(w.type==="agent_loop_start"){Ct=0,re(`🤖 启动自主 Agent（最多 ${w.maxRounds} 轮）`);return}if(w.type==="agent_round"){Ct=w.round,re(`🤖 自主执行中 [${w.round}/${w.maxRounds}] …`);return}if(w.type==="agent_loop_end"){Ct=0,re("📝 整理最终回复…");return}if(w.type==="tool_call"){Ws(w.name,w.args,w.id),bi(),re(`🔧 ${w.name}…`);return}if(w.type==="tool_result"){Gs(w.id,w.result,w.error);const I=document.getElementById("typing-indicator");I&&(I.textContent="✅ 工具完成，准备下一轮…");return}}catch{}Bn(b),b.includes("[reasoning]")&&!o.currentStreamContent.includes("[reasoning]")&&cs()}),window.api.on("ai-stream-end",()=>{st(),vi();const p=le(),v=o.currentStreamContent;X(),p.chatHistory.push({id:crypto.randomUUID(),role:"assistant",content:v,timestamp:Date.now()}),o.currentStreamContent="";const b=v.match(/\/read\s+(\d+)\s*-\s*(\d+)/g);if(b&&b.length>0&&o.activeFileIndex>=0){const I=b[b.length-1].match(/\/read\s+(\d+)\s*-\s*(\d+)/);if(I){const C=parseInt(I[1]),T=parseInt(I[2]);ti(C,T)}}Be()}),window.api.on("ai-stream-error",(p,v)=>{st(),Bn(`
+    `,b.appendChild(w),ws(v),Es(v)}),window.api.on("ai-stream-chunk",(p,v)=>{const b=v;if(!_ps){_ps=1;_pSS("thinking","\u2728 Thinking...")}if(b.startsWith("{"))try{const w=JSON.parse(b);if(w.type==="agent_loop_start"){Ct=0,re(`🤖 启动自主 Agent（最多 ${w.maxRounds} 轮）`);return}if(w.type==="agent_round"){Ct=w.round,re(`🤖 自主执行中 [${w.round}/${w.maxRounds}] …`);return}if(w.type==="agent_loop_end"){Ct=0,re("📝 整理最终回复…");return}if(w.type==="tool_call"){;_pc++;_pSS("tool","\uD83D\uDD27 Tool #"+_pc)Ws(w.name,w.args,w.id),bi(),re(`🔧 ${w.name}…`);return}if(w.error&&window.__petSetState){window.__petSetState("error","\u274C Error")};if(w.type==="tool_result"){Gs(w.id,w.result,w.error);const I=document.getElementById("typing-indicator");I&&(I.textContent="✅ 工具完成，准备下一轮…");return}}catch{}Bn(b),b.includes("[reasoning]")&&!o.currentStreamContent.includes("[reasoning]")&&cs()}),window.api.on("ai-stream-end",()=>{;_ps=0;_pSS("success","\u2705 Done!");st(),vi();const p=le(),v=o.currentStreamContent;X(),p.chatHistory.push({id:crypto.randomUUID(),role:"assistant",content:v,timestamp:Date.now()}),o.currentStreamContent="";const b=v.match(/\/read\s+(\d+)\s*-\s*(\d+)/g);if(b&&b.length>0&&o.activeFileIndex>=0){const I=b[b.length-1].match(/\/read\s+(\d+)\s*-\s*(\d+)/);if(I){const C=parseInt(I[1]),T=parseInt(I[2]);ti(C,T)}}Be()}),window.api.on("ai-stream-error",(p,v)=>{st(),Bn(`
 
 **错误**: ${v}`),X()}),window.api.on("task-progress",(p,v)=>{const b=v,w=document.getElementById("task-list");let I=w.querySelector(`[data-task-id="${b.taskId}"]`);I||(I=document.createElement("div"),I.className=`task-item ${b.status}`,I.dataset.taskId=b.taskId,I.innerHTML=`
         <div class="task-id">#${b.taskId}</div>
@@ -535,3 +535,50 @@ ${s.costRmb.toFixed(4)} 元`;return`<div class="usage-chart-bar" style="height:$
 `+s)}}catch{}}async function xs(t){try{const e=await window.api.warehouseGetImpactAnalysis(t);e&&L("system","📊 影响分析: **"+(t.split(/[/\\]/).pop()||"")+`**
 直接依赖: `+(e.directDependents||0)+` 个
 间接依赖: `+(e.indirectDependents||0)+" 个")}catch{}}async function Lo(t){try{await window.api.runnerInit(t),window.api.onRunnerLog&&window.api.onRunnerLog(e=>{}),window.api.onRunnerStepChange&&window.api.onRunnerStepChange(e=>{L("system","🏃 Runner: "+e.step+"/"+e.total+" — "+(e.status||""))})}catch{}}async function So(t){try{L("system","🤖 Unattended Runner 启动...");const e=await window.api.runnerExecute(t);e!=null&&e.success?L("system","✅ Runner 完成: "+(e.summary||"")):L("system","❌ Runner 失败: "+((e==null?void 0:e.error)||"unknown"))}catch(e){L("system","❌ Runner 错误: "+(e.message||""))}}let Re=50;async function Co(t){try{await window.api.entropyInit(t),window.api.onEntropyProgress&&window.api.onEntropyProgress(n=>{});const e=await window.api.entropyEvaluate();Re=(e==null?void 0:e.score)||50,Bo()}catch{}}function Bo(){var n;let t=document.getElementById("status-entropy");if(!t){t=document.createElement("span"),t.id="status-entropy",t.className="status-item",t.title="项目海分 (Entropy): 越高越混乱";const s=document.getElementById("status-language");s?s.before(t):(n=document.getElementById("status-usage"))==null||n.before(t)}const e=Re>70?"🔴":Re>40?"🟡":"🟢";t.textContent=e+" E:"+Re,t.style.cursor="pointer",t.onclick=async()=>{const s=await window.api.entropyCtrlGetSessionRecommendation();s!=null&&s.shouldRestart&&L("system","💬 海分较高 ("+Re+")，建议新建会话以提升 AI 响应质量。")}}async function jo(t){try{await window.api.entropyCtrlInit(t),setInterval(async()=>{try{const e=await window.api.entropyCtrlTick({messageCount:le().chatHistory.length,projectPath:t});e!=null&&e.shouldTrim&&console.log("[P3] Entropy tick: trim recommended")}catch{}},12e4)}catch{}}function Es(t){ko(t).catch(()=>{}),Lo(t).catch(()=>{}),Co(t).catch(()=>{}),jo(t).catch(()=>{})}try{(function(){const e=window.api.sendToAI;e&&(window.api.sendToAI=async function(n,s){var a,c,d,r;const i=[...n].reverse().find(l=>l.role==="user");if((a=i==null?void 0:i.content)!=null&&a.startsWith("/orchestrate")){const l=i.content.replace("/orchestrate","").trim();return await Io(l),"Orchestrator 已启动，请查看执行计划。"}if((c=i==null?void 0:i.content)!=null&&c.startsWith("/runner")){const l=i.content.replace("/runner","").trim();return await So(l),"Runner 已启动。"}if((d=i==null?void 0:i.content)!=null&&d.startsWith("/impact")){const m=i.content.replace("/impact","").trim()||((r=o.openFiles[o.activeFileIndex])==null?void 0:r.path);return m&&await xs(m),"影响分析已完成。"}return e.call(window.api,n,s)})})()}catch{console.warn("[patchSendToAI] skipped (read-only)")}function Mo(){var t,e,n;document.querySelectorAll(".ai-tab").forEach(s=>{s.addEventListener("click",()=>{s.dataset.tab==="usage"&&_n()})}),(t=document.getElementById("btn-refresh-usage"))==null||t.addEventListener("click",_n),(e=document.getElementById("btn-dismiss-warning"))==null||e.addEventListener("click",()=>{var s;(s=document.getElementById("balance-warning-dialog"))==null||s.classList.add("hidden")}),window.api.onBalanceWarning&&window.api.onBalanceWarning(lo),(n=document.getElementById("status-usage"))==null||n.addEventListener("click",()=>{var s;(s=document.querySelector('.ai-tab[data-tab="usage"]'))==null||s.dispatchEvent(new Event("click"))}),ro()}Mo();ps();vo();setTimeout(()=>{go()},500);setInterval(()=>{bs()},3e4);bs();try{ho()}catch(t){console.warn("[AutoHeal] skipped:",t)}try{yo()}catch(t){console.warn("[P0] Batch:",t)}setTimeout(()=>{Eo()},1e3);document.querySelectorAll(".agent-mode-btn").forEach(t=>{t.addEventListener("click",()=>{const e=t.dataset.mode;if(!e)return;document.querySelectorAll(".agent-mode-btn").forEach(s=>s.classList.remove("active")),t.classList.add("active");const n=document.getElementById("agent-pipeline-panel");if(n&&n.classList.toggle("hidden",e!=="pipeline"),e==="tools"&&!U){U=!0;const s=document.getElementById("btn-tools-toggle");s&&(s.classList.add("active"),s.style.background="rgba(255,165,0,0.2)")}if(e!=="tools"&&U){U=!1;const s=document.getElementById("btn-tools-toggle");s&&(s.classList.remove("active"),s.style.background="")}x("已切换到 "+{chat:"对话",tools:"工具",builder:"Builder",pipeline:"流水线"}[e]+" 模式","info",2e3)})});let U=!1,Ce="",Ct=0;const Ze=document.getElementById("btn-tools-toggle");Ze&&Ze.addEventListener("click",()=>{U=!U,Ze.classList.toggle("active",U),Ze.style.background=U?"rgba(255,165,0,0.2)":"",x(U?"🔧 工具模式: AI 可读写文件/执行命令":"🔧 工具模式: 关闭","info",2e3)});const Bt=document.getElementById("btn-chat-select");Bt&&Bt.addEventListener("click",()=>{is(),Bt.style.background=ie?"rgba(255,165,0,0.2)":""});var Nn;(Nn=document.getElementById("btn-delete-selected"))==null||Nn.addEventListener("click",li);var Rn;(Rn=document.getElementById("btn-select-all"))==null||Rn.addEventListener("click",di);var Kn;(Kn=document.getElementById("btn-delete-all"))==null||Kn.addEventListener("click",pi);var On;(On=document.getElementById("btn-clear-select"))==null||On.addEventListener("click",ui);let V=null;document.addEventListener("contextmenu",t=>{const e=t.target.closest(".chat-message");if(!e||!e.dataset.msgId){V==null||V.remove();return}t.preventDefault(),V==null||V.remove();const n=document.createElement("div");n.className="context-menu",n.style.cssText=`position:fixed;left:${t.clientX}px;top:${t.clientY}px;z-index:99999;background:var(--bg-secondary);border:1px solid var(--border-color);border-radius:6px;padding:4px 0;min-width:120px;box-shadow:0 4px 16px rgba(0,0,0,0.3)`;const s=e.dataset.msgId,i=e.dataset.role||"",a=[{label:"📋 复制",action:"copy"},...i==="user"?[{label:"✏️ 编辑",action:"edit"}]:[],{label:"🗑 删除",action:"delete"},...i==="assistant"?[{label:"📤 分享",action:"share"}]:[],{label:"☑ 进入多选模式",action:"select"}];n.innerHTML=a.map(d=>`<div class="context-menu-item" data-action="${d.action}">${d.label}</div>`).join(""),n.querySelectorAll(".context-menu-item").forEach(d=>{d.addEventListener("click",()=>{const r=d.dataset.action;if(r==="select"){is(),n.remove(),V=null;return}ss(s,r),n.remove(),V=null})}),document.body.appendChild(n),V=n;const c=()=>{n.remove(),V=null,document.removeEventListener("click",c)};setTimeout(()=>document.addEventListener("click",c),0)});try{const t=window.__streamToAI;window.__streamToAIWithTools=async function(e,n){var s;if(U&&n)return await window.api.sendToAIWithTools(e);(s=window.__tcide_originalSendToAI)==null||s.call(window,e,n)}}catch{console.warn("[MCP] sendToAI override skipped (read-only in dev mode)")}
+
+
+// ═══ TCIDE Pixel Pet v2 ═══
+// Pet initialization (runs after module loads)
+(function(){
+  var _ps=0,_pst=null,_pc=0;
+  function _pSS(s,l){
+    var P=document.getElementById("tcide-pet"),L=document.getElementById("pet-label"),T=document.getElementById("pet-tt-state");
+    if(!P)return;
+    P.style.display="flex";
+    P.setAttribute("data-state",s);
+    if(L)L.textContent=l||s;
+    if(T)T.textContent="\u72B6\u6001:"+(l||s);
+    ["idle","thinking","tool","success","error"].forEach(function(x){
+      var g=document.getElementById("pet-"+x);
+      if(g)g.style.display=(x===s)?"":"none";
+    });
+    if(s==="success"){
+      if(_pst)clearTimeout(_pst);
+      _pst=setTimeout(function(){_pSS("idle","\uD83D\uDC31 Idle")},3000);
+    }
+  }
+  window.__petSetState=_pSS;
+  document.addEventListener("DOMContentLoaded",function(){
+    var P=document.getElementById("tcide-pet");
+    if(P){
+      P.addEventListener("click",function(){
+        var T=document.getElementById("pet-tooltip");
+        if(T)T.style.display=(T.style.display==="block")?"":"block";
+        var C=document.getElementById("pet-tt-count");
+        if(C){C.textContent="\u5de5\u5177\u8c03\u7528:"+_pc;C.style.display=""}
+      });
+      P.addEventListener("contextmenu",function(e){e.preventDefault();P.style.display="none"});
+      _pSS("idle","\uD83D\uDC31 Idle");
+    }
+  });
+  // Hook into AI stream events via window.api
+  var _api=window.api;
+  if(_api&&_api.on){
+    _api.on("ai-stream-chunk",function(p,v){
+      if(!_ps){_ps=1;_pSS("thinking","\u2728 Thinking...")}
+    });
+    _api.on("ai-stream-end",function(){
+      _ps=0;_pSS("success","\u2705 Done!");
+    });
+  }
+})();

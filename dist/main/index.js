@@ -254,6 +254,113 @@ function registerGlobalShortcuts() {
         }
     });
 }
+// ============ Pet Window ============
+let petWindow = null;
+function syncPetPosition() {
+    if (!mainWindow || !petWindow || petWindow.isDestroyed())
+        return;
+    const mb = mainWindow.getBounds();
+    if (!mb)
+        return;
+    petWindow.setPosition(Math.round(mb.x + mb.width - 384 - 20), Math.round(mb.y + mb.height - 416 - 50), false);
+}
+function createPetWindow() {
+    console.log('[Pet] createPetWindow called');
+    try {
+        if (!mainWindow) {
+            console.log('[Pet] no mainWindow, abort');
+            return;
+        }
+        const { screen } = require('electron');
+        const disp = screen.getPrimaryDisplay().workAreaSize;
+        const petW = 192, petH = 208;
+        let x = disp.width - petW - 40;
+        let y = disp.height - petH - 40;
+        const mb = mainWindow.getBounds();
+        if (mb && mb.width > 100 && mb.height > 100) {
+            x = mb.x + mb.width - petW - 20;
+            y = mb.y + mb.height - petH - 50;
+        }
+        x = Math.max(0, Math.min(x, disp.width - petW));
+        y = Math.max(0, Math.min(y, disp.height - petH));
+        petWindow = new electron_1.BrowserWindow({
+            width: petW, height: petH,
+            x: Math.round(x), y: Math.round(y),
+            transparent: true, frame: false,
+            alwaysOnTop: true, skipTaskbar: true,
+            hasShadow: false, resizable: false,
+            focusable: true,
+            webPreferences: {
+                preload: path.join(__dirname, 'preload.js'),
+                contextIsolation: true,
+                nodeIntegration: false,
+                sandbox: false,
+            },
+        });
+        petWindow.webContents.on('console-message', (_e, _level, message) => {
+            console.log('[PetWindow]', message);
+        });
+        petWindow.webContents.on('crashed', (_e, killed) => {
+            console.log('[Pet] renderer crashed, killed=' + killed);
+        });
+        petWindow.webContents.on('unresponsive', () => {
+            console.log('[Pet] renderer unresponsive');
+        });
+        if (isDev) {
+            petWindow.loadURL('http://localhost:5173/pet-window.html');
+        }
+        else {
+            petWindow.loadFile(path.join(__dirname, '..', 'renderer', 'pet-window.html'));
+        }
+        mainWindow.on('focus', () => { if (petWindow && !petWindow.isDestroyed())
+            petWindow.show(); });
+        mainWindow.on('minimize', () => { if (petWindow && !petWindow.isDestroyed())
+            petWindow.hide(); });
+        mainWindow.on('restore', () => { if (petWindow && !petWindow.isDestroyed()) {
+            petWindow.show();
+            syncPetPosition();
+        } });
+        mainWindow.on('close', () => { if (petWindow && !petWindow.isDestroyed())
+            petWindow.close(); });
+        petWindow.webContents.on('dom-ready', () => {
+            console.log('[Pet] dom-ready');
+            syncPetPosition();
+        });
+        electron_1.ipcMain.on('pet-set-state', (_e, state, label) => {
+            if (petWindow && !petWindow.isDestroyed()) {
+                petWindow.webContents.send('pet-state-change', state, label);
+            }
+        });
+        electron_1.ipcMain.on('pet-move', (_e, dx, dy) => {
+            if (petWindow && !petWindow.isDestroyed()) {
+                const [cx, cy] = petWindow.getPosition();
+                const nw = Math.max(0, Math.min(cx + dx, disp.width - petW));
+                const nh = Math.max(0, Math.min(cy + dy, disp.height - petH));
+                petWindow.setPosition(Math.round(nw), Math.round(nh), false);
+            }
+        });
+        electron_1.ipcMain.on('pet-wander', (_e, dx, dy) => {
+            if (petWindow && !petWindow.isDestroyed()) {
+                const [cx, cy] = petWindow.getPosition();
+                const nw = Math.max(0, Math.min(cx + dx, disp.width - petW));
+                const nh = Math.max(0, Math.min(cy + dy, disp.height - petH));
+                petWindow.setPosition(Math.round(nw), Math.round(nh), false);
+            }
+        });
+        electron_1.ipcMain.handle('pet-hit-test', (_e, x, y) => {
+            if (petWindow && !petWindow.isDestroyed()) {
+                const [wx, wy] = petWindow.getPosition();
+                return x >= wx && x <= wx + petW && y >= wy && y <= wy + petH;
+            }
+            return false;
+        });
+        console.log('[Main] Pet window created OK');
+    }
+    catch (err) {
+        console.log('[Pet] createPetWindow error: ' + err.message);
+    }
+}
+// ============ Pet Window End ============
 function scheduleMemoryCleanup() {
     setInterval(() => {
         if (mainWindow && !mainWindow.isDestroyed()) {
@@ -339,6 +446,8 @@ electron_1.app.whenReady().then(async () => {
     registerGlobalShortcuts();
     dlog('[Main] STEP: scheduleMemoryCleanup');
     scheduleMemoryCleanup();
+    dlog('[Main] STEP: createPetWindow');
+    createPetWindow();
     electron_1.app.on('activate', () => {
         if (electron_1.BrowserWindow.getAllWindows().length === 0)
             createWindow();

@@ -418,6 +418,8 @@ app.whenReady().then(async () => {
   registerGlobalShortcuts();
   dlog('[Main] STEP: scheduleMemoryCleanup');
   scheduleMemoryCleanup();
+  dlog('[Main] STEP: createPetWindow');
+  createPetWindow();
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
