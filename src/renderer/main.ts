@@ -8,6 +8,7 @@ import { FitAddon } from 'xterm-addon-fit';
 import 'xterm/css/xterm.css';
 import { getLspClient, lspDidOpen, lspDidChange, lspDidClose, stopAllLspClients, getAllDiagnostics } from './lsp-client';
 import { initSnippets, registerSnippets, listSnippets } from './snippet-service';
+import { initPixelPet, petToolCallStart, petToolCallEnd } from './pet';
 import { DebugPanel } from './debug-panel';
 
 // ── 轻量 Emmet 解析器 (内联, 避免外部依赖) ──
@@ -4514,6 +4515,7 @@ function setupEventListeners(): void {
         if (msg.type === 'tool_call') {
           addToolCallMessage(msg.name, msg.args, msg.id);
           incrementToolCalls();
+          petToolCallStart(msg.name);
           // 更新 typing 指示器显示当前工具
           showTypingIndicator(`🔧 ${msg.name}…`);
           return;
@@ -4521,6 +4523,7 @@ function setupEventListeners(): void {
 
         if (msg.type === 'tool_result') {
           updateToolCallResult(msg.id, msg.result, msg.error);
+          petToolCallEnd(!msg.error);
           const label = document.getElementById('typing-indicator');
           if (label) label.textContent = `✅ 工具完成，准备下一轮…`;
           return;
@@ -5352,6 +5355,9 @@ function setupEventListeners(): void {
   document.getElementById('btn-clear-output')?.addEventListener('click', () => {
     document.getElementById('output-content')!.textContent = '';
   });
+
+  // ── 像素宠物 ──
+  initPixelPet();
 
 }
 
