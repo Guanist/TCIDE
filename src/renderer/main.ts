@@ -3681,6 +3681,19 @@ const VERSION_HISTORY: Array<{ version: string; date: string; emoji: string; tit
     ],
     philosophy: '让 AI 自己多跑一圈，你就少点一下。宠物不是摆设，是在线的陪伴。'
   },
+  {
+    version: 'v1.7.1',
+    date: '2026-07-24',
+    emoji: '🐱',
+    title: '像素宠物修复 + 版本对齐',
+    features: [
+      '🐾 修正宠物窗口未在运行时创建的缺陷 (初始化链补齐 createPetWindow 调用)',
+      '🎨 像素宠物精灵重绘: 完整 9 状态身体猫替换原脸部特写素材',
+      '📐 窗口 192x208 原尺寸 1:1 不放大, 像素级对齐',
+      '🔧 补齐 v1.6.1 / v1.7.0 版本记录条目',
+    ],
+    philosophy: '显示的每个像素都有出处, 每一个版本号都对得上。'
+  },
 ];
 
 function renderChangelog(): void {
