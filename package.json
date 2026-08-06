@@ -1,8 +1,8 @@
 {
   "name": "tcide",
   "productName": "虎猫 TCIDE",
-  "version": "1.7.1",
-  "versionName": "v1.7.0 — Autonomous Agent Engine",
+  "version": "1.7.2",
+  "versionName": "v1.7.2 — 修复模型连接与全局脚本缺失",
   "description": "虎猫 TCIDE — 个人专属 AI 编程 IDE",
   "main": "dist/main/index.js",
   "author": "虎猫团队",

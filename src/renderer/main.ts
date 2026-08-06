@@ -3694,6 +3694,19 @@ const VERSION_HISTORY: Array<{ version: string; date: string; emoji: string; tit
     ],
     philosophy: '显示的每个像素都有出处, 每一个版本号都对得上。'
   },
+  {
+    version: 'v1.7.2',
+    date: '2026-08-06',
+    emoji: '🔌',
+    title: '修复模型连接与全局脚本缺失',
+    features: [
+      '🔧 恢复 p0/p1/p2-modules.js 全局脚本 (index.html 引用但产物中丢失)',
+      '🪄 补齐 $id / showToast / 各 __tcide_* 全局辅助, 修复设置/模型面板 ReferenceError',
+      '✅ 模型连接测试 (testModelConnection) 恢复正常',
+      '🧩 p2-modules.js 重建兼容桩, 承接 acceptDiff/closeDiffModal 桥接',
+    ],
+    philosophy: '少一个全局函数, 整个面板就点不动。细节决定能不能连上。'
+  },
 ];
 
 function renderChangelog(): void {
