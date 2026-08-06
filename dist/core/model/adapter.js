@@ -197,7 +197,7 @@ class ModelAdapter {
                     if (json.usage)
                         lastUsage = json.usage;
                 }
-                catch { /* skip */ }
+                catch { /* skip malformed SSE line */ }
             }
         }
         if (lastUsage) {
@@ -365,7 +365,7 @@ class ModelAdapter {
                         onChunk?.(content);
                     }
                 }
-                catch { /* skip */ }
+                catch { /* skip malformed SSE line */ }
             }
         }
         return fullContent;
@@ -408,14 +408,14 @@ class ModelAdapter {
             const { ipcRenderer } = require('electron');
             ipcRenderer.send('record-usage', rec);
         }
-        catch { /* main process — no ipcRenderer */ }
+        catch { /* running in main process, no ipcRenderer */ }
     }
     emitBalanceWarning(detail) {
         try {
             const { ipcRenderer } = require('electron');
             ipcRenderer.send('show-balance-warning', detail);
         }
-        catch { /* main process */ }
+        catch { /* running in main process, no ipcRenderer */ }
     }
     // ─────────────────────────────────────────
     // 测试连接

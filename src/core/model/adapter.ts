@@ -258,7 +258,7 @@ export class ModelAdapter {
           const content = json.choices?.[0]?.delta?.content;
           if (content) { fullContent += content; onChunk?.(content); }
           if (json.usage) lastUsage = json.usage;
-        } catch { /* skip */ }
+        } catch { /* skip malformed SSE line */ }
       }
     }
 
@@ -443,7 +443,7 @@ export class ModelAdapter {
           const json = JSON.parse(line);
           const content = json.message?.content;
           if (content) { fullContent += content; onChunk?.(content); }
-        } catch { /* skip */ }
+        } catch { /* skip malformed SSE line */ }
       }
     }
     return fullContent;
@@ -483,14 +483,14 @@ export class ModelAdapter {
     try {
       const { ipcRenderer } = require('electron');
       ipcRenderer.send('record-usage', rec);
-    } catch { /* main process — no ipcRenderer */ }
+    } catch { /* running in main process, no ipcRenderer */ }
   }
 
   private emitBalanceWarning(detail: string): void {
     try {
       const { ipcRenderer } = require('electron');
       ipcRenderer.send('show-balance-warning', detail);
-    } catch { /* main process */ }
+    } catch { /* running in main process, no ipcRenderer */ }
   }
 
   // ─────────────────────────────────────────

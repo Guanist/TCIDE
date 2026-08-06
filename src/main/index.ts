@@ -271,7 +271,8 @@ function createPetWindow(): void {
       transparent: true, frame: false,
       alwaysOnTop: true, skipTaskbar: true,
       hasShadow: false, resizable: false,
-      focusable: true,
+      focusable: false,
+      type: 'toolbar',
       webPreferences: {
         preload: path.join(__dirname, 'preload.js'),
         contextIsolation: true,

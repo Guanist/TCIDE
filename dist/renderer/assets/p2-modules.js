@@ -1,4 +1,4 @@
-/*  TCIDE P2 功能前端逻辑 (重建桩)
+﻿/*  TCIDE P2 功能前端逻辑 (重建桩)
    文件名：dist/renderer/assets/p2-modules.js
    由 index.html 通过 <script src=...> 加载
 

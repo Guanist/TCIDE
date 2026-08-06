@@ -2686,6 +2686,15 @@ function renderChatHistory(): void {
   }
 }
 
+function switchToSettingsTab(): void {
+  document.querySelectorAll('.ai-tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.ai-tab-content').forEach(t => t.classList.add('hidden'));
+  const settingsTab = document.querySelector('.ai-tab[data-tab="settings"]') as HTMLElement;
+  if (settingsTab) settingsTab.classList.add('active');
+  document.getElementById('tab-settings')?.classList.remove('hidden');
+  loadConfig();
+}
+
 async function sendToAI(): Promise<void> {
   const input = document.getElementById('chat-input') as HTMLTextAreaElement;
   const text = input.value.trim();
@@ -4076,23 +4085,6 @@ function showConfigStatus(msg: string, type: string): void {
   el.className = `cfg-status show ${type}`;
   clearTimeout((showConfigStatus as any).timer);
   (showConfigStatus as any).timer = setTimeout(() => { el.className = 'cfg-status'; }, 5000);
-}
-
-function switchToSettingsTab(): void {
-  document.querySelectorAll('.ai-tab').forEach(t => t.classList.remove('active'));
-  document.querySelectorAll('.ai-tab-content').forEach(t => t.classList.add('hidden'));
-  const settingsTab = document.querySelector('.ai-tab[data-tab="settings"]') as HTMLElement;
-  if (settingsTab) settingsTab.classList.add('active');
-  document.getElementById('tab-settings')?.classList.remove('hidden');
-  loadConfig();
-}
-
-function switchToChatTab(): void {
-  document.querySelectorAll('.ai-tab').forEach(t => t.classList.remove('active'));
-  document.querySelectorAll('.ai-tab-content').forEach(t => t.classList.add('hidden'));
-  const chatTab = document.querySelector('.ai-tab[data-tab="chat"]') as HTMLElement;
-  if (chatTab) chatTab.classList.add('active');
-  document.getElementById('tab-chat')?.classList.remove('hidden');
 }
 
 // 初始化设置面板事件

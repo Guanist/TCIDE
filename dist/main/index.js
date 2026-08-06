@@ -273,7 +273,7 @@ function createPetWindow() {
         }
         const { screen } = require('electron');
         const disp = screen.getPrimaryDisplay().workAreaSize;
-        const petW = 192, petH = 208;
+        const petW = 384, petH = 416;
         let x = disp.width - petW - 40;
         let y = disp.height - petH - 40;
         const mb = mainWindow.getBounds();
@@ -289,7 +289,8 @@ function createPetWindow() {
             transparent: true, frame: false,
             alwaysOnTop: true, skipTaskbar: true,
             hasShadow: false, resizable: false,
-            focusable: true,
+            focusable: false,
+            type: 'toolbar',
             webPreferences: {
                 preload: path.join(__dirname, 'preload.js'),
                 contextIsolation: true,

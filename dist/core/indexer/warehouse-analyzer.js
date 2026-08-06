@@ -1,22 +1,5 @@
 "use strict";
-var __importStar = (this && this.__importStar) || (function () {
-    var ownKeys = function(o) {
-        ownKeys = Object.getOwnPropertyNames || function (o) {
-            var ar = [];
-            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
-            return ar;
-        };
-        return ownKeys(o);
-    };
-    return function (mod) {
-        if (mod && mod.__esModule) return mod;
-        var result = {};
-        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") result[k[i]] = mod[k];
-        return result;
-    };
-})();
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.WarehouseAnalyzer = exports.warehouseAnalyzer = void 0;
+// @ts-nocheck — auto-converted from dist JS, strict types pending
 /**
  * TCIDE Warehouse Analyzer — P2 全仓库语义解析
  *
@@ -33,7 +16,6 @@ exports.WarehouseAnalyzer = exports.warehouseAnalyzer = void 0;
 const fs = require("fs");
 const path = require("path");
 const crypto = require("crypto");
-
 class WarehouseAnalyzer {
     constructor() {
         this.projectRoot = null;
@@ -45,11 +27,9 @@ class WarehouseAnalyzer {
         this.hotspots = [];
         this.onProgress = null;
     }
-
     init(projectRoot) {
         this.projectRoot = projectRoot;
     }
-
     /**
      * 全量分析
      * @returns {Promise<{callGraph, dataFlow, dependencyNetwork, typeChains, clones, hotspots, stats}>}
@@ -58,7 +38,6 @@ class WarehouseAnalyzer {
         this.onProgress = onProgress;
         const files = this._collectSourceFiles();
         const total = files.length;
-
         // Reset state
         this.graph = { nodes: new Map(), edges: [] };
         this.dataFlow = { variables: new Map(), flows: [] };
@@ -66,20 +45,17 @@ class WarehouseAnalyzer {
         this.typeChains = [];
         this.clones = [];
         this.hotspots = [];
-
         const allSymbols = [];
         const fileContents = new Map();
-
         // Pass 1: Extract symbols & imports from all files
         for (let i = 0; i < files.length; i++) {
             const file = files[i];
             const relPath = path.relative(this.projectRoot, file);
             const content = this._readFile(file);
-            if (!content) continue;
-
+            if (!content)
+                continue;
             fileContents.set(relPath, { content, language: this._detectLang(file) });
             const symbols = this._extractSymbols(content, relPath);
-
             // Add to call graph nodes
             for (const sym of symbols) {
                 const nodeId = `${relPath}:${sym.name}`;
@@ -89,7 +65,6 @@ class WarehouseAnalyzer {
                     calls: [],
                     calledBy: [],
                 });
-
                 // Extract calls within this symbol
                 const body = sym.body || '';
                 const calls = this._extractCalls(body, relPath);
@@ -104,28 +79,20 @@ class WarehouseAnalyzer {
                     }
                 }
             }
-
             allSymbols.push(...symbols);
             this.onProgress?.({ phase: 'pass1', progress: i / total, file: relPath });
         }
-
         // Pass 2: Cross-file call resolution
         this._resolveCrossFileCalls(allSymbols);
-
         // Pass 3: Dependency network
         this._buildDependencyNetwork(fileContents);
-
         // Pass 4: Type chains (interfaces → implementations)
         this._buildTypeChains(allSymbols);
-
         // Pass 5: Clone detection
         this._detectClones(fileContents);
-
         // Pass 6: Hotspot analysis (complexity + change frequency)
         this._analyzeHotspots(allSymbols);
-
         this.onProgress?.({ phase: 'done', progress: 1 });
-
         return {
             callGraph: {
                 nodes: [...this.graph.nodes.values()],
@@ -143,7 +110,6 @@ class WarehouseAnalyzer {
             stats: { files: files.length, symbols: allSymbols.length, clones: this.clones.length }
         };
     }
-
     /**
      * 查询符号的调用链
      * @param {string} symbolName
@@ -153,27 +119,23 @@ class WarehouseAnalyzer {
     getCallChain(symbolName, filePath, direction = 'both') {
         const nodeId = `${filePath}:${symbolName}`;
         const node = this.graph.nodes.get(nodeId);
-        if (!node) return [];
-
+        if (!node)
+            return [];
         const chains = [];
-
         // Downstream: who does this call?
         if (direction === 'downstream' || direction === 'both') {
             const visited = new Set();
             const paths = this._dfsCalls(nodeId, 'downstream', visited, [], 5);
             chains.push(...paths.map(p => ({ direction: 'downstream', path: p, depth: p.length })));
         }
-
         // Upstream: who calls this?
         if (direction === 'upstream' || direction === 'both') {
             const visited = new Set();
             const paths = this._dfsCalls(nodeId, 'upstream', visited, [], 5);
             chains.push(...paths.map(p => ({ direction: 'upstream', path: p, depth: p.length })));
         }
-
         return chains;
     }
-
     /**
      * 影响分析 — 修改某文件会影响哪些模块？
      */
@@ -184,37 +146,35 @@ class WarehouseAnalyzer {
             indirectDependents: [],
             rippledByCallGraph: [],
         };
-
         // Direct dependents
         for (const edge of this.dependencyNetwork.edges) {
-            if (edge.to === relPath) impacted.directDependents.push(edge.from);
+            if (edge.to === relPath)
+                impacted.directDependents.push(edge.from);
         }
-
         // Indirect (BFS up to 3 hops)
         const visited = new Set([relPath]);
         const queue = impacted.directDependents.map(d => [d, 1]);
         while (queue.length) {
             const [file, depth] = queue.shift();
-            if (visited.has(file) || depth > 3) continue;
+            if (visited.has(file) || depth > 3)
+                continue;
             visited.add(file);
-            if (depth > 1) impacted.indirectDependents.push(file);
+            if (depth > 1)
+                impacted.indirectDependents.push(file);
             for (const edge of this.dependencyNetwork.edges) {
                 if (edge.to === file && !visited.has(edge.from)) {
                     queue.push([edge.from, depth + 1]);
                 }
             }
         }
-
         return impacted;
     }
-
     /**
      * 代码相似度搜索 (给重构做参考)
      */
     findSimilarCode(snippet, minScore = 0.5) {
         const snippetHash = this._hashContent(snippet);
         const results = [];
-
         // Compare with known clone groups
         for (const clone of this.clones) {
             const sim = this._similarity(snippet, clone.snippet);
@@ -222,49 +182,53 @@ class WarehouseAnalyzer {
                 results.push({ file: clone.file, line: clone.line, similarity: sim, snippet: clone.snippet.slice(0, 200) });
             }
         }
-
         return results.sort((a, b) => b.similarity - a.similarity).slice(0, 10);
     }
-
     // ── Private: File collection ──
     _collectSourceFiles() {
         const SKIP = new Set(['node_modules', '.git', 'dist', 'build', '.next', '__pycache__', 'venv', '.venv', 'target', 'out', '.idea', '.vscode']);
         const EXTS = new Set(['.js', '.jsx', '.ts', '.tsx', '.mjs', '.cjs', '.py', '.pyw', '.go', '.rs', '.java', '.kt', '.kts', '.c', '.cpp', '.h', '.hpp', '.vue']);
         const files = [];
         const walk = (dir, depth) => {
-            if (depth > 10 || files.length > 5000) return;
+            if (depth > 10 || files.length > 5000)
+                return;
             try {
                 for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
-                    if (entry.name.startsWith('.') && entry.name !== '.env') continue;
-                    if (SKIP.has(entry.name)) continue;
+                    if (entry.name.startsWith('.') && entry.name !== '.env')
+                        continue;
+                    if (SKIP.has(entry.name))
+                        continue;
                     const full = path.join(dir, entry.name);
-                    if (entry.isDirectory()) walk(full, depth + 1);
+                    if (entry.isDirectory())
+                        walk(full, depth + 1);
                     else if (EXTS.has(path.extname(entry.name).toLowerCase()) && fs.statSync(full).size < 2 * 1024 * 1024) {
                         files.push(full);
                     }
                 }
-            } catch {}
+            }
+            catch { }
         };
         walk(this.projectRoot, 0);
         return files;
     }
-
     _readFile(filePath) {
-        try { return fs.readFileSync(filePath, 'utf-8'); } catch { return null; }
+        try {
+            return fs.readFileSync(filePath, 'utf-8');
+        }
+        catch {
+            return null;
+        }
     }
-
     _detectLang(filePath) {
         const ext = path.extname(filePath).toLowerCase();
         const map = { '.js': 'js', '.jsx': 'js', '.ts': 'ts', '.tsx': 'ts', '.py': 'py', '.go': 'go', '.java': 'java', '.kt': 'kt', '.rs': 'rs' };
         return map[ext] || 'unknown';
     }
-
     // ── Private: Symbol extraction ──
     _extractSymbols(content, filePath) {
         const lang = this._detectLang(filePath);
         const symbols = [];
         const lines = content.split('\n');
-
         const patterns = this._getSymbolPatterns(lang);
         for (let i = 0; i < lines.length; i++) {
             const line = lines[i].trim();
@@ -272,21 +236,23 @@ class WarehouseAnalyzer {
                 const m = line.match(re);
                 if (m) {
                     const name = m[1] || m[2];
-                    if (!name || name.length < 2 || name.length > 80) continue;
-
+                    if (!name || name.length < 2 || name.length > 80)
+                        continue;
                     // Extract function body for call analysis
                     let body = '';
                     if (bodyEnd && lines[i].includes('{')) {
                         let depth = 1;
                         for (let j = i + 1; j < Math.min(lines.length, i + 200); j++) {
                             const l = lines[j];
-                            if (l.includes('{')) depth++;
-                            if (l.includes('}')) depth--;
+                            if (l.includes('{'))
+                                depth++;
+                            if (l.includes('}'))
+                                depth--;
                             body += l + '\n';
-                            if (depth === 0) break;
+                            if (depth === 0)
+                                break;
                         }
                     }
-
                     symbols.push({
                         name, kind, filePath,
                         line: i + 1,
@@ -298,10 +264,8 @@ class WarehouseAnalyzer {
                 }
             }
         }
-
         return symbols;
     }
-
     _getSymbolPatterns(lang) {
         switch (lang) {
             case 'js':
@@ -333,7 +297,6 @@ class WarehouseAnalyzer {
                 ];
         }
     }
-
     // ── Private: Call extraction ──
     _extractCalls(body, filePath) {
         const calls = [];
@@ -341,25 +304,25 @@ class WarehouseAnalyzer {
         let match;
         while ((match = callRe.exec(body)) !== null) {
             const name = match[1];
-            if (['if','for','while','switch','return','throw','new','const','let','var','function','class','import','typeof','instanceof','catch','finally','async','await','export','default','require'].includes(name)) continue;
-            if (name.length < 2 || name.length > 50) continue;
+            if (['if', 'for', 'while', 'switch', 'return', 'throw', 'new', 'const', 'let', 'var', 'function', 'class', 'import', 'typeof', 'instanceof', 'catch', 'finally', 'async', 'await', 'export', 'default', 'require'].includes(name))
+                continue;
+            if (name.length < 2 || name.length > 50)
+                continue;
             calls.push({ name, line: this._lineNumberOf(body, match.index) });
         }
         return calls;
     }
-
     _lineNumberOf(text, index) {
         return (text.slice(0, index).match(/\n/g) || []).length + 1;
     }
-
     // ── Private: Cross-file resolution ──
     _resolveCrossFileCalls(allSymbols) {
         const symbolMap = new Map(); // name → [{ nodeId, file }]
         for (const sym of allSymbols) {
-            if (!symbolMap.has(sym.name)) symbolMap.set(sym.name, []);
+            if (!symbolMap.has(sym.name))
+                symbolMap.set(sym.name, []);
             symbolMap.get(sym.name).push({ nodeId: `${sym.filePath}:${sym.name}`, file: sym.filePath });
         }
-
         // For each edge, try to resolve to cross-file targets
         for (const edge of this.graph.edges) {
             const [fromFile] = edge.from.split(':');
@@ -370,7 +333,6 @@ class WarehouseAnalyzer {
                 edge.crossFile = true;
             }
         }
-
         // Populate calledBy
         for (const edge of this.graph.edges) {
             const target = this.graph.nodes.get(edge.to);
@@ -382,12 +344,10 @@ class WarehouseAnalyzer {
             }
         }
     }
-
     // ── Private: Dependency network ──
     _buildDependencyNetwork(fileContents) {
         const nodes = new Set();
         const edges = [];
-
         for (const [relPath, { content, language }] of fileContents) {
             nodes.add(relPath);
             const imports = this._extractImports(content, language);
@@ -398,13 +358,11 @@ class WarehouseAnalyzer {
                 }
             }
         }
-
         this.dependencyNetwork = {
             nodes: [...nodes].map(n => ({ path: n, name: path.basename(n) })),
             edges,
         };
     }
-
     _extractImports(content, language) {
         const imports = [];
         switch (language) {
@@ -437,7 +395,6 @@ class WarehouseAnalyzer {
         }
         return imports;
     }
-
     _resolveImport(fromFile, imp) {
         // Relative imports
         if (imp.source.startsWith('.') || imp.source.startsWith('/')) {
@@ -445,7 +402,8 @@ class WarehouseAnalyzer {
             let resolved = path.normalize(path.join(dir, imp.source));
             // Try extensions
             for (const ext of ['.js', '.ts', '.jsx', '.tsx', '.py', '.go']) {
-                if (resolved.endsWith(ext)) break;
+                if (resolved.endsWith(ext))
+                    break;
                 const candidate = resolved + ext;
                 if ([...this.dependencyNetwork.nodes].some(n => n.path === candidate)) {
                     return candidate;
@@ -455,17 +413,13 @@ class WarehouseAnalyzer {
         }
         return null;
     }
-
     // ── Private: Type chains ──
     _buildTypeChains(allSymbols) {
         const interfaces = allSymbols.filter(s => s.kind === 'interface' || s.kind === 'type');
         for (const iface of interfaces) {
             // Find implementations/uses
-            const users = allSymbols.filter(s =>
-                s.filePath !== iface.filePath &&
-                (s.body?.includes(iface.name) || s.name?.includes(iface.name))
-            ).slice(0, 10);
-
+            const users = allSymbols.filter(s => s.filePath !== iface.filePath &&
+                (s.body?.includes(iface.name) || s.name?.includes(iface.name))).slice(0, 10);
             if (users.length > 0) {
                 this.typeChains.push({
                     type: iface.name,
@@ -476,17 +430,14 @@ class WarehouseAnalyzer {
             }
         }
     }
-
     // ── Private: Clone detection ──
     _detectClones(fileContents) {
         const blocks = []; // { file, content, startLine, endLine }
-
         // Extract function-level blocks
         for (const [file, { content }] of fileContents) {
             const lines = content.split('\n');
             let blockStart = -1;
             let depth = 0;
-
             for (let i = 0; i < lines.length; i++) {
                 const line = lines[i].trim();
                 if (line.match(/(?:function|def|func|class|=>)/i) && line.includes('{')) {
@@ -494,8 +445,10 @@ class WarehouseAnalyzer {
                     depth = 0;
                 }
                 if (blockStart >= 0) {
-                    if (line.includes('{')) depth++;
-                    if (line.includes('}')) depth--;
+                    if (line.includes('{'))
+                        depth++;
+                    if (line.includes('}'))
+                        depth--;
                     if (depth === 0 && i > blockStart) {
                         const blockContent = lines.slice(blockStart, i + 1).join('\n');
                         if (blockContent.length > 50 && blockContent.length < 2000) {
@@ -512,14 +465,13 @@ class WarehouseAnalyzer {
                 }
             }
         }
-
         // Pairwise comparison with hash grouping
         const byHash = new Map();
         for (const block of blocks) {
-            if (!byHash.has(block.hash)) byHash.set(block.hash, []);
+            if (!byHash.has(block.hash))
+                byHash.set(block.hash, []);
             byHash.get(block.hash).push(block);
         }
-
         for (const [hash, group] of byHash) {
             if (group.length >= 2) {
                 this.clones.push({
@@ -531,18 +483,17 @@ class WarehouseAnalyzer {
             }
         }
     }
-
     // ── Private: Hotspot analysis ──
     _analyzeHotspots(allSymbols) {
         // Complexity-based hotspots
         const byFile = {};
         for (const sym of allSymbols) {
-            if (!byFile[sym.filePath]) byFile[sym.filePath] = { file: sym.filePath, symbolCount: 0, totalComplexity: 0, maxComplexity: 0 };
+            if (!byFile[sym.filePath])
+                byFile[sym.filePath] = { file: sym.filePath, symbolCount: 0, totalComplexity: 0, maxComplexity: 0 };
             byFile[sym.filePath].symbolCount++;
             byFile[sym.filePath].totalComplexity += sym.complexity || 1;
             byFile[sym.filePath].maxComplexity = Math.max(byFile[sym.filePath].maxComplexity, sym.complexity || 1);
         }
-
         // Find top hotspots (high complexity + high connectivity)
         const files = Object.values(byFile);
         for (const file of files) {
@@ -550,34 +501,30 @@ class WarehouseAnalyzer {
             file.connections = edges;
             file.hotspotScore = (file.totalComplexity * 0.4) + (edges * 0.3) + (file.symbolCount * 0.3);
         }
-
         this.hotspots = files
             .sort((a, b) => b.hotspotScore - a.hotspotScore)
             .slice(0, 20)
             .map(f => ({
-                file: f.file,
-                symbols: f.symbolCount,
-                totalComplexity: f.totalComplexity,
-                maxComplexity: f.maxComplexity,
-                connections: f.connections,
-                hotspotScore: Math.round(f.hotspotScore),
-            }));
+            file: f.file,
+            symbols: f.symbolCount,
+            totalComplexity: f.totalComplexity,
+            maxComplexity: f.maxComplexity,
+            connections: f.connections,
+            hotspotScore: Math.round(f.hotspotScore),
+        }));
     }
-
     _dfsCalls(nodeId, direction, visited, currentPath, maxDepth) {
         if (visited.has(nodeId) || currentPath.length >= maxDepth) {
             return currentPath.length > 0 ? [currentPath] : [];
         }
         visited.add(nodeId);
-
         const node = this.graph.nodes.get(nodeId);
-        if (!node) return currentPath.length > 0 ? [currentPath] : [];
-
+        if (!node)
+            return currentPath.length > 0 ? [currentPath] : [];
         const targets = direction === 'downstream' ? node.calls : node.calledBy;
         if (!targets || targets.length === 0) {
             return currentPath.length > 0 ? [currentPath] : [];
         }
-
         const paths = [];
         for (const target of targets) {
             const targetNode = [...this.graph.nodes.values()].find(n => n.name === target);
@@ -586,7 +533,6 @@ class WarehouseAnalyzer {
         }
         return paths;
     }
-
     _estimateComplexity(line, body) {
         let complexity = 1;
         if (body) {
@@ -602,12 +548,10 @@ class WarehouseAnalyzer {
         }
         return Math.min(complexity, 50);
     }
-
     _hashContent(text) {
         const normalized = text.replace(/\s+/g, ' ').trim().toLowerCase();
         return crypto.createHash('md5').update(normalized).digest('hex').slice(0, 16);
     }
-
     _similarity(a, b) {
         const aTokens = new Set(this._tokenize(a));
         const bTokens = new Set(this._tokenize(b));
@@ -615,7 +559,6 @@ class WarehouseAnalyzer {
         const union = new Set([...aTokens, ...bTokens]);
         return union.size === 0 ? 0 : intersection.size / union.size;
     }
-
     _tokenize(text) {
         return text.toLowerCase()
             .replace(/[^a-z0-9]/g, ' ')
@@ -623,6 +566,4 @@ class WarehouseAnalyzer {
             .filter(t => t.length > 2);
     }
 }
-
-exports.WarehouseAnalyzer = WarehouseAnalyzer;
 exports.warehouseAnalyzer = new WarehouseAnalyzer();

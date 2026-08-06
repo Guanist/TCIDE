@@ -1,39 +1,96 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.debugManager = exports.DebugManager = exports.DebugSession = void 0;
-// TCIDE Debug Manager - TS stub (canonical source in dist/)
-class DebugSession {
-}
-exports.DebugSession = DebugSession;
+exports.debugManager = exports.DebugManager = void 0;
 class DebugManager {
-    sessions;
-    nextId;
-    onEvent;
-    constructor() {
-        this.sessions = new Map();
-        this.nextId = 1;
-        this.onEvent = null;
+    breakpoints = new Map();
+    state = { running: false, paused: false, allFrames: [], variables: [] };
+    listeners = [];
+    /** Add or update a breakpoint */
+    setBreakpoint(filePath, line, column, condition, logMessage) {
+        const id = `${filePath}:${line}${column ? ':' + column : ''}`;
+        const existing = this.breakpoints.get(id);
+        this.breakpoints.set(id, {
+            id,
+            filePath,
+            line,
+            column,
+            enabled: existing?.enabled ?? true,
+            condition,
+            logMessage,
+            hitCount: existing?.hitCount || 0,
+        });
+        return id;
     }
-    getAvailableAdapters() { return []; }
-    isAdapterInstalled(type) { return false; }
-    getInstallGuide(type) { return ''; }
-    async startSession(type, program, cwd, options) { return {}; }
-    async stopSession(sessionId) { }
-    getSession(sessionId) { return null; }
-    listSessions() { return []; }
-    async setBreakpoints(sessionId, filePath, breakpoints) { return {}; }
-    async configurationDone(sessionId) { return {}; }
-    async continue_(sessionId) { return {}; }
-    async next(sessionId, threadId) { return {}; }
-    async stepIn(sessionId, threadId) { return {}; }
-    async stepOut(sessionId, threadId) { return {}; }
-    async pause(sessionId, threadId) { return {}; }
-    async getThreads(sessionId) { return {}; }
-    async getStackTrace(sessionId, threadId) { return {}; }
-    async getScopes(sessionId, frameId) { return {}; }
-    async getVariables(sessionId, variablesReference) { return {}; }
-    async evaluate(sessionId, expression, frameId) { return {}; }
-    shutdownAll() { }
+    /** Remove a breakpoint */
+    removeBreakpoint(id) {
+        return this.breakpoints.delete(id);
+    }
+    /** Toggle breakpoint enabled state */
+    toggleBreakpoint(id) {
+        const bp = this.breakpoints.get(id);
+        if (!bp)
+            return false;
+        bp.enabled = !bp.enabled;
+        return bp.enabled;
+    }
+    /** Get all breakpoints, optionally filtered by file */
+    getBreakpoints(filePath) {
+        const all = Array.from(this.breakpoints.values());
+        return filePath ? all.filter(b => b.filePath === filePath) : all;
+    }
+    /** Get breakpoints for a specific file and line */
+    getBreakpointsAt(filePath, line) {
+        return this.getBreakpoints(filePath).filter(b => b.line === line);
+    }
+    /** Check if a line has an enabled breakpoint */
+    hasEnabledBreakpoint(filePath, line) {
+        return this.getBreakpointsAt(filePath, line).some(b => b.enabled);
+    }
+    /** Record a breakpoint hit */
+    hitBreakpoint(id) {
+        const bp = this.breakpoints.get(id);
+        if (bp)
+            bp.hitCount = (bp.hitCount || 0) + 1;
+    }
+    /** Update debug state (called by debug adapter) */
+    updateState(partial) {
+        Object.assign(this.state, partial);
+        this.notifyListeners();
+    }
+    /** Get current debug state */
+    getState() {
+        return { ...this.state };
+    }
+    /** Get variables for the current paused frame */
+    getVariables() {
+        return this.state.variables;
+    }
+    /** Get current call stack */
+    getCallStack() {
+        return this.state.allFrames;
+    }
+    /** Subscribe to state changes */
+    onStateChange(listener) {
+        this.listeners.push(listener);
+        return () => { this.listeners = this.listeners.filter(l => l !== listener); };
+    }
+    notifyListeners() {
+        const s = this.getState();
+        for (const l of this.listeners)
+            l(s);
+    }
+    /** Check if debugger is active */
+    get isRunning() { return this.state.running; }
+    get isPaused() { return this.state.paused; }
+    /** Clear all breakpoints */
+    clearAllBreakpoints() {
+        this.breakpoints.clear();
+    }
+    /** Reset debug state */
+    reset() {
+        this.state = { running: false, paused: false, allFrames: [], variables: [] };
+        this.notifyListeners();
+    }
 }
 exports.DebugManager = DebugManager;
 exports.debugManager = new DebugManager();

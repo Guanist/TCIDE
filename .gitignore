@@ -1,4 +1,4 @@
-node_modules/
+﻿node_modules/
 release/
 _*/
 _*
@@ -6,3 +6,12 @@ _*
 *.bak
 task-artifacts/
 package-lock.json
+
+# Build artifacts
+_new_app.asar
+release/*.exe
+release/*.blockmap
+release/win-unpacked/
+release/builder-debug.yml
+release/latest.yml
+*.bak
