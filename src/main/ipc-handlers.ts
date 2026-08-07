@@ -246,7 +246,22 @@ export function setupIpcHandlers(): void {
 
   // 终端命令
   ipcMain.handle('terminal:exec', async (_e, command: string, cwd: string) => {
-    if (/rm\s+-rf\s+[\/\*]/.test(command)) throw new Error('危险命令已拒绝');
+    // Block common dangerous operations
+    const dangerous = [
+      /\brm\s+-(?:r[ef]*|f[er]*)\b/i,
+      /\bdel\b.*\/[sfq]/i,
+      /\bRemove-Item\b.*-Recurse/i,
+      /\bformat\s+[A-Z]:/i,
+      /\bgit\s+push\s+--force\b(?!.*\bmain\b|\bmaster\b)/i,
+      /\bDROP\s+(TABLE|DATABASE)\b/i,
+      /[&|;]\s*rm\b/i,
+      />\s*\/dev\//i,
+    ];
+    for (const pattern of dangerous) {
+      if (pattern.test(command)) {
+        throw new Error('Dangerous command blocked by TCIDE safety policy');
+      }
+    }
     const { exec } = await import('child_process');
     const { promisify } = await import('util');
     const execAsync = promisify(exec);
@@ -261,7 +276,9 @@ export function setupIpcHandlers(): void {
 
   // 数据库
   ipcMain.handle('db:query', async (_e, sql: string, params?: unknown[]) => {
-    if (/\b(DROP|ALTER|CREATE|INSERT|UPDATE|DELETE)\b/i.test(sql) && !/\bSELECT\b/i.test(sql)) throw new Error('仅支持查询操作');
+    const trimmed = sql.trim();
+    if (!/^SELECT\b/i.test(trimmed)) throw new Error('Only SELECT queries are allowed');
+    if (/;\s*(DROP|ALTER|CREATE|INSERT|UPDATE|DELETE|SELECT)/i.test(trimmed)) throw new Error('Multi-statement queries are forbidden');
     return queryDb(sql, params);
   });
   ipcMain.handle('db:run', async (_e, sql: string, params?: unknown[]) => {
@@ -1284,12 +1301,26 @@ ipcMain.handle('ai:send-with-tools', async (event, messages: Array<{ role: strin
       tool_choice: 'auto',
       stream: false,
     });
-
-    const response = await fetch(`${(config.baseUrl || 'https://api.deepseek.com/v1').replace(/\/$/, '')}/chat/completions`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${config.apiKey}` },
-      body,
-    });
+    // Retry logic matching ModelAdapter
+    const RETRYABLE = new Set([429, 500, 502, 503, 504]);
+    let response: any = null;
+    for (let attempt = 0; attempt <= 3; attempt++) {
+      try {
+        response = await fetch(`${(config.baseUrl || 'https://api.deepseek.com/v1').replace(/\/$/, '')}/chat/completions`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${config.apiKey}` },
+          body,
+        });
+        break;
+      } catch (err: any) {
+        if (attempt < 3 && (RETRYABLE.has(err.status) || err.message?.includes('fetch'))) {
+          await new Promise(r => setTimeout(r, Math.pow(2, attempt) * 1000));
+        } else {
+          throw err;
+        }
+      }
+    }
+    if (!response) throw new Error('Request failed after retries');
 
     if (!response.ok) {
       const errText = await response.text().catch(() => 'Unknown error');

@@ -265,13 +265,16 @@ function searchInProject(projectPath: string, query: string, filePattern: string
   // 使用 git grep 或 findstr
   try {
     const isWin = process.platform === 'win32';
+  // Sanitize filePattern to prevent command injection
+  const safePattern = filePattern.replace(/[^a-zA-Z0-9*.?_-]/g, '');
+
     let cmd: string;
     if (isWin) {
       const escapedQuery = query.replace(/"/g, '\\"');
-      cmd = `findstr /s /i /n /c:"${escapedQuery}" "${filePattern}" 2>nul`;
+      cmd = `findstr /s /i /n /c:"${escapedQuery}" "${safePattern}" 2>nul`;
     } else {
       const escapedQuery = query.replace(/'/g, "'\\''");
-      cmd = `grep -rn --include="${filePattern}" "${escapedQuery}" . 2>/dev/null`;
+      cmd = `grep -rn --include="${safePattern}" "${escapedQuery}" . 2>/dev/null`;
     }
 
     const output = execSync(cmd, { cwd: projectPath, timeout: 8000, encoding: 'utf-8', maxBuffer: 1024 * 1024 });

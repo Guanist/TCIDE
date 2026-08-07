@@ -208,6 +208,24 @@ class LspClient {
     window.dispatchEvent(new CustomEvent('lsp-diagnostics-changed', { detail: { uri, count: markers.length } }));
   }
 
+  /** 确保 LSP 服务器已启动（用于 didChange/didClose 的延迟初始化） */
+  private async ensureStarted(language: string): Promise<void> {
+    if (this.running || !this.projectPath) return;
+    const lspLang = LANG_MAP[language];
+    if (!lspLang) return;
+    try {
+      const result = await window.api.lspStart(lspLang, this.projectPath);
+      if (result.success) {
+        this.running = true;
+        window.api.onLspMessage(this.handleServerMessage.bind(this));
+        if (!LspClient.registeredLanguages.has(lspLang)) {
+          LspClient.registeredLanguages.add(lspLang);
+          this.registerProviders(lspLang);
+        }
+      }
+    } catch { /* 启动失败不阻塞 */ }
+  }
+
   /** 注册所有 LSP Provider */
   private registerProviders(lspLang: string): void {
     const langId = this.language;

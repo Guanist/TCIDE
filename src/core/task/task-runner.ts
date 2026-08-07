@@ -57,7 +57,6 @@ export class TaskRunner {
         return { success: false, results };
       }
 
-      // 找出可启动的任务（依赖已完成）
       while (pending.length > 0 && running.length < MAX_PARALLEL) {
         const task = pending[0];
         const depsDone = task.dep.every(depId => {
@@ -67,7 +66,12 @@ export class TaskRunner {
 
         if (depsDone && !compiling.has('build')) {
           pending.shift();
-          running.push(this.runTask(task, projectRoot, results, taskMap, compiling));
+          const promise = this.runTask(task, projectRoot, results, taskMap, compiling);
+          running.push(promise);
+          promise.finally(() => {
+            const idx = running.indexOf(promise);
+            if (idx >= 0) running.splice(idx, 1);
+          });
         } else {
           break;
         }
@@ -75,16 +79,8 @@ export class TaskRunner {
 
       if (running.length > 0) {
         await Promise.race(running);
-        // 清理已完成的 promise
-        for (let i = running.length - 1; i >= 0; i--) {
-          // 简单清理策略：保留在数组中，由 runTask 内部处理
-        }
       }
     }
-
-    // 等待所有任务完成
-    await Promise.all(running);
-
     const allSuccess = results.every(r => r.success);
     return { success: allSuccess, results };
   }

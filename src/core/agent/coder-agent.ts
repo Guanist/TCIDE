@@ -1,4 +1,4 @@
-/**
+﻿/**
  * PersonalIDE - Coder Agent
  * 程序员智能体：接收 Builder 任务 → 文件读写 → 终端执行 → 结果反馈
  */
@@ -127,7 +127,13 @@ export class CoderAgent {
     // 执行写操作（先快照再写入）
     for (const action of actions) {
       if (action.type === 'write' && action.path && action.content !== undefined) {
-        const fullPath = path.isAbsolute(action.path) ? action.path : path.join(projectRoot, action.path);
+        let fullPath = path.isAbsolute(action.path) ? action.path : path.join(projectRoot, action.path);
+        // Safety: reject paths that escape the project root
+        const resolved = path.resolve(fullPath);
+        if (!resolved.startsWith(path.resolve(projectRoot))) {
+          return { success: false, output: `Path traversal rejected: ${action.path}` };
+        }
+        fullPath = resolved;
         try {
           // 📸 自动快照：写入前备份原文件
           if (fs.existsSync(fullPath)) {

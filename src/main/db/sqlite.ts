@@ -208,8 +208,7 @@ export function insertUsage(rec: UsageRecord): void {
       rec.role,
     ]
   );
-  const count = db.getRowsModified();
-  if (count % 10 === 0) saveDatabase();
+  saveDatabase();
 }
 
 // ─────────────────────────────────────────

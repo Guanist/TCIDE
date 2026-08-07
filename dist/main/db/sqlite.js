@@ -231,9 +231,7 @@ function insertUsage(rec) {
         rec.taskId,
         rec.role,
     ]);
-    const count = db.getRowsModified();
-    if (count % 10 === 0)
-        saveDatabase();
+    saveDatabase();
 }
 // ─────────────────────────────────────────
 // 用量查询（由 IPC 调用，直接传 SQL）

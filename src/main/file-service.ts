@@ -1,4 +1,4 @@
-/**
+﻿/**
  * PersonalIDE - File Service
  * 主进程文件操作封装，包含基本安全检查
  */
@@ -24,16 +24,16 @@ export function addAllowedRoot(root: string): void {
 
 function checkPath(filePath: string): void {
   const normalized = path.normalize(filePath);
-  // 路径遍历检测
-  if (normalized.includes('..')) {
-    // 允许相对路径，但必须落在 allowed roots 内
-    if (ALLOWED_ROOTS.length > 0) {
-      const resolved = path.resolve(normalized);
-      const inAllowed = ALLOWED_ROOTS.some(root => resolved.startsWith(root));
-      if (!inAllowed) {
-        throw new Error(`路径访问被拒绝: ${filePath}`);
-      }
+  const resolved = path.resolve(normalized);
+  if (ALLOWED_ROOTS.length > 0) {
+    const inAllowed = ALLOWED_ROOTS.some(root => resolved.startsWith(root));
+    if (!inAllowed) {
+      throw new Error(`路径访问被拒绝: ${filePath}`);
     }
+  }
+  // Always reject path traversal via '..'
+  if (normalized.includes('..')) {
+    throw new Error(`路径遍历被拒绝: ${filePath}`);
   }
 }
 
