@@ -3631,21 +3631,6 @@ const VERSION_HISTORY: Array<{ version: string; date: string; emoji: string; tit
     philosophy: '从Demo到生产。18个模块一次交付,57个IPC通道全部接通。'
   },
   {
-    version: 'v1.6.0',
-    date: '2026-05-31',
-    emoji: '🎨',
-    title: '个性蜕变 — Markdown预览/无气泡对话/自定义形象',
-    features: [
-      '📝 Markdown预览: .md文件自动渲染,源码/预览一键切换',
-      '🎨 AI回复去气泡: 对齐Claude/Trae风格,用户消息保留气泡',
-      '🧑 自定义头像昵称: 用户/AI名称+头像emoji自由设置',
-      '📦 代码块折叠 + 聊天气泡限高 + 关闭保存确认',
-      '🐛 HTML/SVG预览串位 / 设置子标签 / 消息重复 / AI截断',
-      '🐯 虎猫思考动画 + AI统计栏',
-    ],
-    philosophy: 'IDE不止是工具，也是个性。Markdown让它能读文档，无气泡让它会聊天。'
-  },
-  {
     version: 'v1.5.1',
     date: '2026-05-30',
     emoji: '🐯',
@@ -3659,6 +3644,21 @@ const VERSION_HISTORY: Array<{ version: string; date: string; emoji: string; tit
       '🎨 聊天气泡限高 / MCP开关视觉反馈 / 活动栏标签',
     ],
     philosophy: '细节决定体验。思考动画让等待可感知,代码折叠让聊天不臃肿。'
+  },
+  {
+    version: 'v1.6.0',
+    date: '2026-05-31',
+    emoji: '🎨',
+    title: '个性蜕变 — Markdown预览/无气泡对话/自定义形象',
+    features: [
+      '📝 Markdown预览: .md文件自动渲染,源码/预览一键切换',
+      '🎨 AI回复去气泡: 对齐Claude/Trae风格,用户消息保留气泡',
+      '🧑 自定义头像昵称: 用户/AI名称+头像emoji自由设置',
+      '📦 代码块折叠 + 聊天气泡限高 + 关闭保存确认',
+      '🐛 HTML/SVG预览串位 / 设置子标签 / 消息重复 / AI截断',
+      '🐯 虎猫思考动画 + AI统计栏',
+    ],
+    philosophy: 'IDE不止是工具，也是个性。Markdown让它能读文档，无气泡让它会聊天。'
   },
   {
     version: 'v1.6.1',
@@ -3715,6 +3715,23 @@ const VERSION_HISTORY: Array<{ version: string; date: string; emoji: string; tit
       '🧩 p2-modules.js 重建兼容桩, 承接 acceptDiff/closeDiffModal 桥接',
     ],
     philosophy: '少一个全局函数, 整个面板就点不动。细节决定能不能连上。'
+  },
+  {
+    version: 'v1.8.0',
+    date: '2026-08-06',
+    emoji: '🚀',
+    title: '全模块TypeScript源码化 + 输入焦点修复 + ce bug修复',
+    features: [
+      '🧩 11个dist-only JS模块逆向为TypeScript源码',
+      '🏗️ 6个空壳模块完整实现 (autoheal/chunker/batch/lint/perf/debug)',
+      '🪟 宠物窗口 focusable=false + type=toolbar (修复聊天输入焦点被抢占)',
+      '🐛 switchToSettingsTab定义前移到sendToAI之前 (修复ce is not defined)',
+      '📝 空catch块添加错误日志',
+      '🔧 package.json BOM头移除 / index.html破损闭合标签修复',
+      '⚡ p0/p1/p2脚本由Vite插件注入, emptyOutDir启用clean build',
+      '📦 vite v1.8.0 198KB主bundle (1064模块)',
+    ],
+    philosophy: '源码在手，心里不慌。每个模块都能读、能改、能修。'
   },
 ];
 

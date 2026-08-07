@@ -1,5 +1,79 @@
 # 🐯 虎猫 TCIDE — 更新日志
 
+## v1.6.0 (2026-05-31) — 个性蜕变
+
+### 🆕 新增功能
+- 📝 **Markdown 预览**：`.md` 文件自动渲染，源码/预览一键切换
+- 🎨 **AI 回复去气泡**：对齐 Claude/Trae 风格，用户消息保留气泡
+- 🧑 **自定义头像昵称**：用户/AI 名称 + 头像 emoji 自由设置
+- 🐯 **虎猫思考动画 + AI 统计栏**
+
+### 🐛 Bug 修复
+- HTML/SVG 预览串位 / 设置子标签点击无效 / 消息重复 / AI 截断
+- 代码块折叠 + 聊天气泡限高 + 关闭保存确认
+
+---
+
+## v1.6.1 (2026-07-22) — 安全修复 & 历史问题清理
+
+### 🐛 Bug 修复
+- 🔒 安全修复：`contextIsolation=true`、`nodeIntegration=false`
+- 🐛 中文编码修复：虎猫 TCIDE 标题不再显示 ???
+- 📦 版本号对齐：package.json 与 Git tag 一致
+- 🧹 清理历史技术债：StoreSchema 类型 / CRLF 换行符
+- ✅ 17/17 自动化 GUI 测试全部通过
+
+---
+
+## v1.7.0 (2026-07-22) — 自治 Agent 引擎 + 像素宠物
+
+### 🆕 新增功能
+- 🧠 **ContextTrimmer**：滑动窗口压缩 + 历史归档 + 去重
+- 🔄 **自主 Agent 循环**：AI 自动多轮工具调用（max 3 rounds）
+- 📊 **Agent 进度追踪**：IPC `agent_round` 事件实时显示
+- 📄 **projectRules** 自动注入系统提示词
+- 🐱 **像素宠物**：9 状态 PNG 精灵 + 透明叠加窗 + 拖拽漫步
+- 🪟 **独立宠物窗口**：frameless / transparent / alwaysOnTop / 穿透点击
+- 🎨 **Mascot 吉祥物**：5 种状态（happy/working/thinking/done/sleeping）
+
+---
+
+## v1.7.1 (2026-07-24) — 像素宠物修复 + 版本对齐
+
+### 🐛 Bug 修复
+- 🐾 修正宠物窗口未在运行时创建的缺陷（初始化链补齐 `createPetWindow` 调用）
+- 🎨 像素宠物精灵重绘：完整 9 状态身体猫替换原脸部特写素材
+- 📐 窗口 192×208 原尺寸 1:1 不放大，像素级对齐
+- 🔧 补齐 v1.6.1 / v1.7.0 版本记录条目
+
+---
+
+## v1.7.2 (2026-08-06) — 修复模型连接与全局脚本缺失
+
+### 🐛 Bug 修复
+- 🔧 恢复 p0/p1/p2-modules.js 全局脚本（index.html 引用但产物中丢失）
+- 🪄 补齐 `$id` / `showToast` / 各 `__tcide_*` 全局辅助，修复设置/模型面板 ReferenceError
+- ✅ 模型连接测试（testModelConnection）恢复正常
+- 🧩 p2-modules.js 重建兼容桩，承接 acceptDiff / closeDiffModal 桥接
+
+---
+
+## v1.8.0 (2026-08-06) — 全模块 TypeScript 源码化 + 输入焦点修复 + ce bug 修复
+
+### 🆕 新增功能
+- 🧩 11 个 dist-only JS 模块逆向为 TypeScript 源码
+- 🏗️ 6 个空壳模块完整实现（autoheal / chunker / batch / lint / perf / debug）
+- ⚡ p0/p1/p2 脚本由 Vite 插件注入，`emptyOutDir` 启用 clean build
+- 📦 主 bundle 198KB（1064 模块）
+
+### 🐛 Bug 修复
+- 🪟 宠物窗口 `focusable=false` + `type=toolbar`（修复聊天输入焦点被抢占）
+- 🐛 `switchToSettingsTab` 定义前移到 `sendToAI` 之前（修复 `ce is not defined`）
+- 📝 空 catch 块添加错误日志
+- 🔧 package.json BOM 头移除 / index.html 破损闭合标签修复
+
+---
+
 ## v1.5.1 (2026-05-30) — 体验打磨
 
 ### 🆕 新增功能
