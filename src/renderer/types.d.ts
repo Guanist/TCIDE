@@ -207,6 +207,25 @@ interface TcIdeApi {
   on(event: string, handler: (...args: unknown[]) => void): void;
   off(event: string, handler: (...args: unknown[]) => void): void;
   onBalanceWarning?(callback: (detail: string) => void): () => void;
+
+  // ── LSP 语言服务 ──
+  lspStart(language: string, projectPath: string): Promise<{ success: boolean; error?: string }>;
+  lspStop(language: string, projectPath?: string): Promise<{ success: boolean }>;
+  lspStatus(language: string, projectPath?: string): Promise<{ running: boolean; serverName?: string }>;
+  lspRequest(language: string, method: string, params: unknown, projectPath?: string): Promise<{ success: boolean; result?: unknown; error?: string }>;
+  lspNotify(language: string, method: string, params: unknown, projectPath?: string): Promise<{ success: boolean }>;
+  lspAvailable(language: string): Promise<boolean>;
+  lspInstallGuide(language: string): Promise<string>;
+  onLspMessage(callback: (data: { language: string; message: unknown }) => void): void;
+  offLspMessage(): void;
+  gitBlame(filePath: string, projectPath: string): Promise<{ success: boolean; blames?: Array<{ hash: string; author: string; date: string; line: number; code: string }>; error?: string }>;
+  gitListBranches(projectPath: string): Promise<{ success: boolean; branches?: Array<{ name: string; current: boolean }>; currentBranch?: string; error?: string }>;
+  gitCheckout(branch: string, projectPath: string): Promise<{ success: boolean; output?: string; error?: string }>;
+  mcpListTools(): Promise<Array<{ name: string; description: string; parameters: Record<string, unknown> }>>;
+  mcpCallTool(call: { id: string; name: string; arguments: Record<string, unknown> }, projectPath: string, extraContext?: { openFiles?: Array<{ path: string; name: string; language: string }> }): Promise<{ id: string; result: string; error?: string }>;
+  sendToAIWithTools(messages: Array<{ role: string; content: string | null }>, options?: { model?: string }): Promise<string>;
+  getApiConfigs(): Promise<{ configs: Array<{ id: string; provider: string; baseUrl: string; apiKey: string; model: string; label: string; createdAt: number }>; activeId: string }>;
+  saveApiConfigs(data: { configs: any[]; activeId: string }): Promise<{ success: boolean }>;
 }
 
 declare interface Window {

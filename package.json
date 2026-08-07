@@ -1,38 +1,129 @@
 {
   "name": "tcide",
-  "productName": "TCIDE",
-  "version": "1.2.0",
-  "description": "虎猫 - 个人专属超级AI编程IDE",
+  "productName": "铏庣尗 TCIDE",
+  "version": "1.8.0",
+  "versionName": "v1.8.0 — 全模块TypeScript源码化 + 输入焦点修复 + ce bug修复",
+  "description": "铏庣尗 TCIDE 鈥?涓汉涓撳睘 AI 缂栫▼ IDE",
   "main": "dist/main/index.js",
-  "author": "Guanist, Inc.",
+  "author": "铏庣尗鍥㈤槦",
   "license": "MIT",
   "scripts": {
-    "dev": "concurrently \"npm run dev:main\" \"npm run dev:renderer\"",
-    "dev:main": "tsc -p tsconfig.main.json --watch",
-    "dev:renderer": "vite",
-    "build": "npm run build:main && npm run build:renderer",
-    "build:main": "tsc -p tsconfig.main.json",
-    "build:renderer": "vite build",
+    "dev": "electron .",
     "start": "electron .",
-    "dist": "npm run build && electron-builder --win --config electron-builder.json",
-    "build-exe": "npm run build && electron-builder --win --config electron-builder.json"
+    "build": "vite build",
+    "pack": "npm run build && electron-builder --dir",
+    "dist": "npm run build && electron-builder",
+    "dist:direct": "electron-builder",
+    "dist:portable": "npm run build && electron-builder --win portable"
   },
   "dependencies": {
+    "@emmetio/expand-abbreviation": "^0.7.3",
     "electron-store": "^8.2.0",
     "monaco-editor": "^0.52.2",
     "sql.js": "^1.14.1",
     "xterm": "^5.3.0",
     "xterm-addon-fit": "^0.8.0",
-    "xterm-addon-web-links": "^0.9.0"
+    "xterm-addon-web-links": "^0.9.0",
+    "vscode-jsonrpc": "^8.2.1"
   },
   "devDependencies": {
-    "@types/node": "^22.10.0",
-    "concurrently": "^9.1.2",
-    "electron": "^33.3.1",
-    "electron-builder": "^25.1.8",
-    "png-to-ico": "^3.0.1",
-    "sharp": "^0.34.5",
-    "typescript": "^5.7.3",
-    "vite": "^6.0.7"
+    "@types/conf": "^2.1.0",
+    "electron": "^28.0.0",
+    "electron-builder": "^24.9.0",
+    "pyright": "^1.1.410",
+    "vite": "^5.4.21"
+  },
+  "build": {
+    "appId": "com.tcide.app",
+    "productName": "铏庣尗 TCIDE",
+    "electronDist": "node_modules/electron/dist",
+    "electronVersion": "28.0.0",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**/*",
+      "resources/**/*",
+      "CLAUDE.md",
+      "package.json",
+      "node_modules/monaco-editor/**/*",
+      "node_modules/xterm/**/*",
+      "node_modules/xterm-addon-fit/**/*",
+      "node_modules/electron-store/**/*",
+      "node_modules/sql.js/**/*",
+      "node_modules/@emmetio/**/*",
+      "node_modules/ajv-formats/**/*",
+      "node_modules/atomically/**/*",
+      "node_modules/conf/**/*",
+      "node_modules/debounce-fn/**/*",
+      "node_modules/dot-prop/**/*",
+      "node_modules/env-paths/**/*",
+      "node_modules/fast-deep-equal/**/*",
+      "node_modules/fast-uri/**/*",
+      "node_modules/find-up/**/*",
+      "node_modules/is-obj/**/*",
+      "node_modules/json-schema-typed/**/*",
+      "node_modules/locate-path/**/*",
+      "node_modules/mimic-fn/**/*",
+      "node_modules/onetime/**/*",
+      "node_modules/p-locate/**/*",
+      "node_modules/p-try/**/*",
+      "node_modules/path-exists/**/*",
+      "node_modules/pkg-up/**/*",
+      "node_modules/require-from-string/**/*",
+      "node_modules/type-fest/**/*",
+      "node_modules/xterm-addon-web-links/**/*"
+    ],
+    "extraResources": [
+      {
+        "from": "resources/sql-wasm.wasm",
+        "to": "sql-wasm.wasm"
+      },
+      {
+        "from": "resources/about-icon.png",
+        "to": "about-icon.png"
+      },
+      {
+        "from": "resources/icon.png",
+        "to": "icon.png"
+      },
+      {
+        "from": "resources/tray-icon.png",
+        "to": "tray-icon.png"
+      },
+      {
+        "from": "resources/tray-icon@2x.png",
+        "to": "tray-icon@2x.png"
+      }
+    ],
+    "extraMetadata": {
+      "main": "dist/main/index.js"
+    },
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "resources/icon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "installerIcon": "resources/icon.ico",
+      "uninstallerIcon": "resources/icon.ico",
+      "installerHeaderIcon": "resources/icon.ico",
+      "installerSidebar": "resources/installer-sidebar.png"
+    },
+    "asar": false
   }
 }

@@ -120,6 +120,12 @@ const api = {
   saveModelConfig: (config: ModelConfig): Promise<void> =>
     ipcRenderer.invoke('model:saveConfig', config),
 
+  getApiConfigs: (): Promise<{ configs: any[]; activeId: string }> =>
+    ipcRenderer.invoke('apiConfigs:get'),
+
+  saveApiConfigs: (data: { configs: any[]; activeId: string }): Promise<{ success: boolean }> =>
+    ipcRenderer.invoke('apiConfigs:save', data),
+
   testModelConnection: (params: TestConnectionParams): Promise<TestConnectionResult> =>
     ipcRenderer.invoke('model:testConnection', params),
 
@@ -420,6 +426,7 @@ const api = {
       'task-complete',
       'memory-cleanup',
       'usage:balance-warning',
+      'pet-state-change',
     ];
     if (validChannels.includes(channel)) {
       ipcRenderer.on(channel, callback);
@@ -447,13 +454,90 @@ const api = {
 
   addRecentProject: (projectPath: string): Promise<void> =>
     ipcRenderer.invoke('project:addRecent', projectPath),
+
+  // ── LSP 语言服务 ──
+  lspStart: (language: string, projectPath: string): Promise<{ success: boolean; error?: string }> =>
+    ipcRenderer.invoke('lsp:start', language, projectPath),
+
+  lspStop: (language: string, projectPath?: string): Promise<{ success: boolean }> =>
+    ipcRenderer.invoke('lsp:stop', language, projectPath),
+
+  lspStatus: (language: string, projectPath?: string): Promise<{ running: boolean; serverName?: string }> =>
+    ipcRenderer.invoke('lsp:status', language, projectPath),
+
+  lspRequest: (language: string, method: string, params: unknown, projectPath?: string): Promise<{ success: boolean; result?: unknown; error?: string }> =>
+    ipcRenderer.invoke('lsp:request', language, method, params, projectPath),
+
+  lspNotify: (language: string, method: string, params: unknown, projectPath?: string): Promise<{ success: boolean }> =>
+    ipcRenderer.invoke('lsp:notify', language, method, params, projectPath),
+
+  lspAvailable: (language: string): Promise<boolean> =>
+    ipcRenderer.invoke('lsp:available', language),
+
+  lspInstallGuide: (language: string): Promise<string> =>
+    ipcRenderer.invoke('lsp:installGuide', language),
+
+  onLspMessage: (callback: (data: { language: string; message: unknown }) => void): void => {
+    ipcRenderer.on('lsp:message', (_e: IpcRendererEvent, data: { language: string; message: unknown }) => callback(data));
+  },
+
+  offLspMessage: (): void => {
+    ipcRenderer.removeAllListeners('lsp:message');
+  },
+
+  // ── Git Blame ──
+  gitBlame: (filePath: string, projectPath: string): Promise<{ success: boolean; blames?: Array<{ hash: string; author: string; date: string; line: number; code: string }>; error?: string }> =>
+    ipcRenderer.invoke('git:blame', filePath, projectPath),
+
+  gitListBranches: (projectPath: string): Promise<{ success: boolean; branches?: Array<{ name: string; current: boolean }>; currentBranch?: string; error?: string }> =>
+    ipcRenderer.invoke('git:listBranches', projectPath),
+
+  gitCheckout: (branch: string, projectPath: string): Promise<{ success: boolean; output?: string; error?: string }> =>
+    ipcRenderer.invoke('git:checkout', branch, projectPath),
+
+  // ── MCP 工具 ──
+  mcpListTools: (): Promise<Array<{ name: string; description: string; parameters: Record<string, unknown> }>> =>
+    ipcRenderer.invoke('mcp:listTools'),
+
+  mcpCallTool: (call: { id: string; name: string; arguments: Record<string, unknown> }, projectPath: string, extraContext?: { openFiles?: Array<{ path: string; name: string; language: string }> }): Promise<{ id: string; result: string; error?: string }> =>
+    ipcRenderer.invoke('mcp:callTool', call, projectPath, extraContext),
+
+  sendToAIWithTools: (messages: Array<{ role: string; content: string | null; tool_calls?: unknown; tool_call_id?: string; name?: string }>, options?: { model?: string }): Promise<string> =>
+    ipcRenderer.invoke('ai:send-with-tools', messages, options),
+
+  // ── 像素宠物 ──
+  petSetState: (state: string, label?: string): void =>
+    ipcRenderer.send('pet-set-state', state, label),
+
+  petHitTest: (x: number, y: number): Promise<boolean> =>
+    ipcRenderer.invoke('pet-hit-test', x, y),
+
+  petMove: (dx: number, dy: number): void =>
+    ipcRenderer.send('pet-move', dx, dy),
+
+  petWander: (dx: number, dy: number): void =>
+    ipcRenderer.send('pet-wander', dx, dy),
+
+  getMascotUri: (state: string): string => {
+    // Serve mascot PNGs as file:// data URIs for pet window
+    // Mascot files are in src/renderer/public/icons/brand/
+    // Map state → filename
+    const map: Record<string, string> = {
+      idle:    'mascot-happy.png',
+      wave:    'mascot-happy.png',
+      run:     'mascot-working.png',
+      failed:  'mascot-sleeping.png',
+      review:  'mascot-thinking.png',
+      jump:    'mascot-done.png',
+      extra1:  'mascot-working.png',
+      extra2:  'mascot-happy.png',
+      extra3:  'mascot-thinking.png',
+    };
+    const file = map[state] || 'mascot-happy.png';
+    // Use IPC to get the data URL from main process
+    // For now return empty string — the main process will serve via ipc
+    return '';
+  },
 };
 
 contextBridge.exposeInMainWorld('api', api);
-
-// 声明全局类型，供渲染进程 TypeScript 使用
-declare global {
-  interface Window {
-    api: typeof api;
-  }
-}

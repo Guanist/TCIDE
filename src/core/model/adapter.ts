@@ -1,4 +1,4 @@
-/**
+﻿/**
  * TCIDE - Model Adapter
  * 统一模型适配层：OpenAI 兼容 / Anthropic Messages / Ollama 三协议
  * 内置 token 用量追踪 + 指数退避重试 + model-meta 动态计费
@@ -27,6 +27,9 @@ export interface SendOptions {
   temperature?: number;
   maxTokens?: number;
 }
+
+export type MessageContent = string | Array<{ type: 'text'; text: string } | { type: 'image_url'; image_url: { url: string } }>;
+export type ChatMessage = { role: string; content: MessageContent };
 
 // ── 重试配置 ──
 const RETRYABLE_STATUS = new Set([429, 500, 502, 503, 504]);
@@ -103,7 +106,7 @@ export class ModelAdapter {
   // 主入口 — 协议路由 + 重试
   // ─────────────────────────────────────────
   async send(
-    messages: Array<{ role: string; content: string }>,
+    messages: ChatMessage[],
     options: SendOptions = {}
   ): Promise<string> {
     const finalMessages = this.injectSystemRules(messages);
@@ -161,14 +164,15 @@ export class ModelAdapter {
   // ─────────────────────────────────────────
   // 规则注入
   // ─────────────────────────────────────────
-  private injectSystemRules(messages: Array<{ role: string; content: string }>): Array<{ role: string; content: string }> {
+  private injectSystemRules(messages: ChatMessage[]): ChatMessage[] {
     if (!this.systemRules) return messages;
 
     const rulesBlock = '\n---\n**项目规则（CLAUDE.md）：**\n' + this.systemRules + '\n---\n';
     const first = messages[0];
 
     if (first && first.role === 'system') {
-      return [{ ...first, content: rulesBlock + '\n' + first.content }, ...messages.slice(1)];
+      const existingContent = typeof first.content === 'string' ? first.content : first.content.map(c => c.type === 'text' ? c.text : '').join('');
+      return [{ ...first, content: rulesBlock + '\n' + existingContent }, ...messages.slice(1)];
     } else {
       return [{ role: 'system', content: rulesBlock }, ...messages];
     }
@@ -178,7 +182,7 @@ export class ModelAdapter {
   // OpenAI 兼容接口（DeepSeek / 火山方舟 / 自定义）
   // ─────────────────────────────────────────
   private async sendOpenAICompatible(
-    messages: Array<{ role: string; content: string }>,
+    messages: ChatMessage[],
     options: SendOptions & { model: string }
   ): Promise<string> {
     const { baseUrl, apiKey } = this.config;
@@ -254,7 +258,7 @@ export class ModelAdapter {
           const content = json.choices?.[0]?.delta?.content;
           if (content) { fullContent += content; onChunk?.(content); }
           if (json.usage) lastUsage = json.usage;
-        } catch { /* skip */ }
+        } catch { /* skip malformed SSE line */ }
       }
     }
 
@@ -268,7 +272,7 @@ export class ModelAdapter {
   // Anthropic Messages API
   // ─────────────────────────────────────────
   private async sendAnthropicMessages(
-    messages: Array<{ role: string; content: string }>,
+    messages: ChatMessage[],
     options: SendOptions & { model: string }
   ): Promise<string> {
     const { baseUrl, apiKey } = this.config;
@@ -394,7 +398,7 @@ export class ModelAdapter {
   // Ollama（本地模型）
   // ─────────────────────────────────────────
   private async sendOllama(
-    messages: Array<{ role: string; content: string }>,
+    messages: ChatMessage[],
     options: SendOptions
   ): Promise<string> {
     const baseUrl = this.config.baseUrl || 'http://localhost:11434';
@@ -439,7 +443,7 @@ export class ModelAdapter {
           const json = JSON.parse(line);
           const content = json.message?.content;
           if (content) { fullContent += content; onChunk?.(content); }
-        } catch { /* skip */ }
+        } catch { /* skip malformed SSE line */ }
       }
     }
     return fullContent;
@@ -479,14 +483,14 @@ export class ModelAdapter {
     try {
       const { ipcRenderer } = require('electron');
       ipcRenderer.send('record-usage', rec);
-    } catch { /* main process — no ipcRenderer */ }
+    } catch { /* running in main process, no ipcRenderer */ }
   }
 
   private emitBalanceWarning(detail: string): void {
     try {
       const { ipcRenderer } = require('electron');
       ipcRenderer.send('show-balance-warning', detail);
-    } catch { /* main process */ }
+    } catch { /* running in main process, no ipcRenderer */ }
   }
 
   // ─────────────────────────────────────────

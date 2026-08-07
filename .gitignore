@@ -1,8 +1,17 @@
-node_modules/
-dist/
+﻿node_modules/
 release/
-*.exe
-*.blockmap
-asar-unpacked/
-.DS_Store
-Thumbs.db
+_*/
+_*
+*.zip
+*.bak
+task-artifacts/
+package-lock.json
+
+# Build artifacts
+_new_app.asar
+release/*.exe
+release/*.blockmap
+release/win-unpacked/
+release/builder-debug.yml
+release/latest.yml
+*.bak
