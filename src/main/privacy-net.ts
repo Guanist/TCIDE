@@ -4,9 +4,12 @@
 import { session, net } from 'electron';
 
 const ALLOWED_DOMAINS = new Set<string>([
-  'localhost', '127.0.0.1', 'api.deepseek.com', 'openai.com',
+  'api.deepseek.com', 'openai.com',
   'api.openai.com', 'ollama.localhost',
 ]);
+
+// 本地服务仅放行指定端口（Ollama 11434 / Vite 5173 / 本地调试 3000 / 8000）
+const ALLOWED_LOCAL_PORTS = new Set<number>([11434, 3000, 5173, 8000]);
 
 export class PrivacyNet {
   enable(): void {
@@ -17,8 +20,14 @@ export class PrivacyNet {
           callback({});
           return;
         }
-        if (url.hostname === 'localhost' || url.hostname === '127.0.0.1') {
-          callback({});
+        if (url.hostname === 'localhost' || url.hostname === '127.0.0.1' || url.hostname === '::1') {
+          const port = url.port ? Number(url.port) : (url.protocol === 'https:' ? 443 : 80);
+          if (ALLOWED_LOCAL_PORTS.has(port)) {
+            callback({});
+            return;
+          }
+          console.warn(`[PrivacyNet] Blocked localhost port: ${details.url}`);
+          callback({ cancel: true });
           return;
         }
         if (!this.isAllowed(url.hostname)) {

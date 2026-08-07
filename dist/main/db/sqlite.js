@@ -45,6 +45,7 @@ exports.insertUsage = insertUsage;
 exports.queryUsage = queryUsage;
 exports.saveSnapshot = saveSnapshot;
 exports.getSnapshots = getSnapshots;
+exports.getSnapshotById = getSnapshotById;
 exports.markSnapshotRestored = markSnapshotRestored;
 exports.saveTaskSession = saveTaskSession;
 exports.getTaskSession = getTaskSession;
@@ -249,7 +250,11 @@ function saveSnapshot(projectPath, taskId, filePath, content) {
     saveDatabase();
 }
 function getSnapshots(projectPath, filePath) {
-    return queryDb(`SELECT id, task_id AS taskId, content, timestamp FROM file_snapshots WHERE project_path = ? AND file_path = ? AND restored = 0 ORDER BY timestamp DESC`, [projectPath, filePath]);
+    return queryDb(`SELECT id, task_id AS taskId, file_path AS filePath, content, timestamp FROM file_snapshots WHERE project_path = ? AND file_path = ? AND restored = 0 ORDER BY timestamp DESC`, [projectPath, filePath]);
+}
+function getSnapshotById(id) {
+    const rows = queryDb(`SELECT id, project_path AS projectPath, task_id AS taskId, file_path AS filePath, content, timestamp FROM file_snapshots WHERE id = ?`, [id]);
+    return rows.length > 0 ? rows[0] : null;
 }
 function markSnapshotRestored(id) {
     if (!db)

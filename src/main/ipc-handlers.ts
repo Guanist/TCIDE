@@ -2,16 +2,16 @@
  * PersonalIDE - IPC Handlers
  */
 import { ipcMain, dialog, safeStorage, BrowserWindow } from 'electron';
-import { FileService } from './file-service';
+import { FileService, addAllowedRoot, isAllowedPath } from './file-service';
 import { ModelAdapter, ModelConfig, ChatMessage } from '../core/model/adapter';
 import { modelRegistry } from '../core/model/model-meta';
 import { BuilderAgent } from '../core/agent/builder-agent';
 import { CoderAgent } from '../core/agent/coder-agent';
-import { saveSnapshot, getSnapshots, markSnapshotRestored, saveTaskSession, getTaskSession, clearTaskSession } from './db/sqlite';
+import { saveSnapshot, getSnapshots, getSnapshotById, markSnapshotRestored, saveTaskSession, getTaskSession, clearTaskSession } from './db/sqlite';
 import { TaskRunner } from '../core/task/task-runner';
 import { configManager } from '../core/config/config-manager';
 import { ProjectCompatManager } from '../core/compat/project-compat';
-import { queryDb, runDb, insertUsage, queryUsage } from './db/sqlite';
+import { insertUsage, queryUsage } from './db/sqlite';
 import { getStore } from './store';
 const store = getStore();
 import * as zlib from 'zlib';
@@ -84,13 +84,6 @@ function insertUsageRecord(rec: {
   }
 }
 
-function safeGitArg(arg: string): string {
-  if (!/^[a-zA-Z0-9._\/:-]+$/.test(arg)) throw new Error(`Unsafe git argument: ${arg}`);
-  return arg;
-}
-function safeCommitMsg(msg: string): string {
-  return msg.replace(/[`$(){}[\]|&;!<>]/g, '').replace(/"/g, '');
-}
 
 export function setupIpcHandlers(): void {
   // 文件操作
@@ -142,6 +135,7 @@ export function setupIpcHandlers(): void {
     });
     if (!result.canceled && result.filePaths[0]) {
       currentProjectPath = result.filePaths[0];
+      addAllowedRoot(currentProjectPath);
       return currentProjectPath;
     }
     return null;
@@ -149,7 +143,11 @@ export function setupIpcHandlers(): void {
 
   ipcMain.handle('project:openPath', async (_e, projectPath: string) => {
     const fs = await import('fs');
-    if (fs.existsSync(projectPath)) { currentProjectPath = projectPath; return; }
+    if (fs.existsSync(projectPath)) {
+      currentProjectPath = projectPath;
+      addAllowedRoot(currentProjectPath);
+      return;
+    }
     throw new Error(`项目路径不存在: ${projectPath}`);
   });
 
@@ -254,6 +252,12 @@ export function setupIpcHandlers(): void {
 
   // 终端命令
   ipcMain.handle('terminal:exec', async (_e, command: string, cwd: string) => {
+    if (typeof command !== 'string' || command.length > 4096) {
+      throw new Error('命令长度超出限制 (4096)');
+    }
+    if (!isAllowedPath(cwd || '')) {
+      throw new Error('终端工作目录不在允许范围内');
+    }
     // Block common dangerous operations
     const dangerous = [
       /\brm\s+-(?:r[ef]*|f[er]*)\b/i,
@@ -270,28 +274,16 @@ export function setupIpcHandlers(): void {
         throw new Error('Dangerous command blocked by TCIDE safety policy');
       }
     }
-    const { exec } = await import('child_process');
+    const { execFile } = await import('child_process');
     const { promisify } = await import('util');
-    const execAsync = promisify(exec);
+    const execFileAsync = promisify(execFile);
     try {
-      const { stdout, stderr } = await execAsync(command, { cwd, timeout: 120000, maxBuffer: 10 * 1024 * 1024, windowsHide: true });
+      const { stdout, stderr } = await execFileAsync(process.env.ComSpec || 'cmd.exe', ['/d', '/s', '/c', command], { cwd, timeout: 120000, maxBuffer: 10 * 1024 * 1024, windowsHide: true });
       return { stdout, stderr, exitCode: 0 };
     } catch (err: unknown) {
       const error = err as { stdout?: string; stderr?: string; code?: number };
       return { stdout: error.stdout || '', stderr: error.stderr || '', exitCode: error.code || 1 };
     }
-  });
-
-  // 数据库
-  ipcMain.handle('db:query', async (_e, sql: string, params?: unknown[]) => {
-    const trimmed = sql.trim();
-    if (!/^SELECT\b/i.test(trimmed)) throw new Error('Only SELECT queries are allowed');
-    if (/;\s*(DROP|ALTER|CREATE|INSERT|UPDATE|DELETE|SELECT)/i.test(trimmed)) throw new Error('Multi-statement queries are forbidden');
-    return queryDb(sql, params);
-  });
-  ipcMain.handle('db:run', async (_e, sql: string, params?: unknown[]) => {
-    if (/\bDROP\s+TABLE\b/i.test(sql)) throw new Error('禁止删除表');
-    return runDb(sql, params);
   });
 
   // 工程兼容
@@ -506,11 +498,7 @@ export function setupIpcHandlers(): void {
 
   // ── 文件创建 ──
   ipcMain.handle('file:create', async (_e, filePath: string, content?: string) => {
-    const fs = await import('fs');
-    const pathMod = await import('path');
-    const dir = pathMod.dirname(filePath);
-    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-    fs.writeFileSync(filePath, content || '', 'utf-8');
+    await fileService.write(filePath, content || '');
   });
 
   // ── 系统：打开外部应用/文件 ──
@@ -529,8 +517,9 @@ export function setupIpcHandlers(): void {
   ipcMain.handle('system:openTerminal', async (_e, cwd?: string) => {
     const { spawn } = await import('child_process');
     const targetDir = cwd || currentProjectPath || process.cwd();
+    if (!isAllowedPath(targetDir)) throw new Error('目录不在允许范围内');
     if (process.platform === 'win32') {
-      spawn('cmd', ['/c', 'start', 'cmd', '/k', `cd /d "${targetDir}"`], { shell: true, detached: true, stdio: 'ignore' }).unref();
+      spawn('cmd', ['/c', 'start', 'cmd', '/k'], { cwd: targetDir, detached: true, stdio: 'ignore' }).unref();
     } else if (process.platform === 'darwin') {
       spawn('open', ['-a', 'Terminal', targetDir], { detached: true, stdio: 'ignore' }).unref();
     } else {
@@ -574,7 +563,11 @@ export function setupSnapshotIpc(): void {
   });
 
   ipcMain.handle('snapshot:restore', async (_e, id: number) => {
-    const rows = getSnapshots('', ''); // Marker only
+    const snap = getSnapshotById(id);
+    if (!snap) throw new Error('快照不存在: ' + id);
+    if (!isAllowedPath(snap.filePath)) throw new Error('快照文件路径不在允许范围内');
+    const fs = await import('fs');
+    fs.writeFileSync(snap.filePath, snap.content, 'utf-8');
     markSnapshotRestored(id);
   });
 
@@ -592,10 +585,11 @@ export function setupSnapshotIpc(): void {
 
   // ── Git 分支查询 ──
   ipcMain.handle('git:getBranch', async (_e, projectPath: string) => {
+    if (!isAllowedPath(projectPath)) return { branch: null, success: false };
     try {
-      const { execSync } = require('child_process');
-      const branch = execSync('git rev-parse --abbrev-ref HEAD', { cwd: projectPath, timeout: 3000 })
-        .toString().trim();
+      const { execFileSync } = require('child_process');
+      const branch = execFileSync('git', ['rev-parse', '--abbrev-ref', 'HEAD'], { cwd: projectPath, timeout: 3000, encoding: 'utf-8' })
+        .trim();
       return { branch, success: true };
     } catch {
       return { branch: null, success: false };
@@ -604,12 +598,15 @@ export function setupSnapshotIpc(): void {
 
   // ── Gradle 快捷操作 ──
   ipcMain.handle('gradle:exec', async (_e, projectPath: string, task: string) => {
+    const allowedTasks = ['assembleDebug', 'build', 'clean', 'test', 'lint', 'dependencies', 'tasks', 'help'];
+    if (!allowedTasks.includes(task)) throw new Error('Gradle task 不在白名单中: ' + task);
+    if (!isAllowedPath(projectPath)) throw new Error('项目路径不在允许范围内');
     const { spawn } = require('child_process');
     const gradlew = process.platform === 'win32'
       ? require('path').join(projectPath, 'gradlew.bat')
       : require('path').join(projectPath, 'gradlew');
     return new Promise((resolve) => {
-      const proc = spawn(gradlew, [task], { cwd: projectPath, shell: true });
+      const proc = spawn(gradlew, [task], { cwd: projectPath, windowsHide: true });
       let output = '';
       proc.stdout?.on('data', (d: Buffer) => { output += d.toString(); });
       proc.stderr?.on('data', (d: Buffer) => { output += d.toString(); });
@@ -620,10 +617,11 @@ export function setupSnapshotIpc(): void {
 
   // ── Git 用户身份 ──
   ipcMain.handle('git:getUser', async (_e, projectPath: string) => {
+    if (!isAllowedPath(projectPath)) return { name: null, email: null };
     try {
-      const { execSync } = require('child_process');
-      const name = execSync('git config user.name', { cwd: projectPath, timeout: 2000 }).toString().trim();
-      const email = execSync('git config user.email', { cwd: projectPath, timeout: 2000 }).toString().trim();
+      const { execFileSync } = require('child_process');
+      const name = execFileSync('git', ['config', 'user.name'], { cwd: projectPath, timeout: 2000, encoding: 'utf-8' }).trim();
+      const email = execFileSync('git', ['config', 'user.email'], { cwd: projectPath, timeout: 2000, encoding: 'utf-8' }).trim();
       return { name, email };
     } catch {
       return { name: null, email: null };
@@ -632,9 +630,10 @@ export function setupSnapshotIpc(): void {
 
   // ── Git 状态 ──
   ipcMain.handle('git:status', async (_e, projectPath: string) => {
+    if (!isAllowedPath(projectPath)) return { success: false, branch: '', files: [], ahead: 0, behind: 0, dirty: false };
     try {
-      const { execSync } = require('child_process');
-      const output = execSync('git status --porcelain -b', { cwd: projectPath, timeout: 5000 }).toString();
+      const { execFileSync } = require('child_process');
+      const output = execFileSync('git', ['status', '--porcelain', '-b'], { cwd: projectPath, timeout: 5000, encoding: 'utf-8' });
       const lines = output.split('\n').filter(Boolean);
       const branchLine = lines[0];
       const branch = branchLine.startsWith('## ') ? branchLine.slice(3).split('...')[0] : 'unknown';
@@ -652,9 +651,10 @@ export function setupSnapshotIpc(): void {
 
   // ── Git Stage All ──
   ipcMain.handle('git:stageAll', async (_e, projectPath: string) => {
+    if (!isAllowedPath(projectPath)) return { success: false, error: '项目路径不在允许范围内' };
     try {
-      const { execSync } = require('child_process');
-      execSync('git add -A', { cwd: projectPath, timeout: 10000 });
+      const { execFileSync } = require('child_process');
+      execFileSync('git', ['add', '-A'], { cwd: projectPath, timeout: 10000 });
       return { success: true };
     } catch (err: unknown) {
       return { success: false, error: (err as Error).message };
@@ -663,10 +663,11 @@ export function setupSnapshotIpc(): void {
 
   // ── Git Commit ──
   ipcMain.handle('git:commit', async (_e, projectPath: string, message: string) => {
+    if (!isAllowedPath(projectPath)) return { success: false, error: '项目路径不在允许范围内' };
     try {
-      const { execSync } = require('child_process');
-      const safeMsg = message.replace(/"/g, '\\"');
-      const output = execSync(`git commit -m "${safeCommitMsg(safeMsg)}"`, { cwd: projectPath, timeout: 10000 }).toString().trim();
+      const { execFileSync } = require('child_process');
+      const safeMsg = String(message || '').slice(0, 500);
+      const output = execFileSync('git', ['commit', '-m', safeMsg], { cwd: projectPath, timeout: 10000, encoding: 'utf-8' }).trim();
       return { success: true, output };
     } catch (err: unknown) {
       return { success: false, error: (err as Error).message };
@@ -675,10 +676,11 @@ export function setupSnapshotIpc(): void {
 
   // ── Git Push ──
   ipcMain.handle('git:push', async (_e, projectPath: string) => {
+    if (!isAllowedPath(projectPath)) return { success: false, error: '项目路径不在允许范围内' };
     try {
-      const { execSync } = require('child_process');
-      const branch = execSync('git rev-parse --abbrev-ref HEAD', { cwd: projectPath, timeout: 3000 }).toString().trim();
-      const output = execSync(`git push origin ${safeGitArg(branch)}`, { cwd: projectPath, timeout: 30000 }).toString().trim();
+      const { execFileSync } = require('child_process');
+      const branch = execFileSync('git', ['rev-parse', '--abbrev-ref', 'HEAD'], { cwd: projectPath, timeout: 3000, encoding: 'utf-8' }).trim();
+      const output = execFileSync('git', ['push', 'origin', branch], { cwd: projectPath, timeout: 30000, encoding: 'utf-8' }).trim();
       return { success: true, output };
     } catch (err: unknown) {
       return { success: false, error: (err as Error).message };
@@ -687,9 +689,10 @@ export function setupSnapshotIpc(): void {
 
   // ── Git 分支列表 ──
   ipcMain.handle('git:listBranches', async (_e, projectPath: string) => {
+    if (!isAllowedPath(projectPath)) return { success: false, branches: [], currentBranch: '', error: '项目路径不在允许范围内' };
     try {
-      const { execSync } = require('child_process');
-      const output = execSync('git branch -a --sort=-committerdate', { cwd: projectPath, timeout: 5000 }).toString();
+      const { execFileSync } = require('child_process');
+      const output = execFileSync('git', ['branch', '-a', '--sort=-committerdate'], { cwd: projectPath, timeout: 5000, encoding: 'utf-8' });
       const current = output.match(/\*\s+(\S+)/)?.[1] || '';
       const branches: Array<{ name: string; current: boolean; remote: boolean }> = [];
       for (const line of output.split('\n')) {
@@ -706,9 +709,10 @@ export function setupSnapshotIpc(): void {
 
   // ── Git 切换分支 ──
   ipcMain.handle('git:checkout', async (_e, branch: string, projectPath: string) => {
+    if (!isAllowedPath(projectPath)) return { success: false, error: '项目路径不在允许范围内' };
     try {
-      const { execSync } = require('child_process');
-      const output = execSync(`git checkout "${safeGitArg(branch)}"`, { cwd: projectPath, timeout: 10000 }).toString().trim();
+      const { execFileSync } = require('child_process');
+      const output = execFileSync('git', ['checkout', branch], { cwd: projectPath, timeout: 10000, encoding: 'utf-8' }).trim();
       return { success: true, output };
     } catch (err: unknown) {
       return { success: false, error: (err as Error).message };
@@ -717,10 +721,11 @@ export function setupSnapshotIpc(): void {
 
   // ── Git Diff（返回文件改动行号）──
   ipcMain.handle('git:diff', async (_e, filePath: string, projectPath: string) => {
+    if (!isAllowedPath(projectPath) || !isAllowedPath(filePath)) return { success: false, added: [], removed: [], modified: [] };
     try {
-      const { execSync } = require('child_process');
+      const { execFileSync } = require('child_process');
       const relative = path.relative(projectPath, filePath).replace(/\\/g, '/');
-      const output = execSync(`git diff -U0 HEAD -- "${safeGitArg(relative)}"`, { cwd: projectPath, timeout: 5000 }).toString();
+      const output = execFileSync('git', ['diff', '-U0', 'HEAD', '--', relative], { cwd: projectPath, timeout: 5000, encoding: 'utf-8' });
       // 解析 unified diff 获取改动行号
       const added: number[] = [];
       const removed: number[] = [];
@@ -749,9 +754,10 @@ export function setupSnapshotIpc(): void {
 
   // ── Git Pull ──
   ipcMain.handle('git:pull', async (_e, projectPath: string) => {
+    if (!isAllowedPath(projectPath)) return { success: false, error: '项目路径不在允许范围内' };
     try {
-      const { execSync } = require('child_process');
-      const output = execSync('git pull', { cwd: projectPath, timeout: 30000 }).toString().trim();
+      const { execFileSync } = require('child_process');
+      const output = execFileSync('git', ['pull'], { cwd: projectPath, timeout: 30000, encoding: 'utf-8' }).trim();
       return { success: true, output };
     } catch (err: unknown) {
       return { success: false, error: (err as Error).message };
@@ -760,9 +766,11 @@ export function setupSnapshotIpc(): void {
 
   // ── Git Log ──
   ipcMain.handle('git:log', async (_e, projectPath: string, count: number = 10) => {
+    if (!isAllowedPath(projectPath)) return { success: false, commits: [] };
     try {
-      const { execSync } = require('child_process');
-      const output = execSync(`git log --oneline -${count}`, { cwd: projectPath, timeout: 5000 }).toString().trim();
+      const { execFileSync } = require('child_process');
+      const safeCount = Math.min(100, Math.max(1, Math.floor(Number(count) || 10)));
+      const output = execFileSync('git', ['log', '--oneline', `-${safeCount}`], { cwd: projectPath, timeout: 5000, encoding: 'utf-8' }).trim();
       const commits = output.split('\n').filter(Boolean).map((l: string) => {
         const [hash, ...msg] = l.split(' ');
         return { hash, message: msg.join(' ') };
@@ -1422,9 +1430,10 @@ ipcMain.handle('ai:send-with-tools', async (event, messages: Array<{ role: strin
 // Git Blame
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 ipcMain.handle('git:blame', async (_e, filePath: string, projectPath: string) => {
+  if (!isAllowedPath(projectPath) || !isAllowedPath(filePath)) return { success: false, error: '路径不在允许范围内' };
   try {
-    const { execSync } = require('child_process');
-    const result = execSync(`git blame --date=short -l "${safeGitArg(filePath)}"`, {
+    const { execFileSync } = require('child_process');
+    const result = execFileSync('git', ['blame', '--date=short', '-l', filePath], {
       cwd: projectPath,
       timeout: 10000,
       encoding: 'utf-8',

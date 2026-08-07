@@ -230,11 +230,28 @@ export function saveSnapshot(projectPath: string, taskId: string, filePath: stri
   saveDatabase();
 }
 
-export function getSnapshots(projectPath: string, filePath: string): Array<{ id: number; taskId: string; content: string; timestamp: number }> {
+export interface FileSnapshot {
+  id: number;
+  projectPath: string;
+  taskId: string;
+  filePath: string;
+  content: string;
+  timestamp: number;
+}
+
+export function getSnapshots(projectPath: string, filePath: string): Array<{ id: number; taskId: string; filePath: string; content: string; timestamp: number }> {
   return queryDb(
-    `SELECT id, task_id AS taskId, content, timestamp FROM file_snapshots WHERE project_path = ? AND file_path = ? AND restored = 0 ORDER BY timestamp DESC`,
+    `SELECT id, task_id AS taskId, file_path AS filePath, content, timestamp FROM file_snapshots WHERE project_path = ? AND file_path = ? AND restored = 0 ORDER BY timestamp DESC`,
     [projectPath, filePath]
-  ) as Array<{ id: number; taskId: string; content: string; timestamp: number }>;
+  ) as Array<{ id: number; taskId: string; filePath: string; content: string; timestamp: number }>;
+}
+
+export function getSnapshotById(id: number): FileSnapshot | null {
+  const rows = queryDb(
+    `SELECT id, project_path AS projectPath, task_id AS taskId, file_path AS filePath, content, timestamp FROM file_snapshots WHERE id = ?`,
+    [id]
+  ) as FileSnapshot[];
+  return rows.length > 0 ? rows[0] : null;
 }
 
 export function markSnapshotRestored(id: number): void {

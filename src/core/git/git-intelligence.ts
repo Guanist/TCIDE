@@ -39,19 +39,21 @@ class GitIntelligence {
         // Stage & get diff
         let stagedDiff = '';
         try {
-            stagedDiff = this._exec('git diff --cached --stat', projectRoot);
+            stagedDiff = this._execArgs(['diff', '--cached', '--stat'], projectRoot);
         } catch {}
 
         if (!stagedDiff.trim()) {
             try {
-                stagedDiff = this._exec('git diff --stat', projectRoot);
+                stagedDiff = this._execArgs(['diff', '--stat'], projectRoot);
             } catch {}
             if (!stagedDiff.trim()) {
                 return { message: 'chore: minor update', breakdown: [], rawDiff: '' };
             }
         }
 
-        const rawDiff = this._exec('git diff --cached -U3', projectRoot) || this._exec('git diff -U3', projectRoot);
+        let rawDiff = '';
+        try { rawDiff = this._execArgs(['diff', '--cached', '-U3'], projectRoot) || ''; } catch {}
+        if (!rawDiff) { try { rawDiff = this._execArgs(['diff', '-U3'], projectRoot) || ''; } catch {} }
         const statLines = stagedDiff.split('\n').filter(l => l.includes('|'));
         const changedFiles = this._parseChangedFiles(statLines);
 
@@ -96,7 +98,7 @@ class GitIntelligence {
 
         try {
             // Diff stats
-            const diffStat = this._exec(`git diff ${safeGitArg(baseRef)} ${safeGitArg(headRef)} --stat`, projectRoot);
+            const diffStat = this._execArgs(['diff', baseRef, headRef, '--stat'], projectRoot);
             const statLines = diffStat.split('\n');
             const lastLine = statLines[statLines.length - 2] || '';
             const statMatch = lastLine.match(/(\d+) files? changed(?:, (\d+) insertions?\(\+\))?(?:, (\d+) deletions?\(-\))?/);
@@ -180,14 +182,19 @@ class GitIntelligence {
         };
 
         try {
-            result.mergeBase = this._exec(`git merge-base HEAD ${safeGitArg(branch)}`, projectRoot).trim();
+            result.mergeBase = this._execArgs(['merge-base', 'HEAD', branch], projectRoot).trim();
 
             // Test merge
-            const mergeMsg = this._exec(`git merge --no-commit --no-ff ${safeGitArg(branch)} 2>&1 || true`, projectRoot);
+            let mergeMsg = '';
+            try {
+                mergeMsg = this._execArgs(['merge', '--no-commit', '--no-ff', branch], projectRoot);
+            } catch (err) {
+                mergeMsg = String((err && (err.stderr || err.message)) || '');
+            }
             if (mergeMsg.includes('CONFLICT')) {
                 result.hasConflicts = true;
 
-                const diffCheck = this._exec('git diff --name-only --diff-filter=U', projectRoot);
+                const diffCheck = this._execArgs(['diff', '--name-only', '--diff-filter=U'], projectRoot);
                 const conflictedFiles = diffCheck.split('\n').filter(f => f.trim());
 
                 for (const file of conflictedFiles) {
@@ -204,11 +211,11 @@ class GitIntelligence {
                 }
 
                 // Reset
-                this._exec('git merge --abort', projectRoot);
+                this._execArgs(['merge', '--abort'], projectRoot);
             }
         } catch {
             // Could not analyze, clean up
-            try { this._exec('git merge --abort', projectRoot); } catch {}
+            try { this._execArgs(['merge', '--abort'], projectRoot); } catch {}
         }
 
         return result;
@@ -223,7 +230,7 @@ class GitIntelligence {
         const results = [];
 
         try {
-            const blame = this._exec(`git blame --line-porcelain "${safeGitPath(absPath)}"`, projectRoot);
+            const blame = this._execArgs(['blame', '--line-porcelain', absPath], projectRoot);
             const chunks = blame.split('\n');
 
             let current = null;
@@ -273,7 +280,7 @@ class GitIntelligence {
     // ── 5. 变更时间线 ──
     async getChangelog(projectRoot, days = 7) {
         const since = new Date(Date.now() - days * 86400000).toISOString().slice(0, 10);
-        const log = this._exec(`git log --since="${safeGitArg(since)}" --pretty=format:"%h|%an|%ad|%s" --date=short`, projectRoot);
+        const log = this._execArgs(['log', '--since=' + since, '--pretty=format:%h|%an|%ad|%s', '--date=short'], projectRoot);
         return log.split('\n').filter(l => l).map(l => {
             const [hash, author, date, ...msg] = l.split('|');
             return { hash, author, date, message: msg.join('|') };
@@ -282,12 +289,8 @@ class GitIntelligence {
 
     // ── 私有方法 ──
 
-    _exec(cmd, cwd) {
-        try {
-            return child_process.execSync(cmd, { cwd, encoding: 'utf-8', maxBuffer: 50 * 1024 * 1024 });
-        } catch (e) {
-            return e.stdout || e.stderr || '';
-        }
+    _execArgs(args, cwd) {
+        return child_process.execFileSync('git', args, { cwd, encoding: 'utf-8', maxBuffer: 50 * 1024 * 1024 });
     }
 
     _parseChangedFiles(statLines) {

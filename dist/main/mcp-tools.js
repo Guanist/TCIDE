@@ -44,6 +44,7 @@ exports.executeTool = executeTool;
 const child_process_1 = require("child_process");
 const fs = __importStar(require("fs"));
 const path = __importStar(require("path"));
+const file_service_1 = require("./file-service");
 // ── 工具注册表 ──
 const BUILTIN_TOOLS = [
     {
@@ -160,10 +161,12 @@ async function executeTool(call, projectPath, extraContext) {
 }
 async function executeToolImpl(call, projectPath, extraContext) {
     const args = call.arguments || {};
+    if (!(0, file_service_1.isAllowedPath)(projectPath))
+        throw new Error('项目路径不在允许范围内');
     switch (call.name) {
         case 'read_file': {
             const filePath = path.resolve(projectPath, args.path || '');
-            if (!filePath.startsWith(projectPath))
+            if (!isInside(projectPath, filePath))
                 throw new Error('路径必须在项目目录内');
             if (!fs.existsSync(filePath))
                 throw new Error(`文件不存在: ${args.path}`);
@@ -175,7 +178,7 @@ async function executeToolImpl(call, projectPath, extraContext) {
         }
         case 'write_file': {
             const filePath = path.resolve(projectPath, args.path || '');
-            if (!filePath.startsWith(projectPath))
+            if (!isInside(projectPath, filePath))
                 throw new Error('路径必须在项目目录内');
             fs.mkdirSync(path.dirname(filePath), { recursive: true });
             fs.writeFileSync(filePath, args.content, 'utf-8');
@@ -184,7 +187,7 @@ async function executeToolImpl(call, projectPath, extraContext) {
         case 'list_files': {
             const dirPath = path.resolve(projectPath, args.path || '.');
             const depth = Math.min(3, Math.max(1, args.depth || 1));
-            if (!dirPath.startsWith(projectPath))
+            if (!isInside(projectPath, dirPath))
                 throw new Error('路径必须在项目目录内');
             return listDir(dirPath, depth, projectPath);
         }
@@ -195,14 +198,46 @@ async function executeToolImpl(call, projectPath, extraContext) {
             return searchInProject(projectPath, query, filePattern, maxResults);
         }
         case 'run_command': {
-            const cmd = args.command;
-            try {
-                const output = (0, child_process_1.execSync)(cmd, { cwd: projectPath, timeout: 15000, encoding: 'utf-8', maxBuffer: 1024 * 1024 });
-                return output.slice(0, 4000);
+            const cmd = args.command || '';
+            // 安全策略：仅允许构建/测试类命令，且禁止 shell 元字符拼接
+            const allowedPrefixes = [
+                'npm run ', 'npm test', 'npm install', 'npm ci', 'npm exec', 'npx ',
+                'yarn ', 'pnpm ', 'gradlew', 'gradle ', 'mvn ', 'make ', 'cmake ',
+                'python ', 'python3 ', 'node ',
+                'git status', 'git diff', 'git log', 'git branch', 'git fetch', 'git pull',
+            ];
+            const trimmed = cmd.trim();
+            const allowed = allowedPrefixes.some(p => trimmed.startsWith(p));
+            const hasMeta = /[&|;<>`$(){}[\]%!"]/.test(trimmed);
+            if (!allowed || hasMeta) {
+                return '命令被安全策略拦截：仅允许构建/测试类命令（npm/npx/yarn/pnpm/gradle/mvn/make/cmake/python/node/git 只读操作），且不允许 shell 元字符';
             }
-            catch (err) {
-                return `命令执行失败 (exit ${err.status}):\n${err.stderr || err.message}`.slice(0, 2000);
-            }
+            return new Promise((resolve) => {
+                const isWin = process.platform === 'win32';
+                let proc;
+                if (isWin) {
+                    // npm/npx/gradlew 等是 .cmd 包装器，需经 cmd.exe 执行（命令已过白名单+元字符过滤）
+                    proc = (0, child_process_1.spawn)(process.env.ComSpec || 'cmd.exe', ['/d', '/s', '/c', trimmed], { cwd: projectPath, windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] });
+                }
+                else {
+                    const parts = trimmed.split(/\s+/);
+                    proc = (0, child_process_1.spawn)(parts[0], parts.slice(1), { cwd: projectPath, windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] });
+                }
+                let output = '';
+                let stderr = '';
+                proc.stdout?.on('data', (d) => { output += d.toString(); });
+                proc.stderr?.on('data', (d) => { stderr += d.toString(); });
+                const timer = setTimeout(() => { try {
+                    proc.kill();
+                }
+                catch { /* ignore */ } }, 15000);
+                proc.on('close', (code) => {
+                    clearTimeout(timer);
+                    const text = (output + (stderr ? '\n' + stderr : '')).slice(0, 4000);
+                    resolve(code === 0 ? text : `命令执行失败 (exit ${code}):\n${text}`.slice(0, 2000));
+                });
+                proc.on('error', (err) => { clearTimeout(timer); resolve(`命令执行失败: ${err.message}`.slice(0, 2000)); });
+            });
         }
         case 'get_diagnostics': {
             // 诊断信息由渲染进程提供，这里返回占位
@@ -216,7 +251,7 @@ async function executeToolImpl(call, projectPath, extraContext) {
         }
         case 'git_status': {
             try {
-                const output = (0, child_process_1.execSync)('git status --short', { cwd: projectPath, timeout: 5000, encoding: 'utf-8' });
+                const output = (0, child_process_1.execFileSync)('git', ['status', '--short'], { cwd: projectPath, timeout: 5000, encoding: 'utf-8' });
                 return output || '工作区干净';
             }
             catch (err) {
@@ -225,10 +260,13 @@ async function executeToolImpl(call, projectPath, extraContext) {
         }
         case 'git_diff': {
             const filePath = args.file_path || '';
+            if (filePath && !isInside(projectPath, path.resolve(projectPath, filePath))) {
+                throw new Error('路径必须在项目目录内');
+            }
             try {
                 const output = filePath
-                    ? (0, child_process_1.execSync)(`git diff HEAD -- "${filePath}"`, { cwd: projectPath, timeout: 5000, encoding: 'utf-8' })
-                    : (0, child_process_1.execSync)('git diff HEAD', { cwd: projectPath, timeout: 10000, encoding: 'utf-8' });
+                    ? (0, child_process_1.execFileSync)('git', ['diff', 'HEAD', '--', filePath], { cwd: projectPath, timeout: 5000, encoding: 'utf-8' })
+                    : (0, child_process_1.execFileSync)('git', ['diff', 'HEAD'], { cwd: projectPath, timeout: 10000, encoding: 'utf-8' });
                 return output || '无变更';
             }
             catch (err) {
@@ -240,6 +278,11 @@ async function executeToolImpl(call, projectPath, extraContext) {
     }
 }
 // ── 辅助函数 ──
+/** 判断 target 是否位于 root 目录内（防前缀攻击：/project/evil） */
+function isInside(root, target) {
+    const rel = path.relative(path.resolve(root), path.resolve(target));
+    return rel === '' || (!rel.startsWith('..') && !path.isAbsolute(rel));
+}
 function listDir(dirPath, depth, projectRoot) {
     if (depth < 1)
         return '';
@@ -267,30 +310,72 @@ function listDir(dirPath, depth, projectRoot) {
     return lines.join('\n');
 }
 function searchInProject(projectPath, query, filePattern, maxResults) {
-    // 使用 git grep 或 findstr
-    try {
-        const isWin = process.platform === 'win32';
-        // Sanitize filePattern to prevent command injection
-        const safePattern = filePattern.replace(/[^a-zA-Z0-9*.?_-]/g, '');
-        let cmd;
-        if (isWin) {
-            const escapedQuery = query.replace(/"/g, '\\"');
-            cmd = `findstr /s /i /n /c:"${escapedQuery}" "${safePattern}" 2>nul`;
+    // 纯 Node 递归扫描，避免 findstr/grep 命令注入
+    const results = [];
+    const maxFileSize = 1 * 1024 * 1024; // 单文件上限 1MB
+    const skipDirs = new Set(['.git', 'node_modules', '__pycache__', '.venv', 'dist', '.next', '.idea', '.vscode', 'build', '.gradle', 'target']);
+    const q = String(query || '').toLowerCase();
+    if (!q)
+        return '未找到匹配结果';
+    function walk(dir) {
+        if (results.length >= maxResults)
+            return;
+        let entries;
+        try {
+            entries = fs.readdirSync(dir, { withFileTypes: true });
         }
-        else {
-            const escapedQuery = query.replace(/'/g, "'\\''");
-            cmd = `grep -rn --include="${safePattern}" "${escapedQuery}" . 2>/dev/null`;
+        catch {
+            return;
         }
-        const output = (0, child_process_1.execSync)(cmd, { cwd: projectPath, timeout: 8000, encoding: 'utf-8', maxBuffer: 1024 * 1024 });
-        const lines = output.split('\n').filter(l => l.trim());
-        const result = lines.slice(0, maxResults).join('\n');
-        return result || '未找到匹配结果';
+        for (const e of entries) {
+            if (results.length >= maxResults)
+                return;
+            if (skipDirs.has(e.name))
+                continue;
+            const full = path.join(dir, e.name);
+            if (e.isDirectory()) {
+                walk(full);
+            }
+            else if (e.isFile()) {
+                if (filePattern !== '*' && !wildcardMatch(filePattern, e.name))
+                    continue;
+                try {
+                    const stat = fs.statSync(full);
+                    if (stat.size > maxFileSize)
+                        continue;
+                    const lines = fs.readFileSync(full, 'utf-8').split('\n');
+                    for (let i = 0; i < lines.length; i++) {
+                        if (lines[i].toLowerCase().includes(q)) {
+                            results.push({ file: path.relative(projectPath, full), line: i + 1, text: lines[i].trim().slice(0, 120) });
+                            if (results.length >= maxResults)
+                                return;
+                        }
+                    }
+                }
+                catch {
+                    // 忽略无法读取的文件
+                }
+            }
+        }
     }
-    catch (err) {
-        if (err.status === 1)
-            return '未找到匹配结果'; // grep returns 1 when no matches
-        return `搜索失败: ${err.message}`;
+    walk(projectPath);
+    if (results.length === 0)
+        return '未找到匹配结果';
+    return results.map(r => `${r.file}:${r.line}: ${r.text}`).join('\n');
+}
+function wildcardMatch(pattern, name) {
+    let re = '';
+    for (const ch of pattern) {
+        if (ch === '*')
+            re += '.*';
+        else if (ch === '?')
+            re += '.';
+        else if ('\\^$.|+()[{'.includes(ch))
+            re += '\\' + ch;
+        else
+            re += ch;
     }
+    return new RegExp('^' + re + '$', 'i').test(name);
 }
 function truncate(text, maxLen) {
     if (text.length <= maxLen)

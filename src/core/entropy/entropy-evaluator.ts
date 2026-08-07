@@ -338,22 +338,27 @@ class EntropyEvaluator {
     _analyzeChurn() {
         const details = [];
         try {
-            // Get churn data from git (last 90 days)
-            const output = child_process.execSync(
-                'git log --pretty=format: --name-only --since="90 days ago" | sort | uniq -c | sort -rn | head -30',
-                { cwd: this.projectRoot, encoding: 'utf-8', timeout: 10000 }
+            // Get churn data from git (last 90 days) — execFileSync 参数数组，避免 shell 管道在 Windows 上不可用
+            const output = child_process.execFileSync(
+                'git',
+                ['log', '--pretty=format:', '--name-only', '--since=90 days ago'],
+                { cwd: this.projectRoot, encoding: 'utf-8', timeout: 10000, maxBuffer: 20 * 1024 * 1024 }
             );
-            const lines = output.split('\n').filter(l => l.trim());
-            for (const line of lines) {
-                const match = line.match(/^\s*(\d+)\s+(.+)/);
-                if (match) {
-                    const count = parseInt(match[1]);
-                    const file = match[2].trim();
-                    const metrics = this.fileMetrics.get(path.join(this.projectRoot, file));
-                    const complexity = metrics?.complexity || 1;
-                    const churnComplexity = count * complexity;
-                    details.push({ file, changes: count, complexity, churnComplexity });
-                }
+            // 在 JS 中聚合 uniq -c / sort -rn / head -30 逻辑
+            const counts = new Map<string, number>();
+            for (const file of output.split('\n')) {
+                const f = file.trim();
+                if (!f) continue;
+                counts.set(f, (counts.get(f) || 0) + 1);
+            }
+            const top = [...counts.entries()]
+                .sort((a, b) => b[1] - a[1])
+                .slice(0, 30);
+            for (const [file, count] of top) {
+                const metrics = this.fileMetrics.get(path.join(this.projectRoot, file));
+                const complexity = metrics?.complexity || 1;
+                const churnComplexity = count * complexity;
+                details.push({ file, changes: count, complexity, churnComplexity });
             }
         } catch {
             // No git or no history

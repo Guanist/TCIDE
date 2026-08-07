@@ -1731,11 +1731,15 @@ function appendStreamChunk(chunk: string): void {
 
 function renderMarkdown(text: string): string {
   // 先用占位符替换代码块,处理完其他 markdown 后再还原
+  // 整体内容先做 HTML 转义,防止 AI 输出中的 HTML/XSS 注入
   const codeBlocks: Array<{ lang: string; code: string }> = [];
   let html = text.replace(/```(\w*)\n([\s\S]*?)```/g, (_m, lang, code) => {
     codeBlocks.push({ lang: lang || '', code });
     return `___CODEBLOCK_${codeBlocks.length - 1}___`;
   });
+
+  // 整体转义（非代码块部分）
+  html = escapeHtml(html);
 
   // 行内代码
   html = html.replace(/`([^`]+)`/g, '<code>$1</code>');
@@ -1753,10 +1757,9 @@ function renderMarkdown(text: string): string {
   html = html.replace(/___CODEBLOCK_(\d+)___/g, (_m, idx) => {
     const block = codeBlocks[parseInt(idx)];
     if (!block) return '';
-    const escaped = block.code
-      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;');
-    const langLabel = block.lang ? `<span class="code-lang">${block.lang}</span>` : '';
+    const escaped = escapeHtml(block.code);
+    const langAttr = escapeAttr(block.lang);
+    const langLabel = block.lang ? `<span class="code-lang">${escapeHtml(block.lang)}</span>` : '';
     const codeId = 'cb_' + Math.random().toString(36).slice(2, 8);
     const langLower = (block.lang || '').toLowerCase();
     
@@ -1768,34 +1771,73 @@ function renderMarkdown(text: string): string {
     const runnable = ['python', 'py', 'javascript', 'js', 'typescript', 'ts', 'shell', 'bash', 'bat', 'cmd'];
     const canRun = runnable.includes(langLower);
     
-    // 构建代码属性，用于打开编辑
-    const escapedLang = block.lang.replace(/'/g, "\\'");
-    const escapedCode = block.code.replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/\n/g, '\\n');
-    
+    // 按钮使用 data-lang + 事件委托（不再拼接内联 onclick,避免 XSS）
     const actionsHtml = `
-      <button class="code-action-btn code-open-btn" title="在编辑器中打开" 
-        onclick="event.stopPropagation();(function(){const el=document.getElementById('${codeId}');const code=el?el.textContent:'';window.__openCodeInEditor__('${escapedLang}',code)})()">📂 打开</button>
-      ${canPreview ? `<button class="code-action-btn code-preview-btn" title="预览效果"
-        onclick="event.stopPropagation();(function(){const el=document.getElementById('${codeId}');const code=el?el.textContent:'';window.__previewCode__('${escapedLang}',code)})()">👁 预览</button>` : ''}
-      ${canRun ? `<button class="code-action-btn code-run-btn" title="运行代码"
-        onclick="event.stopPropagation();(function(){const el=document.getElementById('${codeId}');const code=el?el.textContent:'';window.__runCode__('${escapedLang}',code)})()">▶ 运行</button>` : ''}
-      <button class="code-action-btn code-save-btn" title="保存到项目"
-        onclick="event.stopPropagation();(function(){const el=document.getElementById('${codeId}');const code=el?el.textContent:'';window.__saveCodeToProject__('${escapedLang}',code)})()">💾 保存</button>
+      <button class="code-action-btn code-open-btn" data-lang="${langAttr}" title="在编辑器中打开">📂 打开</button>
+      ${canPreview ? `<button class="code-action-btn code-preview-btn" data-lang="${langAttr}" title="预览效果">👁 预览</button>` : ''}
+      ${canRun ? `<button class="code-action-btn code-run-btn" data-lang="${langAttr}" title="运行代码">▶ 运行</button>` : ''}
+      <button class="code-action-btn code-save-btn" data-lang="${langAttr}" title="保存到项目">💾 保存</button>
     `;
 
-    // 长代码块折叠（>10 行），默认只显示前 6 行
+    // 长代码块折叠（>10 行）,默认只显示前 6 行
     const lines = block.code.split('\n');
     const isLong = lines.length > 10;
     const collapsibleClass = isLong ? ' code-block-collapsed' : '';
-    const toggleBtn = isLong ? `<button class="code-expand-btn" onclick="const w=this.closest('.code-block-wrapper');const p=w.querySelector('.code-block-pre');const e=w.querySelector('.code-expand-btn');if(p.classList.contains('code-block-collapsed')){p.classList.remove('code-block-collapsed');e.textContent='收起 ▲'}else{p.classList.add('code-block-collapsed');e.textContent='展开 ▼ ('+${lines.length}+'行)'};return false">展开 ▼ (${lines.length}行)</button>` : '';
+    const toggleBtn = isLong ? `<button class="code-expand-btn" title="展开/收起">展开 ▼ (${lines.length}行)</button>` : '';
     
     return `<div class="code-block-wrapper">
-      <div class="code-block-header">${langLabel}<span class="code-block-spacer"></span>${actionsHtml}${toggleBtn}<button class="copy-code-btn" onclick="var t=this.parentElement.parentElement.querySelector('code').textContent;navigator.clipboard.writeText(t).then(()=>{this.textContent='✓已复制';setTimeout(()=>{this.textContent='📋 复制'},2000)})">📋 复制</button></div>
-      <pre class="code-block-pre${collapsibleClass}"><code id="${codeId}" class="lang-${block.lang}">${escaped}</code></pre>
+      <div class="code-block-header">${langLabel}<span class="code-block-spacer"></span>${actionsHtml}${toggleBtn}<button class="copy-code-btn" title="复制">📋 复制</button></div>
+      <pre class="code-block-pre${collapsibleClass}"><code id="${codeId}" class="lang-${langAttr}">${escaped}</code></pre>
     </div>`;
   });
 
   return html;
+}
+
+
+// 代码块按钮事件委托（避免内联 onclick 造成的 XSS 面）
+function setupCodeBlockActions(): void {
+  document.addEventListener('click', (e) => {
+    const target = e.target as HTMLElement | null;
+    const btn = target && target.closest ? (target.closest('button') as HTMLElement | null) : null;
+    if (!btn) return;
+    const wrapper = btn.closest('.code-block-wrapper') as HTMLElement | null;
+    if (!wrapper) return;
+    const codeEl = wrapper.querySelector('code');
+    const lang = btn.dataset.lang || '';
+    const code = codeEl ? codeEl.textContent || '' : '';
+    if (btn.classList.contains('code-open-btn')) {
+      e.preventDefault(); e.stopPropagation();
+      (self as any).__openCodeInEditor__(lang, code);
+    } else if (btn.classList.contains('code-preview-btn')) {
+      e.preventDefault(); e.stopPropagation();
+      (self as any).__previewCode__(lang, code);
+    } else if (btn.classList.contains('code-run-btn')) {
+      e.preventDefault(); e.stopPropagation();
+      (self as any).__runCode__(lang, code);
+    } else if (btn.classList.contains('code-save-btn')) {
+      e.preventDefault(); e.stopPropagation();
+      (self as any).__saveCodeToProject__(lang, code);
+    } else if (btn.classList.contains('code-expand-btn')) {
+      e.preventDefault(); e.stopPropagation();
+      const pre = wrapper.querySelector('.code-block-pre');
+      if (pre) {
+        pre.classList.toggle('code-block-collapsed');
+        const total = (codeEl ? codeEl.textContent || '' : '').split('\n').length;
+        btn.textContent = pre.classList.contains('code-block-collapsed')
+          ? `展开 ▼ (${total}行)`
+          : '收起 ▲';
+      }
+    } else if (btn.classList.contains('copy-code-btn')) {
+      e.preventDefault(); e.stopPropagation();
+      const t = codeEl ? codeEl.textContent || '' : '';
+      navigator.clipboard.writeText(t).then(() => {
+        const orig = btn.textContent;
+        btn.textContent = '✓已复制';
+        setTimeout(() => { btn.textContent = orig; }, 2000);
+      }).catch(() => { /* ignore */ });
+    }
+  });
 }
 
 // ─────────────────────────────────────────
@@ -1864,7 +1906,7 @@ let _lastPreviewFrame: HTMLIFrameElement | null = null;
         <button class="code-preview-open-editor" id="code-preview-open-btn" title="在编辑器中打开">📂 编辑</button>
       </div>
       <div class="code-preview-content">
-        <iframe id="code-preview-frame" class="code-preview-frame" sandbox="allow-scripts allow-same-origin"></iframe>
+        <iframe id="code-preview-frame" class="code-preview-frame" sandbox="allow-scripts"></iframe>
       </div>
     `;
     document.body.appendChild(previewContainer);
@@ -1882,16 +1924,16 @@ let _lastPreviewFrame: HTMLIFrameElement | null = null;
   const frame = document.getElementById('code-preview-frame') as HTMLIFrameElement;
   if (frame) {
     if (langLower === 'html' || langLower === 'htm') {
-      frame.srcdoc = code;
+      frame.srcdoc = code; // sandbox(无 allow-same-origin) 隔离,脚本无法访问父页面
     } else if (langLower === 'svg') {
       const blob = new Blob([code], { type: 'image/svg+xml' });
       frame.src = URL.createObjectURL(blob);
     } else if (langLower === 'css') {
-      frame.srcdoc = `<html><head><style>${code}</style></head><body><div style="padding:40px;font-family:sans-serif;color:#888">CSS 预览 — 样式已应用到此页面</div></body></html>`;
+      frame.srcdoc = `<html><head><style>${code.replace(/<\//g, '<\\/')}</style></head><body><div style="padding:40px;font-family:sans-serif;color:#888">CSS 预览 — 样式已应用到此页面</div></body></html>`;
     } else if (langLower === 'javascript' || langLower === 'js' || langLower === 'ts') {
-      frame.srcdoc = `<html><head></head><body><div id="output" style="padding:20px;font-family:monospace"></div><script>try{const out=document.getElementById('output');const origLog=console.log;console.log=function(...args){out.innerHTML+=args.join(' ')+'<br>'};${code};console.log=origLog}catch(e){document.getElementById('output').innerHTML='<span style="color:red">❌ Error: '+e.message+'</span>'}<\/script></body></html>`;
+      frame.srcdoc = `<html><head></head><body><div id="output" style="padding:20px;font-family:monospace"></div><script>try{const out=document.getElementById('output');const origLog=console.log;console.log=function(...args){out.innerHTML+=args.join(' ')+'<br>'};${code.replace(/<\//g, '<\\/')};console.log=origLog}catch(e){document.getElementById('output').innerHTML='<span style="color:red">❌ Error: '+e.message+'</span>'}<\/script></body></html>`;
     } else {
-      frame.srcdoc = `<html><body style="padding:20px;font-family:monospace;background:#1e1e1e;color:#d4d4d4"><h3>🔍 ${lang} 源码预览</h3><pre style="white-space:pre-wrap">${code.replace(/&/g,'&amp;').replace(/</g,'&lt;')}</pre></body></html>`;
+      frame.srcdoc = `<html><body style="padding:20px;font-family:monospace;background:#1e1e1e;color:#d4d4d4"><h3>🔍 ${escapeHtml(lang)} 源码预览</h3><pre style="white-space:pre-wrap">${escapeHtml(code)}</pre></body></html>`;
     }
   }
   
@@ -2290,7 +2332,7 @@ function confirmAiRead(start: number, end: number): void {
   readDiv.innerHTML = `
     <div class="read-confirm-card">
       <div class="read-confirm-title">📖 虎猫想继续读取文件</div>
-      <div class="read-confirm-file">${file?.name || '当前文件'} L${start}-L${end}</div>
+      <div class="read-confirm-file">${escapeHtml(file?.name || '当前文件')} L${start}-L${end}</div>
       <div class="read-confirm-actions">
         <button class="btn-read-confirm">✅ 允许读取</button>
         <button class="btn-read-deny">❌ 拒绝</button>
@@ -2453,9 +2495,9 @@ function renderChatMessage(msg: ChatMessage): void {
     attachHtml = '<div class="msg-attachments">' + msg.attachments.map(a => {
       if (a.type === 'image') {
         const src = a.dataUrl || `tcide://${encodeURIComponent(a.name)}`;
-        return `<img class="msg-attachment-img" src="${src}" alt="${a.name}" title="${a.name}" loading="lazy">`;
+        return `<img class="msg-attachment-img" src="${escapeAttr(src)}" alt="${escapeAttr(a.name)}" title="${escapeAttr(a.name)}" loading="lazy">`;
       }
-      return `<span class="msg-attachment">📄 ${a.name}</span>`;
+      return `<span class="msg-attachment">📄 ${escapeHtml(a.name)}</span>`;
     }).join('') + '</div>';
   }
 
@@ -2465,7 +2507,7 @@ function renderChatMessage(msg: ChatMessage): void {
   // 消息操作按钮（hover 显示）
   const actionsHtml = buildMsgActions(msg);
   // 多选复选框
-  const selectHtml = chatSelectMode ? `<label class="msg-select-cb"><input type="checkbox" data-msg-id="${msg.id}" onchange="window.__chatToggleSelect__('${msg.id}', this.checked)"></label>` : '';
+  const selectHtml = chatSelectMode ? `<label class="msg-select-cb"><input type="checkbox" data-msg-id="${escapeAttr(msg.id)}" onchange="window.__chatToggleSelect__(this.dataset.msgId, this.checked)"></label>` : '';
 
   el.innerHTML = `
     ${selectHtml}
@@ -3238,6 +3280,15 @@ let diffState: { selection: monaco.Selection; insertText: string; editor: monaco
 
 function escapeHtml(str: string): string {
   return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+function escapeAttr(str: string): string {
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
 }
 
 function computeLineDiff(original: string[], modified: string[]): { o: string[]; m: string[] } {
@@ -4308,7 +4359,7 @@ function renderTerminalTabs(): void {
   if (!list) return;
   list.innerHTML = termSessions.map(s => `
     <div class="terminal-tab ${s.id === activeTermId ? 'active' : ''}" data-term-id="${s.id}">
-      <span>${s.name}</span>
+      <span>${escapeHtml(s.name)}</span>
       <span class="terminal-tab-close" data-close="${s.id}">&times;</span>
     </div>
   `).join('');
@@ -4492,7 +4543,8 @@ async function handleContextAction(action: string): Promise<void> {
         showToast('未找到该文件的快照记录', 'info');
         break;
       }
-      const latest = snapshots[snapshots.length - 1];
+      // getSnapshots 按 timestamp DESC 返回,最新在前
+      const latest = snapshots[0];
       await window.api.restoreSnapshot(latest.id);
       // 如果当前编辑器中是该文件,更新内容
       const openEntry = state.openFiles.find(f => f.path === path);
@@ -6067,10 +6119,10 @@ async function executeSearch(): Promise<void> {
     }
     container.innerHTML = results.slice(0, 100).map((r: { file: string; line: number; text: string }) => {
       const relPath = r.file.replace(state.projectPath!, '').replace(/^[\\/]/, '');
-      return `<div class="search-result-item" data-file="${r.file}" data-line="${r.line}">
-        <span class="search-result-file">${relPath}</span>
-        <span class="search-result-line">${r.line}:</span>
-        <span class="search-result-text">${r.text.slice(0, 120)}</span>
+      return `<div class="search-result-item" data-file="${escapeAttr(r.file)}" data-line="${escapeAttr(String(r.line))}">
+        <span class="search-result-file">${escapeHtml(relPath)}</span>
+        <span class="search-result-line">${escapeHtml(String(r.line))}:</span>
+        <span class="search-result-text">${escapeHtml(r.text.slice(0, 120))}</span>
       </div>`;
     }).join('');
 
@@ -6265,12 +6317,12 @@ function renderChatList(): void {
     const time = new Date(session.updatedAt).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
     const msgCount = session.chatHistory.length;
     return `
-      <div class="chat-list-item${isActive ? ' active' : ''}" data-session-id="${session.id}">
-        <span class="chat-list-title">${title}</span>
-        <span class="chat-list-meta">${msgCount > 0 ? msgCount + ' 条' : '新对话'} · ${time}</span>
+      <div class="chat-list-item${isActive ? ' active' : ''}" data-session-id="${escapeAttr(session.id)}">
+        <span class="chat-list-title">${escapeHtml(title)}</span>
+        <span class="chat-list-meta">${msgCount > 0 ? msgCount + ' 条' : '新对话'} · ${escapeHtml(time)}</span>
         <div class="chat-list-actions">
-          <button class="chat-list-rename" data-session-id="${session.id}" title="重命名">✎</button>
-          <button class="chat-list-delete" data-session-id="${session.id}" title="删除">×</button>
+          <button class="chat-list-rename" data-session-id="${escapeAttr(session.id)}" title="重命名">✎</button>
+          <button class="chat-list-delete" data-session-id="${escapeAttr(session.id)}" title="删除">×</button>
         </div>
       </div>`;
   }).join('');
@@ -6336,6 +6388,7 @@ async function init(): Promise<void> {
 
   initMonaco();
   setupEventListeners();
+  setupCodeBlockActions();
   setupResizers();
   await loadConfig();
   loadModelList();  // 异步加载模型注册表
@@ -6651,9 +6704,9 @@ function updateProblemsPanel(): void {
   const icons: Record<string,string> = { error:'\u{1F534}', warning:'\u{1F7E1}', info:'\u{1F535}' };
   panelList.innerHTML = allDiags.map((d: any) => {
     const fileName = (d.filePath || '').replace(/^.*[/\\]/, '');
-    return `<div class="problem-item" data-file="${d.filePath||''}" data-line="${d.line||1}" style="padding:3px 8px;cursor:pointer;font-size:11px;border-bottom:1px solid var(--border-color);display:flex;gap:6px;">
+    return `<div class="problem-item" data-file="${escapeAttr(d.filePath||'')}" data-line="${escapeAttr(String(d.line||1))}" style="padding:3px 8px;cursor:pointer;font-size:11px;border-bottom:1px solid var(--border-color);display:flex;gap:6px;">
       <span style="flex-shrink:0;">${icons[d.severity]||'\u26AA'}</span>
-      <span style="flex:1;"><span style="font-weight:600;">${fileName}:${d.line}</span> <span style="color:var(--fg-secondary);margin-left:4px;">${(d.message||'').substring(0,120)}</span></span>
+      <span style="flex:1;"><span style="font-weight:600;">${escapeHtml(fileName)}:${escapeHtml(String(d.line))}</span> <span style="color:var(--fg-secondary);margin-left:4px;">${escapeHtml((d.message||'').substring(0,120))}</span></span>
     </div>`;
   }).join('');
   panelList.querySelectorAll('.problem-item').forEach((el: any) => {
