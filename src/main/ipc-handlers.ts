@@ -84,6 +84,14 @@ function insertUsageRecord(rec: {
   }
 }
 
+function safeGitArg(arg: string): string {
+  if (!/^[a-zA-Z0-9._\/:-]+$/.test(arg)) throw new Error(`Unsafe git argument: ${arg}`);
+  return arg;
+}
+function safeCommitMsg(msg: string): string {
+  return msg.replace(/[`$(){}[\]|&;!<>]/g, '').replace(/"/g, '');
+}
+
 export function setupIpcHandlers(): void {
   // 文件操作
   ipcMain.handle('file:read', async (_e, filePath: string) => fileService.read(filePath));
@@ -658,7 +666,7 @@ export function setupSnapshotIpc(): void {
     try {
       const { execSync } = require('child_process');
       const safeMsg = message.replace(/"/g, '\\"');
-      const output = execSync(`git commit -m "${safeMsg}"`, { cwd: projectPath, timeout: 10000 }).toString().trim();
+      const output = execSync(`git commit -m "${safeCommitMsg(safeMsg)}"`, { cwd: projectPath, timeout: 10000 }).toString().trim();
       return { success: true, output };
     } catch (err: unknown) {
       return { success: false, error: (err as Error).message };
@@ -670,7 +678,7 @@ export function setupSnapshotIpc(): void {
     try {
       const { execSync } = require('child_process');
       const branch = execSync('git rev-parse --abbrev-ref HEAD', { cwd: projectPath, timeout: 3000 }).toString().trim();
-      const output = execSync(`git push origin ${branch}`, { cwd: projectPath, timeout: 30000 }).toString().trim();
+      const output = execSync(`git push origin ${safeGitArg(branch)}`, { cwd: projectPath, timeout: 30000 }).toString().trim();
       return { success: true, output };
     } catch (err: unknown) {
       return { success: false, error: (err as Error).message };
@@ -700,7 +708,7 @@ export function setupSnapshotIpc(): void {
   ipcMain.handle('git:checkout', async (_e, branch: string, projectPath: string) => {
     try {
       const { execSync } = require('child_process');
-      const output = execSync(`git checkout "${branch}"`, { cwd: projectPath, timeout: 10000 }).toString().trim();
+      const output = execSync(`git checkout "${safeGitArg(branch)}"`, { cwd: projectPath, timeout: 10000 }).toString().trim();
       return { success: true, output };
     } catch (err: unknown) {
       return { success: false, error: (err as Error).message };
@@ -712,7 +720,7 @@ export function setupSnapshotIpc(): void {
     try {
       const { execSync } = require('child_process');
       const relative = path.relative(projectPath, filePath).replace(/\\/g, '/');
-      const output = execSync(`git diff -U0 HEAD -- "${relative}"`, { cwd: projectPath, timeout: 5000 }).toString();
+      const output = execSync(`git diff -U0 HEAD -- "${safeGitArg(relative)}"`, { cwd: projectPath, timeout: 5000 }).toString();
       // 解析 unified diff 获取改动行号
       const added: number[] = [];
       const removed: number[] = [];
@@ -1343,7 +1351,7 @@ ipcMain.handle('ai:send-with-tools', async (event, messages: Array<{ role: strin
         const toolCall: ToolCall = {
           id: tc.id,
           name: tc.function.name,
-          arguments: JSON.parse(tc.function.arguments || '{}'),
+          arguments: (() => { try { return JSON.parse(tc.function.arguments || '{}'); } catch { return {}; } })(),
         };
 
         // Notify renderer: tool call start
@@ -1416,7 +1424,7 @@ ipcMain.handle('ai:send-with-tools', async (event, messages: Array<{ role: strin
 ipcMain.handle('git:blame', async (_e, filePath: string, projectPath: string) => {
   try {
     const { execSync } = require('child_process');
-    const result = execSync(`git blame --date=short -l "${filePath}"`, {
+    const result = execSync(`git blame --date=short -l "${safeGitArg(filePath)}"`, {
       cwd: projectPath,
       timeout: 10000,
       encoding: 'utf-8',

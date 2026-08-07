@@ -1,4 +1,4 @@
-﻿/**
+/**
  * PersonalIDE - Coder Agent
  * 程序员智能体：接收 Builder 任务 → 文件读写 → 终端执行 → 结果反馈
  */

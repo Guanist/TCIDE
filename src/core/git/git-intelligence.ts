@@ -96,7 +96,7 @@ class GitIntelligence {
 
         try {
             // Diff stats
-            const diffStat = this._exec(`git diff ${baseRef} ${headRef} --stat`, projectRoot);
+            const diffStat = this._exec(`git diff ${safeGitArg(baseRef)} ${safeGitArg(headRef)} --stat`, projectRoot);
             const statLines = diffStat.split('\n');
             const lastLine = statLines[statLines.length - 2] || '';
             const statMatch = lastLine.match(/(\d+) files? changed(?:, (\d+) insertions?\(\+\))?(?:, (\d+) deletions?\(-\))?/);
@@ -180,10 +180,10 @@ class GitIntelligence {
         };
 
         try {
-            result.mergeBase = this._exec(`git merge-base HEAD ${branch}`, projectRoot).trim();
+            result.mergeBase = this._exec(`git merge-base HEAD ${safeGitArg(branch)}`, projectRoot).trim();
 
             // Test merge
-            const mergeMsg = this._exec(`git merge --no-commit --no-ff ${branch} 2>&1 || true`, projectRoot);
+            const mergeMsg = this._exec(`git merge --no-commit --no-ff ${safeGitArg(branch)} 2>&1 || true`, projectRoot);
             if (mergeMsg.includes('CONFLICT')) {
                 result.hasConflicts = true;
 
@@ -223,7 +223,7 @@ class GitIntelligence {
         const results = [];
 
         try {
-            const blame = this._exec(`git blame --line-porcelain "${absPath}"`, projectRoot);
+            const blame = this._exec(`git blame --line-porcelain "${safeGitPath(absPath)}"`, projectRoot);
             const chunks = blame.split('\n');
 
             let current = null;
@@ -273,7 +273,7 @@ class GitIntelligence {
     // ── 5. 变更时间线 ──
     async getChangelog(projectRoot, days = 7) {
         const since = new Date(Date.now() - days * 86400000).toISOString().slice(0, 10);
-        const log = this._exec(`git log --since="${since}" --pretty=format:"%h|%an|%ad|%s" --date=short`, projectRoot);
+        const log = this._exec(`git log --since="${safeGitArg(since)}" --pretty=format:"%h|%an|%ad|%s" --date=short`, projectRoot);
         return log.split('\n').filter(l => l).map(l => {
             const [hash, author, date, ...msg] = l.split('|');
             return { hash, author, date, message: msg.join('|') };
