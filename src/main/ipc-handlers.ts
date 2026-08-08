@@ -26,26 +26,58 @@ const fileService = new FileService();
 
 function getModelConfig(): ModelConfig {
   const saved = getStore().get('modelConfig') as unknown as ModelConfig | undefined;
-  if (saved) {
-    // 解密存储的 API Key
-    const config = { ...saved };
-    if (config.apiKey && safeStorage.isEncryptionAvailable()) {
-      try {
-        config.apiKey = safeStorage.decryptString(Buffer.from(config.apiKey, 'base64'));
-      } catch {
-        // 旧版明文 Key，保持原值
-      }
-    }
-    return config;
-  }
-  return {
+  const config: ModelConfig = { ...(saved || {
     provider: 'deepseek',
     model: 'deepseek-v4-pro',
     baseUrl: 'https://api.deepseek.com/v1',
     apiKey: '',
     builderModel: 'deepseek-reasoner',
     coderModel: 'deepseek-v4-pro',
-  };
+  }) };
+
+  // 解密存储的 API Key（safeStorage 不可用时保持明文）
+  if (config.apiKey && safeStorage.isEncryptionAvailable()) {
+    try {
+      config.apiKey = safeStorage.decryptString(Buffer.from(config.apiKey, 'base64'));
+    } catch {
+      // 旧版明文 Key，保持原值
+    }
+  }
+
+  // ── 配置自愈：activeApiConfigId 指向的已保存配置优先，修复历史 id 漂移 ──
+  try {
+    const apiConfigs = (getStore().get('apiConfigs', []) as Array<{ id: string; provider?: string; baseUrl?: string; apiKey?: string; model?: string }>) || [];
+    let activeId = (getStore().get('activeApiConfigId', '') as string) || '';
+    let active = apiConfigs.find(c => c && c.id === activeId);
+    if (!active && apiConfigs.length > 0) {
+      // 历史 bug 会把 activeApiConfigId 写成不存在的 id：回退到第一条已保存配置并修复
+      active = apiConfigs[0];
+      activeId = active.id;
+      getStore().set('activeApiConfigId', activeId);
+    }
+    if (active && active.baseUrl) {
+      config.baseUrl = active.baseUrl;
+      if (active.apiKey) config.apiKey = active.apiKey;
+      if (active.model) config.model = active.model;
+      if (active.provider) config.provider = active.provider;
+      // 同步回 modelConfig，避免下次启动仍读到旧值（仅值变化时写入）
+      const cur = getStore().get('modelConfig') as Record<string, unknown> | undefined;
+      if (!cur || cur.baseUrl !== active.baseUrl || cur.model !== active.model || cur.apiKey !== active.apiKey || cur.provider !== active.provider) {
+        getStore().set('modelConfig', { ...(saved || {}), baseUrl: active.baseUrl, apiKey: active.apiKey, model: active.model, provider: active.provider });
+      }
+    }
+  } catch { /* 配置自愈失败不阻塞启动 */ }
+
+  return config;
+}
+
+/** 将底层网络错误转成用户可读的中文错误信息（fetch failed / ECONNREFUSED 等） */
+function friendlyAIError(err: unknown, config: ModelConfig): Error {
+  const msg = err instanceof Error ? err.message : String(err);
+  if (/fetch failed|ECONNREFUSED|ECONNRESET|ENOTFOUND|ENETUNREACH|EAI_AGAIN|ETIMEDOUT|ECONNABORTED|socket hang up/i.test(msg)) {
+    return new Error('无法连接到模型服务（' + config.baseUrl + '），请检查本地代理/网络是否可用。原始错误: ' + msg);
+  }
+  return err instanceof Error ? err : new Error(msg);
 }
 
 /** 创建 Adapter 并注入用量记录回调（主进程直写 SQLite，不走 IPC） */
@@ -158,7 +190,11 @@ export function setupIpcHandlers(): void {
     const config = getModelConfig();
     const adapter = createAdapterWithUsage(config);
     adapter.setSystemRules(projectRules);
-    return adapter.send(messages as Array<{ role: string; content: string }>, { ...options, stream: false });
+    try {
+      return await adapter.send(messages as Array<{ role: string; content: string }>, { ...options, stream: false });
+    } catch (err: unknown) {
+      throw friendlyAIError(err, config);
+    }
   });
 
   // AI 发送（流式）
@@ -177,7 +213,7 @@ export function setupIpcHandlers(): void {
       });
       if (!window.isDestroyed()) window.webContents.send('ai-stream-end', '');
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : String(err);
+      const msg = friendlyAIError(err, config).message;
       if (!window.isDestroyed()) window.webContents.send('ai-stream-error', msg);
     }
   });
@@ -1332,11 +1368,11 @@ ipcMain.handle('ai:send-with-tools', async (event, messages: Array<{ role: strin
         if (attempt < 3 && (RETRYABLE.has(err.status) || err.message?.includes('fetch'))) {
           await new Promise(r => setTimeout(r, Math.pow(2, attempt) * 1000));
         } else {
-          throw err;
+          throw friendlyAIError(err, config);
         }
       }
     }
-    if (!response) throw new Error('Request failed after retries');
+    if (!response) throw friendlyAIError(new Error('Request failed after retries'), config);
 
     if (!response.ok) {
       const errText = await response.text().catch(() => 'Unknown error');
@@ -1465,4 +1501,30 @@ ipcMain.handle('apiConfigs:save', async (_e, data: { configs: any[]; activeId: s
   store.set('apiConfigs', data.configs);
   store.set('activeApiConfigId', data.activeId);
   return { success: true };
+});
+
+// ===== 性能监控 IPC =====
+// perf:metrics 由渲染进程周期性调用，上报内存/运行时长
+// perf:gcSweep 触发主进程 GC（需 --expose-gc 生效）
+ipcMain.handle('perf:metrics', async () => {
+  try {
+    const mem = process.memoryUsage();
+    return {
+      openCount: 0,
+      heapUsedMB: Math.round(mem.heapUsed / 1024 / 1024),
+      heapTotalMB: Math.round(mem.heapTotal / 1024 / 1024),
+      rssMB: Math.round(mem.rss / 1024 / 1024),
+      uptimeSec: Math.round(process.uptime()),
+    };
+  } catch {
+    return { openCount: 0, heapUsedMB: 0, heapTotalMB: 0, rssMB: 0, uptimeSec: 0 };
+  }
+});
+
+ipcMain.handle('perf:gcSweep', async () => {
+  try {
+    const g = global as any;
+    if (typeof g.gc === 'function') g.gc();
+  } catch {}
+  return { ok: true };
 });

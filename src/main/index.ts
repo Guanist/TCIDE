@@ -14,6 +14,7 @@ const isDev = !app.isPackaged;
 let mainWindow: BrowserWindow | null = null;
 let tray: Tray | null = null;
 let isQuitting = false;
+const DEBUG_LOG_PATH = path.join(app.getPath('appData'), 'TCIDE', 'tcide-debug.log');
 
 // ─────────────────────────────────────────
 // 窗口创建
@@ -50,8 +51,17 @@ function createWindow(): void {
     }
   });
 
+  let viteLoaded = false;
+  const fallbackToLocalBuild = () => {
+    if (viteLoaded) return;
+    viteLoaded = true;
+    const loadPath = path.join(__dirname, '..', 'renderer', 'index.html');
+    console.log('[Main] Vite dev server unreachable, falling back to local build:', loadPath);
+    mainWindow?.loadFile(loadPath).then(() => console.log('[Main] loadFile resolved')).catch((err) => console.error('[Main] loadFile error:', err));
+  };
+
   if (isDev) {
-    mainWindow.loadURL('http://localhost:5173/');
+    mainWindow.loadURL('http://localhost:5173/').then(() => { viteLoaded = true; }).catch(() => fallbackToLocalBuild());
   } else {
     const loadPath = path.join(__dirname, '..', 'renderer', 'index.html');
     console.log('[Main] Loading:', loadPath);
@@ -60,7 +70,10 @@ function createWindow(): void {
 
   mainWindow.webContents.on('did-start-loading', () => console.log('[Main] did-start-loading'));
   mainWindow.webContents.on('did-finish-load', () => console.log('[Main] did-finish-load'));
-  mainWindow.webContents.on('did-fail-load', (_e, code, desc, url) => console.error('[Main] did-fail-load:', code, desc, url));
+  mainWindow.webContents.on('did-fail-load', (_e, code, desc, url, isMainFrame) => {
+    console.error('[Main] did-fail-load:', code, desc, url);
+    if (isMainFrame !== false && url.startsWith('http://localhost:5173')) fallbackToLocalBuild();
+  });
   mainWindow.webContents.on('did-fail-provisional-load', (_e, code, desc, url) => console.error('[Main] did-fail-provisional-load:', code, desc, url));
   mainWindow.webContents.on('console-message', (_e, level, message) => console.log('[Renderer]', message));
   
@@ -289,10 +302,19 @@ function createPetWindow(): void {
     petWindow.webContents.on('unresponsive', () => {
       console.log('[Pet] renderer unresponsive');
     });
+    const petLoadPath = path.join(__dirname, '..', 'renderer', 'pet-window.html');
     if (isDev) {
-      petWindow.loadURL('http://localhost:5173/pet-window.html');
+      petWindow.loadURL('http://localhost:5173/pet-window.html').catch(() => {
+        if (petWindow && !petWindow.isDestroyed()) petWindow.loadFile(petLoadPath);
+      });
+      petWindow.webContents.on('did-fail-load', (_e, code, desc, url, isMainFrame) => {
+        console.error('[Pet] did-fail-load:', code, desc, url);
+        if (isMainFrame !== false && url.startsWith('http://localhost:5173')) {
+          if (petWindow && !petWindow.isDestroyed()) petWindow.loadFile(petLoadPath);
+        }
+      });
     } else {
-      petWindow.loadFile(path.join(__dirname, '..', 'renderer', 'pet-window.html'));
+      petWindow.loadFile(petLoadPath);
     }
     mainWindow.on('focus', () => { if (petWindow && !petWindow.isDestroyed()) petWindow.show(); });
     mainWindow.on('minimize', () => { if (petWindow && !petWindow.isDestroyed()) petWindow.hide(); });
@@ -369,8 +391,13 @@ if (!gotLock) {
 // 应用生命周期
 // ─────────────────────────────────────────
 app.whenReady().then(async () => {
-  try { fs.writeFileSync(path.join(app.getPath('userData'), 'tcide-debug.log'), 'START\n'); } catch {}
-  function dlog(msg: string) { console.log(msg); try { fs.appendFileSync(path.join(app.getPath('userData'), 'tcide-debug.log'), msg + '\n'); } catch {} }
+  function dlog(msg: string) {
+    console.log(msg);
+    try { fs.appendFileSync(DEBUG_LOG_PATH, '[' + new Date().toISOString() + '] ' + msg + '\n'); }
+    catch (err) { console.error('[Main] log write failed:', err); }
+  }
+  try { fs.writeFileSync(DEBUG_LOG_PATH, '[' + new Date().toISOString() + '] START\n'); }
+  catch (err) { console.error('[Main] log init failed:', err); }
   dlog('[Main] STEP: whenReady entered');
   // ── 自定义协议 ──
   // Electron 33+ 要求在 whenReady 后注册 protocol
@@ -427,7 +454,10 @@ app.whenReady().then(async () => {
   });
 
   console.log('[Main] PersonalIDE ready');
-});
+  }).catch((err) => {
+    console.error('[Main] FATAL startup error:', err);
+    try { fs.appendFileSync(DEBUG_LOG_PATH, '[FATAL] ' + ((err && (err as Error).stack) || String(err)) + '\n'); } catch {}
+  });
 
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit();
@@ -435,3 +465,12 @@ app.on('window-all-closed', () => {
 
 app.on('before-quit', () => { isQuitting = true; });
 app.on('will-quit', () => { globalShortcut.unregisterAll(); closeDatabase(); });
+
+process.on('uncaughtException', (err) => {
+  console.error('[Main] uncaughtException:', err);
+  try { fs.appendFileSync(DEBUG_LOG_PATH, '[uncaughtException] ' + ((err && (err as Error).stack) || String(err)) + '\n'); } catch {}
+});
+process.on('unhandledRejection', (reason) => {
+  console.error('[Main] unhandledRejection:', reason);
+  try { fs.appendFileSync(DEBUG_LOG_PATH, '[unhandledRejection] ' + String(reason) + '\n'); } catch {}
+});

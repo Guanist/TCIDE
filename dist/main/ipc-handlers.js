@@ -61,27 +61,59 @@ let projectRules = '';
 const fileService = new file_service_1.FileService();
 function getModelConfig() {
     const saved = (0, store_1.getStore)().get('modelConfig');
-    if (saved) {
-        // 解密存储的 API Key
-        const config = { ...saved };
-        if (config.apiKey && electron_1.safeStorage.isEncryptionAvailable()) {
-            try {
-                config.apiKey = electron_1.safeStorage.decryptString(Buffer.from(config.apiKey, 'base64'));
-            }
-            catch {
-                // 旧版明文 Key，保持原值
+    const config = { ...(saved || {
+            provider: 'deepseek',
+            model: 'deepseek-v4-pro',
+            baseUrl: 'https://api.deepseek.com/v1',
+            apiKey: '',
+            builderModel: 'deepseek-reasoner',
+            coderModel: 'deepseek-v4-pro',
+        }) };
+    // 解密存储的 API Key（safeStorage 不可用时保持明文）
+    if (config.apiKey && electron_1.safeStorage.isEncryptionAvailable()) {
+        try {
+            config.apiKey = electron_1.safeStorage.decryptString(Buffer.from(config.apiKey, 'base64'));
+        }
+        catch {
+            // 旧版明文 Key，保持原值
+        }
+    }
+    // ── 配置自愈：activeApiConfigId 指向的已保存配置优先，修复历史 id 漂移 ──
+    try {
+        const apiConfigs = (0, store_1.getStore)().get('apiConfigs', []) || [];
+        let activeId = (0, store_1.getStore)().get('activeApiConfigId', '') || '';
+        let active = apiConfigs.find(c => c && c.id === activeId);
+        if (!active && apiConfigs.length > 0) {
+            // 历史 bug 会把 activeApiConfigId 写成不存在的 id：回退到第一条已保存配置并修复
+            active = apiConfigs[0];
+            activeId = active.id;
+            (0, store_1.getStore)().set('activeApiConfigId', activeId);
+        }
+        if (active && active.baseUrl) {
+            config.baseUrl = active.baseUrl;
+            if (active.apiKey)
+                config.apiKey = active.apiKey;
+            if (active.model)
+                config.model = active.model;
+            if (active.provider)
+                config.provider = active.provider;
+            // 同步回 modelConfig，避免下次启动仍读到旧值（仅值变化时写入）
+            const cur = (0, store_1.getStore)().get('modelConfig');
+            if (!cur || cur.baseUrl !== active.baseUrl || cur.model !== active.model || cur.apiKey !== active.apiKey || cur.provider !== active.provider) {
+                (0, store_1.getStore)().set('modelConfig', { ...(saved || {}), baseUrl: active.baseUrl, apiKey: active.apiKey, model: active.model, provider: active.provider });
             }
         }
-        return config;
     }
-    return {
-        provider: 'deepseek',
-        model: 'deepseek-v4-pro',
-        baseUrl: 'https://api.deepseek.com/v1',
-        apiKey: '',
-        builderModel: 'deepseek-reasoner',
-        coderModel: 'deepseek-v4-pro',
-    };
+    catch { /* 配置自愈失败不阻塞启动 */ }
+    return config;
+}
+/** 将底层网络错误转成用户可读的中文错误信息（fetch failed / ECONNREFUSED 等） */
+function friendlyAIError(err, config) {
+    const msg = err instanceof Error ? err.message : String(err);
+    if (/fetch failed|ECONNREFUSED|ECONNRESET|ENOTFOUND|ENETUNREACH|EAI_AGAIN|ETIMEDOUT|ECONNABORTED|socket hang up/i.test(msg)) {
+        return new Error('无法连接到模型服务（' + config.baseUrl + '），请检查本地代理/网络是否可用。原始错误: ' + msg);
+    }
+    return err instanceof Error ? err : new Error(msg);
 }
 /** 创建 Adapter 并注入用量记录回调（主进程直写 SQLite，不走 IPC） */
 function createAdapterWithUsage(config) {
@@ -187,7 +219,12 @@ function setupIpcHandlers() {
         const config = getModelConfig();
         const adapter = createAdapterWithUsage(config);
         adapter.setSystemRules(projectRules);
-        return adapter.send(messages, { ...options, stream: false });
+        try {
+            return await adapter.send(messages, { ...options, stream: false });
+        }
+        catch (err) {
+            throw friendlyAIError(err, config);
+        }
     });
     // AI 发送（流式）
     electron_1.ipcMain.handle('ai:send-stream', async (event, messages, options) => {
@@ -208,7 +245,7 @@ function setupIpcHandlers() {
                 window.webContents.send('ai-stream-end', '');
         }
         catch (err) {
-            const msg = err instanceof Error ? err.message : String(err);
+            const msg = friendlyAIError(err, config).message;
             if (!window.isDestroyed())
                 window.webContents.send('ai-stream-error', msg);
         }
@@ -1296,12 +1333,12 @@ electron_1.ipcMain.handle('ai:send-with-tools', async (event, messages, options)
                     await new Promise(r => setTimeout(r, Math.pow(2, attempt) * 1000));
                 }
                 else {
-                    throw err;
+                    throw friendlyAIError(err, config);
                 }
             }
         }
         if (!response)
-            throw new Error('Request failed after retries');
+            throw friendlyAIError(new Error('Request failed after retries'), config);
         if (!response.ok) {
             const errText = await response.text().catch(() => 'Unknown error');
             throw new Error(`AI API error (${response.status}): ${errText.slice(0, 200)}`);
@@ -1422,4 +1459,31 @@ electron_1.ipcMain.handle('apiConfigs:save', async (_e, data) => {
     store.set('apiConfigs', data.configs);
     store.set('activeApiConfigId', data.activeId);
     return { success: true };
+});
+// ===== 性能监控 IPC =====
+// perf:metrics 由渲染进程周期性调用，上报内存/运行时长
+// perf:gcSweep 触发主进程 GC（需 --expose-gc 生效）
+electron_1.ipcMain.handle('perf:metrics', async () => {
+    try {
+        const mem = process.memoryUsage();
+        return {
+            openCount: 0,
+            heapUsedMB: Math.round(mem.heapUsed / 1024 / 1024),
+            heapTotalMB: Math.round(mem.heapTotal / 1024 / 1024),
+            rssMB: Math.round(mem.rss / 1024 / 1024),
+            uptimeSec: Math.round(process.uptime()),
+        };
+    }
+    catch {
+        return { openCount: 0, heapUsedMB: 0, heapTotalMB: 0, rssMB: 0, uptimeSec: 0 };
+    }
+});
+electron_1.ipcMain.handle('perf:gcSweep', async () => {
+    try {
+        const g = global;
+        if (typeof g.gc === 'function')
+            g.gc();
+    }
+    catch { }
+    return { ok: true };
 });

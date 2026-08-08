@@ -196,5 +196,8 @@ const api = {
         // For now return empty string — the main process will serve via ipc
         return '';
     },
+    // 性能指标与 GC 清理（渲染进程每 30s 调用）
+    perfGetMetrics: () => electron_1.ipcRenderer.invoke('perf:metrics'),
+    perfGcSweep: () => electron_1.ipcRenderer.invoke('perf:gcSweep'),
 };
 electron_1.contextBridge.exposeInMainWorld('api', api);

@@ -10,16 +10,36 @@ import type { Database } from 'sql.js';
 let db: Database | null = null;
 let dbPath: string = '';
 
+async function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
+  let timer: NodeJS.Timeout | undefined;
+  const timeout = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => reject(new Error(label + ' (' + ms + 'ms)')), ms);
+  });
+  try {
+    return await Promise.race([promise, timeout]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
+
 export async function initDatabase(): Promise<void> {
   const userDataPath = app.getPath('userData');
   dbPath = path.join(userDataPath, 'personal-ide.db');
 
-  // 生产环境（asar 打包），wasm 文件在 extraResources 中
-  const wasmPath = app.isPackaged
-    ? path.join(process.resourcesPath, 'sql-wasm.wasm')
-    : undefined;
+  // 生产环境 (asar 打包)，wasm 文件在 extraResources 中；开发模式使用项目 resources
+  let wasmPath: string | undefined;
+  if (app.isPackaged) {
+    wasmPath = path.join(process.resourcesPath, 'sql-wasm.wasm');
+  } else {
+    const devWasm = path.join(__dirname, '..', '..', 'resources', 'sql-wasm.wasm');
+    if (fs.existsSync(devWasm)) wasmPath = devWasm;
+  }
 
-  const SQL = wasmPath ? await initSqlJs({ locateFile: () => wasmPath }) : await initSqlJs();
+  // 显式指定wasm 路径，避免 sql.js 默认加载路径在 Electron 下不确定；加超时防止启动卡死
+  const initPromise = wasmPath && fs.existsSync(wasmPath)
+    ? initSqlJs({ locateFile: () => wasmPath as string })
+    : initSqlJs();
+  const SQL = await withTimeout(initPromise, 15000, 'sql.js init timeout');
   if (fs.existsSync(dbPath)) {
     const buffer = fs.readFileSync(dbPath);
     db = new SQL.Database(buffer);

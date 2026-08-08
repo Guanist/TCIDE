@@ -16,12 +16,18 @@ const petPlugin = {
     const src = pathLib.join(__dirname, 'src', 'renderer', 'pet-window.html');
     const dst = pathLib.join(__dirname, 'dist', 'renderer', 'pet-window.html');
     if (fs.existsSync(src)) fs.copyFileSync(src, dst);
-    // Copy p0/p1/p2 modules from save
-    const saveDir = pathLib.join(__dirname, 'dist', 'renderer', 'assets_save');
+    // Copy p0/p1/p2 modules from canonical source to assets + assets_save
+    // (assets_save 位于 dist/renderer 内，会被 emptyOutDir 清空，故以 src 为准)
+    const srcDir = pathLib.join(__dirname, 'src', 'renderer', 'public', 'assets');
     const assetsDir = pathLib.join(__dirname, 'dist', 'renderer', 'assets');
-    if (fs.existsSync(saveDir)) {
-      for (const f of fs.readdirSync(saveDir)) {
-        fs.copyFileSync(pathLib.join(saveDir, f), pathLib.join(assetsDir, f));
+    const saveDir = pathLib.join(__dirname, 'dist', 'renderer', 'assets_save');
+    if (fs.existsSync(srcDir)) {
+      if (!fs.existsSync(saveDir)) fs.mkdirSync(saveDir, { recursive: true });
+      for (const f of fs.readdirSync(srcDir)) {
+        if (f.endsWith('.js')) {
+          fs.copyFileSync(pathLib.join(srcDir, f), pathLib.join(assetsDir, f));
+          fs.copyFileSync(pathLib.join(srcDir, f), pathLib.join(saveDir, f));
+        }
       }
     }
   },

@@ -4032,23 +4032,34 @@ async function saveApiConfigs(): Promise<void> {
 }
 
 async function saveToApiConfigs(cfg: typeof state.config): Promise<void> {
-  // 检查是否已存在同 provider+model 的配置
+  // 检查是否已存在同 provider+apiKey+model 的配置（存在则复用其 id，避免 activeApiConfigId 漂移）
   const existing = savedApiConfigs.findIndex(c => c.provider === cfg.provider && c.apiKey === cfg.apiKey && c.model === cfg.model);
-  const newConfig: SavedApiConfig = {
-    id: crypto.randomUUID(),
-    provider: cfg.provider,
-    baseUrl: cfg.baseUrl,
-    apiKey: cfg.apiKey,
-    model: cfg.model,
-    label: `${getProviderLabel(cfg.provider)} · ${cfg.model || '默认'}`,
-    createdAt: Date.now(),
-  };
+  const label = `${getProviderLabel(cfg.provider)} · ${cfg.model || '默认'}`;
+  let targetId: string;
   if (existing >= 0) {
-    savedApiConfigs[existing] = { ...savedApiConfigs[existing], ...newConfig, id: savedApiConfigs[existing].id };
+    // 已存在：复用原 id，仅更新其它字段（activeApiConfigId 必须指向列表中真实存在的 id）
+    targetId = savedApiConfigs[existing].id;
+    savedApiConfigs[existing] = {
+      ...savedApiConfigs[existing],
+      provider: cfg.provider,
+      baseUrl: cfg.baseUrl,
+      apiKey: cfg.apiKey,
+      model: cfg.model,
+      label,
+    };
   } else {
-    savedApiConfigs.push(newConfig);
+    targetId = crypto.randomUUID();
+    savedApiConfigs.push({
+      id: targetId,
+      provider: cfg.provider,
+      baseUrl: cfg.baseUrl,
+      apiKey: cfg.apiKey,
+      model: cfg.model,
+      label,
+      createdAt: Date.now(),
+    });
   }
-  activeApiConfigId = newConfig.id;
+  activeApiConfigId = targetId;
   await saveApiConfigs();
   renderSavedConfigs();
 }
@@ -4135,9 +4146,26 @@ async function deleteApiConfig(id: string): Promise<void> {
   if (!cfg) return;
   showConfirm(`删除「${cfg.label}」?`, async () => {
     savedApiConfigs = savedApiConfigs.filter(c => c.id !== id);
-    if (activeApiConfigId === id) activeApiConfigId = savedApiConfigs[0]?.id || '';
+    if (activeApiConfigId === id) {
+      // 删除的是当前激活配置：切换到剩余第一条，并同步主配置，避免 modelConfig 漂移
+      const next = savedApiConfigs[0];
+      activeApiConfigId = next?.id || '';
+      if (next) {
+        state.config = {
+          ...state.config,
+          provider: next.provider as any,
+          baseUrl: next.baseUrl,
+          apiKey: next.apiKey,
+          model: next.model,
+        };
+        await window.api.saveModelConfig(state.config);
+      }
+    }
     await saveApiConfigs();
     renderSavedConfigs();
+    updateSettingsUI();
+    updateModelListSelection();
+    updateModelIndicator();
     showToast('已删除', 'success');
   });
 }
