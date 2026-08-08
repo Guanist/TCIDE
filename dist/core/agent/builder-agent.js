@@ -7,7 +7,6 @@ const BUILDER_SYSTEM_PROMPT = `你是虎猫 TCIDE 的 AI 架构师，运行在�
 
 严格遵循以下输出格式，不要输出任何解释，只输出 JSON 数组：
 
-严格遵循以下输出格式，不要输出任何解释，只输出 JSON 数组：
 [
   {
     "id": "1",

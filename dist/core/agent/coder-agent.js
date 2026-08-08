@@ -60,6 +60,52 @@ const CODER_SYSTEM_PROMPT = `你是虎猫 TCIDE 的 AI 程序员，运行在用�
 - Kotlin 代码遵循官方编码规范
 - Android 代码遵循 Jetpack 组件最佳实践
 - 修改完成后，必须验证代码质量`;
+/** 判断 target 是否位于 root 目录内（防前缀攻击：/project/evil 之类） */
+function isInside(root, target) {
+    const rel = path.relative(path.resolve(root), path.resolve(target));
+    return rel === '' || (!rel.startsWith('..') && !path.isAbsolute(rel));
+}
+/** 以参数数组方式执行终端命令（不拼 shell 字符串，防命令注入）；Windows 经 cmd.exe 运行 */
+function runCommand(command, cwd) {
+    return new Promise((resolve, reject) => {
+        const { spawn } = require('child_process');
+        const isWin = process.platform === 'win32';
+        let file;
+        let args;
+        if (isWin) {
+            file = process.env.ComSpec || 'cmd.exe';
+            args = ['/d', '/s', '/c', command];
+        }
+        else {
+            const parts = command.split(/\s+/).filter(Boolean);
+            file = parts[0] || 'sh';
+            args = parts.slice(1);
+        }
+        const proc = spawn(file, args, { cwd, windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] });
+        let stdout = '';
+        let stderr = '';
+        const timer = setTimeout(() => { try {
+            proc.kill();
+        }
+        catch { /* ignore */ } }, 120000);
+        proc.stdout?.on('data', (d) => { stdout += d.toString(); });
+        proc.stderr?.on('data', (d) => { stderr += d.toString(); });
+        proc.on('error', (err) => { clearTimeout(timer); reject(err); });
+        proc.on('close', (code) => {
+            clearTimeout(timer);
+            if (code === 0) {
+                resolve({ stdout, stderr });
+            }
+            else {
+                const err = new Error(`命令执行失败 (exit ${code})`);
+                err.code = code;
+                err.stdout = stdout;
+                err.stderr = stderr;
+                reject(err);
+            }
+        });
+    });
+}
 class CoderAgent {
     model;
     fileService;
@@ -144,7 +190,13 @@ class CoderAgent {
         // 执行写操作（先快照再写入）
         for (const action of actions) {
             if (action.type === 'write' && action.path && action.content !== undefined) {
-                const fullPath = path.isAbsolute(action.path) ? action.path : path.join(projectRoot, action.path);
+                let fullPath = path.isAbsolute(action.path) ? action.path : path.join(projectRoot, action.path);
+                // Safety: reject paths that escape the project root（防前缀攻击：/project/evil）
+                const resolved = path.resolve(fullPath);
+                if (!isInside(projectRoot, resolved)) {
+                    return { success: false, output: `Path traversal rejected: ${action.path}` };
+                }
+                fullPath = resolved;
                 try {
                     // 📸 自动快照：写入前备份原文件
                     if (fs.existsSync(fullPath)) {
@@ -164,16 +216,14 @@ class CoderAgent {
         let buildSucceeded = false;
         for (const action of actions) {
             if (action.type === 'run' && action.command) {
-                const { exec } = await Promise.resolve().then(() => __importStar(require('child_process')));
-                const { promisify } = await Promise.resolve().then(() => __importStar(require('util')));
-                const execAsync = promisify(exec);
+                // cwd 必须位于项目目录内（AI 可能返回任意路径，防止逃逸）
+                const runCwd = action.cwd && path.isAbsolute(action.cwd) ? action.cwd : path.join(projectRoot, action.cwd || '');
+                if (!isInside(projectRoot, runCwd)) {
+                    terminalOutputs.push(`[TERM] ${action.command} REJECTED: cwd 不在项目目录内`);
+                    continue;
+                }
                 try {
-                    const { stdout, stderr } = await execAsync(action.command, {
-                        cwd: action.cwd || projectRoot,
-                        timeout: 120000,
-                        maxBuffer: 5 * 1024 * 1024,
-                        windowsHide: true,
-                    });
+                    const { stdout, stderr } = await runCommand(action.command, runCwd);
                     terminalOutputs.push(`[TERM] ${action.command}\nstdout: ${stdout.slice(0, 2000)}\nstderr: ${stderr.slice(0, 1000)}`);
                     // 检测是否为构建命令且成功
                     if (/gradle|assemble|build|compile/i.test(action.command) && !stderr.includes('FAILED') && !stderr.includes('BUILD FAILED')) {
@@ -191,10 +241,10 @@ class CoderAgent {
         let gitCommitResult = '';
         if (buildSucceeded && fileCount > 0) {
             try {
-                const { execSync } = require('child_process');
+                const { execFileSync } = require('child_process');
                 const msg = `Auto: ${task.desc.slice(0, 60)} [task:${task.id}]`;
-                execSync('git add -A', { cwd: projectRoot, timeout: 10000 });
-                const commitOutput = execSync(`git commit -m "${msg.replace(/"/g, '\\"')}"`, { cwd: projectRoot, timeout: 10000 }).toString().trim();
+                execFileSync('git', ['add', '-A'], { cwd: projectRoot, timeout: 10000 });
+                const commitOutput = execFileSync('git', ['commit', '-m', msg], { cwd: projectRoot, timeout: 10000 }).toString().trim();
                 gitCommitResult = `\n[GIT] ✅ 自动提交: ${commitOutput}`;
             }
             catch (err) {

@@ -1,4 +1,4 @@
-/**
+﻿/**
  * PersonalIDE - Electron Store
  * 配置持久化
  */

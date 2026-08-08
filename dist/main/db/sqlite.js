@@ -45,6 +45,7 @@ exports.insertUsage = insertUsage;
 exports.queryUsage = queryUsage;
 exports.saveSnapshot = saveSnapshot;
 exports.getSnapshots = getSnapshots;
+exports.getSnapshotById = getSnapshotById;
 exports.markSnapshotRestored = markSnapshotRestored;
 exports.saveTaskSession = saveTaskSession;
 exports.getTaskSession = getTaskSession;
@@ -58,14 +59,37 @@ const electron_1 = require("electron");
 const sql_js_1 = __importDefault(require("sql.js"));
 let db = null;
 let dbPath = '';
+async function withTimeout(promise, ms, label) {
+    let timer;
+    const timeout = new Promise((_, reject) => {
+        timer = setTimeout(() => reject(new Error(label + ' (' + ms + 'ms)')), ms);
+    });
+    try {
+        return await Promise.race([promise, timeout]);
+    }
+    finally {
+        if (timer)
+            clearTimeout(timer);
+    }
+}
 async function initDatabase() {
     const userDataPath = electron_1.app.getPath('userData');
     dbPath = path.join(userDataPath, 'personal-ide.db');
-    // 生产环境（asar 打包），wasm 文件在 extraResources 中
-    const wasmPath = electron_1.app.isPackaged
-        ? path.join(process.resourcesPath, 'sql-wasm.wasm')
-        : undefined;
-    const SQL = wasmPath ? await (0, sql_js_1.default)({ locateFile: () => wasmPath }) : await (0, sql_js_1.default)();
+    // 生产环境 (asar 打包)，wasm 文件在 extraResources 中；开发模式使用项目 resources
+    let wasmPath;
+    if (electron_1.app.isPackaged) {
+        wasmPath = path.join(process.resourcesPath, 'sql-wasm.wasm');
+    }
+    else {
+        const devWasm = path.join(__dirname, '..', '..', 'resources', 'sql-wasm.wasm');
+        if (fs.existsSync(devWasm))
+            wasmPath = devWasm;
+    }
+    // 显式指定wasm 路径，避免 sql.js 默认加载路径在 Electron 下不确定；加超时防止启动卡死
+    const initPromise = wasmPath && fs.existsSync(wasmPath)
+        ? (0, sql_js_1.default)({ locateFile: () => wasmPath })
+        : (0, sql_js_1.default)();
+    const SQL = await withTimeout(initPromise, 15000, 'sql.js init timeout');
     if (fs.existsSync(dbPath)) {
         const buffer = fs.readFileSync(dbPath);
         db = new SQL.Database(buffer);
@@ -231,9 +255,7 @@ function insertUsage(rec) {
         rec.taskId,
         rec.role,
     ]);
-    const count = db.getRowsModified();
-    if (count % 10 === 0)
-        saveDatabase();
+    saveDatabase();
 }
 // ─────────────────────────────────────────
 // 用量查询（由 IPC 调用，直接传 SQL）
@@ -251,7 +273,11 @@ function saveSnapshot(projectPath, taskId, filePath, content) {
     saveDatabase();
 }
 function getSnapshots(projectPath, filePath) {
-    return queryDb(`SELECT id, task_id AS taskId, content, timestamp FROM file_snapshots WHERE project_path = ? AND file_path = ? AND restored = 0 ORDER BY timestamp DESC`, [projectPath, filePath]);
+    return queryDb(`SELECT id, task_id AS taskId, file_path AS filePath, content, timestamp FROM file_snapshots WHERE project_path = ? AND file_path = ? AND restored = 0 ORDER BY timestamp DESC`, [projectPath, filePath]);
+}
+function getSnapshotById(id) {
+    const rows = queryDb(`SELECT id, project_path AS projectPath, task_id AS taskId, file_path AS filePath, content, timestamp FROM file_snapshots WHERE id = ?`, [id]);
+    return rows.length > 0 ? rows[0] : null;
 }
 function markSnapshotRestored(id) {
     if (!db)

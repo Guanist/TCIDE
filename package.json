@@ -1,11 +1,11 @@
 {
   "name": "tcide",
-  "productName": "铏庣尗 TCIDE",
+  "productName": "虎猫 TCIDE",
   "version": "1.8.0",
   "versionName": "v1.8.0 — 全模块TypeScript源码化 + 输入焦点修复 + ce bug修复",
-  "description": "铏庣尗 TCIDE 鈥?涓汉涓撳睘 AI 缂栫▼ IDE",
+  "description": "虎猫 TCIDE — 个人专属 AI 编程 IDE",
   "main": "dist/main/index.js",
-  "author": "铏庣尗鍥㈤槦",
+  "author": "虎猫团队",
   "license": "MIT",
   "scripts": {
     "dev": "electron .",
@@ -35,7 +35,7 @@
   },
   "build": {
     "appId": "com.tcide.app",
-    "productName": "铏庣尗 TCIDE",
+    "productName": "虎猫 TCIDE",
     "electronDist": "node_modules/electron/dist",
     "electronVersion": "28.0.0",
     "directories": {

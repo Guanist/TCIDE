@@ -1,4 +1,4 @@
-{
+﻿{
   "compilerOptions": {
     "target": "ES2022",
     "module": "commonjs",
@@ -15,5 +15,5 @@
     "noEmitOnError": false
   },
   "include": ["src/main/**/*", "src/core/**/*"],
-  "exclude": ["node_modules", "src/renderer"]
+  "exclude": ["src/main/lsp-manager.ts","node_modules", "src/renderer"]
 }

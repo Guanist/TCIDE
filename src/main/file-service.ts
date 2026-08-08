@@ -1,4 +1,4 @@
-/**
+﻿/**
  * PersonalIDE - File Service
  * 主进程文件操作封装，包含基本安全检查
  */
@@ -13,27 +13,39 @@ export interface FileTreeNode {
 }
 
 // 允许的文件操作根目录（防止路径遍历攻击）
-const ALLOWED_ROOTS: string[] = [];
+let ALLOWED_ROOTS: string[] = [];
+
+function normalizePath(p: string): string {
+  const resolved = path.resolve(p);
+  // Windows 路径大小写不敏感，统一小写后比较
+  return process.platform === 'win32' ? resolved.toLowerCase() : resolved;
+}
 
 export function addAllowedRoot(root: string): void {
-  const normalized = path.normalize(root);
+  const normalized = normalizePath(root);
   if (!ALLOWED_ROOTS.includes(normalized)) {
     ALLOWED_ROOTS.push(normalized);
   }
 }
 
+export function getAllowedRoots(): string[] {
+  return [...ALLOWED_ROOTS];
+}
+
+export function isAllowedPath(filePath: string): boolean {
+  if (ALLOWED_ROOTS.length === 0) return true;
+  const resolved = normalizePath(filePath);
+  return ALLOWED_ROOTS.some(root => {
+    const rel = path.relative(root, resolved);
+    // rel === '' 表示就是根目录本身；不允许 .. 跳出且不允许绝对路径逃逸
+    return rel === '' || (!rel.startsWith('..') && !path.isAbsolute(rel));
+  });
+}
+
 function checkPath(filePath: string): void {
-  const normalized = path.normalize(filePath);
-  // 路径遍历检测
-  if (normalized.includes('..')) {
-    // 允许相对路径，但必须落在 allowed roots 内
-    if (ALLOWED_ROOTS.length > 0) {
-      const resolved = path.resolve(normalized);
-      const inAllowed = ALLOWED_ROOTS.some(root => resolved.startsWith(root));
-      if (!inAllowed) {
-        throw new Error(`路径访问被拒绝: ${filePath}`);
-      }
-    }
+  const resolved = path.resolve(filePath);
+  if (!isAllowedPath(resolved)) {
+    throw new Error(`路径访问被拒绝: ${filePath}`);
   }
 }
 

@@ -36,9 +36,43 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.TaskRunner = void 0;
 const path = __importStar(require("path"));
 const fs = __importStar(require("fs"));
-const child_process_1 = require("child_process");
-const util_1 = require("util");
-const execAsync = (0, util_1.promisify)(child_process_1.exec);
+/** 以参数数组方式执行命令（禁用 shell 字符串拼接，防命令注入） */
+function runCommand(file, args, cwd, timeoutMs) {
+    return new Promise((resolve, reject) => {
+        const { spawn } = require('child_process');
+        const isWin = process.platform === 'win32';
+        let actualFile = file;
+        let actualArgs = args;
+        if (isWin && (/\\.(bat|cmd)$/i.test(file) || ['npm', 'npx', 'yarn', 'pnpm', 'gradle', 'mvn'].includes(file))) {
+            // Windows 下 .bat/.cmd 包装器需经 cmd.exe 执行（file 为固定命令或项目内固定路径）
+            actualFile = process.env.ComSpec || 'cmd.exe';
+            actualArgs = ['/d', '/s', '/c', file, ...args];
+        }
+        const proc = spawn(actualFile, actualArgs, { cwd, windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] });
+        let stdout = '';
+        let stderr = '';
+        const timer = setTimeout(() => { try {
+            proc.kill();
+        }
+        catch { /* ignore */ } }, timeoutMs);
+        proc.stdout?.on('data', (d) => { stdout += d.toString(); });
+        proc.stderr?.on('data', (d) => { stderr += d.toString(); });
+        proc.on('error', (err) => { clearTimeout(timer); reject(err); });
+        proc.on('close', (code) => {
+            clearTimeout(timer);
+            if (code === 0) {
+                resolve({ stdout, stderr });
+            }
+            else {
+                const err = new Error(`命令执行失败 (exit ${code})`);
+                err.code = code;
+                err.stdout = stdout;
+                err.stderr = stderr;
+                reject(err);
+            }
+        });
+    });
+}
 const MAX_RETRIES = 3;
 class TaskRunner {
     model;
@@ -65,7 +99,21 @@ class TaskRunner {
             if (this.aborted) {
                 return { success: false, results };
             }
-            // 找出可启动的任务（依赖已完成）
+            // 依赖失败的子任务直接标记 failed 并移出 pending，防止死等
+            const failedIds = new Set(results.filter(r => !r.success).map(r => r.taskId));
+            if (failedIds.size > 0) {
+                for (let i = pending.length - 1; i >= 0; i--) {
+                    const t = pending[i];
+                    if (t.dep.some(depId => failedIds.has(depId))) {
+                        pending.splice(i, 1);
+                        const tmap = taskMap.get(t.id);
+                        if (tmap)
+                            tmap.status = 'failed';
+                        this.report({ taskId: t.id, status: 'failed', message: `依赖任务失败，跳过: ${t.desc}`, retryCount: t.retries });
+                        results.push({ taskId: t.id, success: false, output: '依赖任务失败，跳过', retries: t.retries });
+                    }
+                }
+            }
             while (pending.length > 0 && running.length < MAX_PARALLEL) {
                 const task = pending[0];
                 const depsDone = task.dep.every(depId => {
@@ -74,22 +122,32 @@ class TaskRunner {
                 });
                 if (depsDone && !compiling.has('build')) {
                     pending.shift();
-                    running.push(this.runTask(task, projectRoot, results, taskMap, compiling));
+                    const promise = this.runTask(task, projectRoot, results, taskMap, compiling);
+                    const entry = { taskId: task.id, promise };
+                    running.push(entry);
+                    promise.finally(() => {
+                        const idx = running.findIndex(r => r.promise === promise);
+                        if (idx >= 0)
+                            running.splice(idx, 1);
+                    });
                 }
                 else {
                     break;
                 }
             }
             if (running.length > 0) {
-                await Promise.race(running);
-                // 清理已完成的 promise
-                for (let i = running.length - 1; i >= 0; i--) {
-                    // 简单清理策略：保留在数组中，由 runTask 内部处理
-                }
+                await Promise.race(running.map(r => r.promise));
+            }
+            else if (pending.length > 0) {
+                // 防御：running 为空但 pending 仍有任务（循环依赖/异常），标记 failed 防止死循环
+                const leftover = pending.shift();
+                const tmap = taskMap.get(leftover.id);
+                if (tmap)
+                    tmap.status = 'failed';
+                this.report({ taskId: leftover.id, status: 'failed', message: `无法执行（依赖缺失或循环依赖）: ${leftover.desc}`, retryCount: leftover.retries });
+                results.push({ taskId: leftover.id, success: false, output: '无法执行（依赖缺失或循环依赖）', retries: leftover.retries });
             }
         }
-        // 等待所有任务完成
-        await Promise.all(running);
         const allSuccess = results.every(r => r.success);
         return { success: allSuccess, results };
     }
@@ -103,14 +161,9 @@ class TaskRunner {
             let compileOutput = '';
             if (buildCmd) {
                 compiling.add('build');
-                this.report({ taskId: task.id, status: 'compiling', message: `编译验证: ${buildCmd.cmd}`, retryCount: task.retries });
+                this.report({ taskId: task.id, status: 'compiling', message: `编译验证: ${buildCmd.type}`, retryCount: task.retries });
                 try {
-                    const { stdout, stderr } = await execAsync(buildCmd.cmd, {
-                        cwd: projectRoot,
-                        timeout: 180000,
-                        maxBuffer: 10 * 1024 * 1024,
-                        windowsHide: true,
-                    });
+                    const { stdout, stderr } = await runCommand(buildCmd.file, buildCmd.args, projectRoot, 180000);
                     compileOutput = stdout + stderr;
                 }
                 catch (err) {
@@ -131,7 +184,7 @@ class TaskRunner {
                         }
                         // 重新编译
                         try {
-                            const retry = await execAsync(buildCmd.cmd, { cwd: projectRoot, timeout: 180000, maxBuffer: 10 * 1024 * 1024, windowsHide: true });
+                            const retry = await runCommand(buildCmd.file, buildCmd.args, projectRoot, 180000);
                             compileOutput = retry.stdout + retry.stderr;
                         }
                         catch (retryErr) {
@@ -177,21 +230,32 @@ class TaskRunner {
         }
     }
     detectBuildCommand(projectRoot) {
+        const isWin = process.platform === 'win32';
         if (fs.existsSync(path.join(projectRoot, 'build.gradle.kts')) ||
             fs.existsSync(path.join(projectRoot, 'build.gradle'))) {
-            const gradlew = fs.existsSync(path.join(projectRoot, 'gradlew.bat'))
-                ? 'gradlew.bat'
-                : fs.existsSync(path.join(projectRoot, 'gradlew')) ? './gradlew' : 'gradle';
-            return { cmd: `${gradlew} assembleDebug`, type: 'gradle' };
+            const gradlewBat = path.join(projectRoot, 'gradlew.bat');
+            const gradlewSh = path.join(projectRoot, 'gradlew');
+            if (isWin && fs.existsSync(gradlewBat)) {
+                return { file: gradlewBat, args: ['assembleDebug'], type: 'gradle' };
+            }
+            if (fs.existsSync(gradlewSh))
+                return { file: gradlewSh, args: ['assembleDebug'], type: 'gradle' };
+            return { file: 'gradle', args: ['assembleDebug'], type: 'gradle' };
         }
         if (fs.existsSync(path.join(projectRoot, 'pom.xml'))) {
-            return { cmd: 'mvnw compile', type: 'maven' };
+            const mvnwCmd = path.join(projectRoot, 'mvnw.cmd');
+            const mvnwSh = path.join(projectRoot, 'mvnw');
+            if (isWin && fs.existsSync(mvnwCmd))
+                return { file: mvnwCmd, args: ['compile'], type: 'maven' };
+            if (fs.existsSync(mvnwSh))
+                return { file: mvnwSh, args: ['compile'], type: 'maven' };
+            return { file: 'mvn', args: ['compile'], type: 'maven' };
         }
         if (fs.existsSync(path.join(projectRoot, 'package.json'))) {
-            return { cmd: 'npm run build', type: 'npm' };
+            return { file: 'npm', args: ['run', 'build'], type: 'npm' };
         }
         if (fs.existsSync(path.join(projectRoot, 'Cargo.toml'))) {
-            return { cmd: 'cargo build', type: 'cargo' };
+            return { file: 'cargo', args: ['build'], type: 'cargo' };
         }
         return null;
     }
