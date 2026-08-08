@@ -4,7 +4,6 @@
 
 > Builder → Coder → Compile → Deploy, fully automated
 
-[![Release](https://img.shields.io/github/v/release/Guanist/TCIDE?color=ff8c00)](https://github.com/Guanist/TCIDE/releases)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
 ---
@@ -149,21 +148,29 @@ Just say "build me a xxx", and Tiger Cat handles the rest — design, coding, co
 
 ## 🚀 Quick Start
 
-### Download & Install
+### Build & Run
 
-Get the latest version from [Releases](https://github.com/Guanist/TCIDE/releases):
-
-- **Installer**: NSIS installer with uninstaller and desktop shortcut
-- **Portable**: No install needed, run from anywhere
-
-### Development Setup
+**Requirements**: Node.js ≥ 18, npm
 
 ```bash
 git clone https://github.com/Guanist/TCIDE.git
 cd TCIDE
 npm install
 npm run build
+npm start
 ```
+
+Then open Settings → fill in your API Key → Save.
+
+To build installers:
+
+```bash
+npm run dist           # NSIS installer + portable
+npm run dist:portable  # portable EXE only
+```
+
+Artifacts are written to the release/ directory.
+
 
 ### Tech Stack
 

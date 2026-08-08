@@ -2,7 +2,6 @@
 
 > Builder → Coder → Compile → Deploy
 
-[![Release](https://img.shields.io/github/v/release/Guanist/TCIDE?color=ff8c00)](https://github.com/Guanist/TCIDE/releases)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
 ## 核心差异
@@ -38,7 +37,35 @@ Monaco Editor + LSP、文件树、搜索、Git、xterm.js 终端、文件预览�
 
 ## 快速开始
 
-下载 Release 便携版 EXE，双击运行。设置 → 填入 API Key → 保存。
+### 环境要求
+
+- Node.js ≥ 18
+- npm
+
+### 安装依赖
+
+```bash
+npm install
+```
+
+### 启动
+
+```bash
+npm run build
+npm start
+```
+
+启动后：设置 → 填入 API Key → 保存，即可开始使用。
+
+### 构建安装包
+
+```bash
+npm run dist           # 构建 NSIS 安装包 + 便携版
+npm run dist:portable  # 仅构建便携版（免安装 EXE）
+```
+
+构建产物输出到 release/ 目录。
+
 
 ## 技术栈
 
