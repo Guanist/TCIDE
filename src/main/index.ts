@@ -117,7 +117,7 @@ function showAboutDialog(): void {
     type: 'info',
     title: '关于 虎猫 TCIDE',
     message: '虎猫 TCIDE ' + appVersion,
-    detail: '作者：文森特骆\n公众号：文森特骆\n备注：PyClaw 作者骆戡的爸爸\n\n个人 AI 编程 IDE',
+    detail: '作者：文森特骆\n公众号：文森特骆\n备注：PyClaw 作者骆戡的爸爸\n\n个人专属超级 AI 编程 IDE',
     icon: nativeImage.createFromPath(aboutIconPath),
   });
 }

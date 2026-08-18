@@ -5599,7 +5599,7 @@ function createSnakeDemo(): void {
 // ─────────────────────────────────────────
 const FIRST_LAUNCH_README = `# 🐅 欢迎使用虎猫 TCIDE v0.0.1
 
-**个人 AI 编程 IDE**
+**个人专属超级 AI 编程 IDE**
 
 ---
 
