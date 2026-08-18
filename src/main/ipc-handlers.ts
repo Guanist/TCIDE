@@ -17,7 +17,7 @@ const store = getStore();
 import * as zlib from 'zlib';
 import * as path from 'path';
 import { lspManager, LspLanguage } from './lsp-manager';
-import { listTools, executeTool, ToolCall } from './mcp-tools';
+import { listTools, executeTool, ToolCall, loadMcpServers, disconnectAllMcp, listConnectedServers } from './mcp-tools';
 
 let currentAbortController: AbortController | null = null;
 let currentProjectPath: string | null = null;
@@ -141,7 +141,13 @@ export function setupIpcHandlers(): void {
 
   ipcMain.handle('project:openPath', async (_e, projectPath: string) => {
     const fs = await import('fs');
-    if (fs.existsSync(projectPath)) { currentProjectPath = projectPath; return; }
+    if (fs.existsSync(projectPath)) {
+      currentProjectPath = projectPath;
+      // 自动按项目配置拉起外部 MCP server
+      try { const connected = await loadMcpServers(projectPath); if (connected.length) console.log('[MCP] 已连接:', connected.join(', ')); }
+      catch (e: any) { console.error('[MCP] 加载失败:', e.message); }
+      return;
+    }
     throw new Error(`项目路径不存在: ${projectPath}`);
   });
 
@@ -1234,6 +1240,7 @@ lspManager.onServerMessage = (language: string, message: unknown) => {
 // 应用退出时清理所有服务器
 process.on('before-quit', () => {
   lspManager.shutdownAll();
+  disconnectAllMcp();
 });
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -1242,6 +1249,10 @@ process.on('before-quit', () => {
 
 ipcMain.handle('mcp:listTools', async () => {
   return listTools();
+});
+
+ipcMain.handle('mcp:connectedServers', async () => {
+  return listConnectedServers();
 });
 
 ipcMain.handle('mcp:callTool', async (_e, call: ToolCall, projectPath: string, extraContext?: { openFiles?: Array<{ path: string; name: string; language: string }> }) => {

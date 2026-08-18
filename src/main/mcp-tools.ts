@@ -6,6 +6,7 @@
  */
 
 import { execSync } from 'child_process';
+import { spawn, ChildProcess } from 'child_process';
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -15,6 +16,12 @@ export interface ToolDef {
   name: string;
   description: string;
   parameters: Record<string, unknown>; // JSON Schema
+}
+
+// 扩展工具定义：标记来源，便于路由
+export interface McpToolDef extends ToolDef {
+  _source: 'builtin' | 'mcp';
+  _server?: string; // 外部 MCP server 名
 }
 
 export interface ToolCall {
@@ -27,6 +34,187 @@ export interface ToolResult {
   id: string;
   result: string;
   error?: string;
+}
+
+// ── 外部 MCP Server 连接层 ──
+
+interface McpServerConfig {
+  command: string;
+  args?: string[];
+  env?: Record<string, string>;
+}
+
+export interface McpConfigFile {
+  mcpServers?: Record<string, McpServerConfig>;
+}
+
+interface McpClientState {
+  name: string;
+  config: McpServerConfig;
+  proc: ChildProcess;
+  projectPath: string;
+  buffer: Buffer;
+  nextId: number;
+  ready: boolean;
+  pending: Map<number, { resolve: (v: any) => void; reject: (e: Error) => void }>;
+  tools: McpToolDef[];
+}
+
+const mcpClients: Map<string, McpClientState> = new Map();
+
+/** 解析一行 LSP/MCP 风格的 Content-Length 帧，返回完成的消息体数组
+ * 注意：Content-Length 以 UTF-8 字节计，因此缓冲区必须用 Buffer 累积，不能用 string */
+function parseFrames(state: McpClientState, chunk: Buffer): any[] {
+  state.buffer = state.buffer.length ? Buffer.concat([state.buffer, chunk]) : chunk;
+  const out: any[] = [];
+  while (true) {
+    const sep = state.buffer.indexOf('\r\n\r\n');
+    if (sep === -1) break;
+    const header = state.buffer.slice(0, sep).toString('utf-8');
+    const m = header.match(/Content-Length:\s*(\d+)/i);
+    if (!m) { state.buffer = state.buffer.slice(sep + 4); continue; }
+    const len = parseInt(m[1], 10);
+    const bodyStart = sep + 4;
+    if (state.buffer.length < bodyStart + len) break;
+    const body = state.buffer.slice(bodyStart, bodyStart + len).toString('utf-8');
+    state.buffer = state.buffer.slice(bodyStart + len);
+    try { out.push(JSON.parse(body)); } catch { /* 跳过坏帧 */ }
+  }
+  return out;
+}
+
+function sendRpc(state: McpClientState, method: string, params: unknown, isNotification = false): Promise<any> {
+  return new Promise((resolve, reject) => {
+    const id = isNotification ? undefined : state.nextId++;
+    if (id !== undefined) state.pending.set(id, { resolve, reject });
+    const msg = JSON.stringify({ jsonrpc: '2.0', ...(id !== undefined ? { id } : {}), method, params });
+    const payload = `Content-Length: ${Buffer.byteLength(msg, 'utf-8')}\r\n\r\n${msg}`;
+    try { state.proc.stdin?.write(payload); } catch (e: any) {
+      if (id !== undefined) { state.pending.delete(id); reject(e); }
+    }
+    if (isNotification) resolve(undefined);
+    if (id !== undefined) {
+      setTimeout(() => {
+        if (state.pending.has(id)) { state.pending.delete(id); reject(new Error(`MCP ${method} 超时`)); }
+      }, 30000);
+    }
+  });
+}
+
+/** 连接一个外部 MCP server（stdio transport） */
+export async function connectMcpServer(name: string, config: McpServerConfig, projectPath: string): Promise<void> {
+  if (mcpClients.has(name)) await disconnectMcpServer(name);
+  const fullEnv = { ...process.env, ...(config.env || {}) };
+  const proc = spawn(config.command, config.args || [], {
+    cwd: projectPath,
+    env: fullEnv,
+    stdio: ['pipe', 'pipe', 'pipe'],
+  });
+  const state: McpClientState = {
+    name, config, proc, projectPath,
+    buffer: Buffer.alloc(0), nextId: 1, ready: false, pending: new Map(), tools: [],
+  };
+  mcpClients.set(name, state);
+
+  proc.on('error', (err) => console.error(`[MCP:${name}] 进程错误:`, err.message));
+  proc.on('exit', (code) => {
+    console.log(`[MCP:${name}] 退出 code=${code}`);
+    mcpClients.delete(name);
+  });
+  proc.stderr?.on('data', (d) => console.error(`[MCP:${name}:stderr]`, d.toString().trim()));
+  proc.stdout?.on('data', (chunk: Buffer) => {
+    const msgs = parseFrames(state, chunk);
+    for (const msg of msgs) {
+      if (msg.id !== undefined && msg.id !== null) {
+        const p = state.pending.get(msg.id);
+        if (p) { state.pending.delete(msg.id); msg.error ? p.reject(new Error(msg.error.message)) : p.resolve(msg.result); }
+      }
+    }
+  });
+
+  await sendRpc(state, 'initialize', {
+    protocolVersion: '2024-11-05',
+    capabilities: { tools: {} },
+    clientInfo: { name: 'TCIDE', version: '0.0.1' },
+  });
+  await sendRpc(state, 'notifications/initialized', {}, true);
+  const listRes: any = await sendRpc(state, 'tools/list', {});
+  state.tools = (listRes?.tools || []).map((t: any) => ({
+    name: `${name}__${t.name}`,
+    description: `[MCP:${name}] ${t.description || ''}`,
+    parameters: t.inputSchema || { type: 'object', properties: {} },
+    _source: 'mcp' as const,
+    _server: name,
+  }));
+  state.ready = true;
+  console.log(`[MCP:${name}] 已连接，提供 ${state.tools.length} 个工具`);
+}
+
+/** 断开一个 MCP server */
+export async function disconnectMcpServer(name: string): Promise<void> {
+  const state = mcpClients.get(name);
+  if (!state) return;
+  try { await sendRpc(state, 'shutdown', {}, true); state.proc.stdin?.end(); } catch { /* ignore */ }
+  try { state.proc.kill(); } catch { /* ignore */ }
+  mcpClients.delete(name);
+}
+
+/** 断开全部 */
+export function disconnectAllMcp(): void {
+  for (const name of [...mcpClients.keys()]) {
+    try { disconnectMcpServer(name); } catch { /* ignore */ }
+  }
+}
+
+/** 列出所有已连外部 server 的工具（带来源标记） */
+export function listExternalTools(): McpToolDef[] {
+  const out: McpToolDef[] = [];
+  for (const state of mcpClients.values()) out.push(...state.tools);
+  return out;
+}
+
+/** 列出已配置的外部 server 名 */
+export function listConnectedServers(): string[] {
+  return [...mcpClients.keys()];
+}
+
+/** 调用外部 MCP 工具。call.name 形如 `${server}__${tool}` */
+export async function callExternalTool(call: ToolCall): Promise<ToolResult> {
+  const sepIdx = call.name.indexOf('__');
+  if (sepIdx === -1) return { id: call.id, result: '', error: '非外部 MCP 工具' };
+  const server = call.name.slice(0, sepIdx);
+  const tool = call.name.slice(sepIdx + 2);
+  const state = mcpClients.get(server);
+  if (!state) return { id: call.id, result: '', error: `MCP server 未连接: ${server}` };
+  try {
+    const res: any = await sendRpc(state, 'tools/call', { name: tool, arguments: call.arguments || {} });
+    const text = Array.isArray(res?.content)
+      ? res.content.map((c: any) => c.text || c.resource?.text || JSON.stringify(c)).join('\n')
+      : JSON.stringify(res);
+    return { id: call.id, result: truncate(text, 8000) };
+  } catch (err: any) {
+    return { id: call.id, result: '', error: err.message };
+  }
+}
+
+/** 从项目配置加载 MCP server 并连接 */
+export async function loadMcpServers(projectPath: string): Promise<string[]> {
+  let cfg: McpConfigFile = {};
+  const candidates = [
+    path.join(projectPath, '.tcide', 'mcp.json'),
+    path.join(projectPath, 'mcp.json'),
+    path.join(process.env.APPDATA || '', '虎猫 TCIDE', 'mcp.json'),
+  ];
+  for (const c of candidates) {
+    try { if (fs.existsSync(c)) { cfg = JSON.parse(fs.readFileSync(c, 'utf-8')); break; } } catch { /* 跳过损坏 */ }
+  }
+  const servers = cfg.mcpServers || {};
+  const connected: string[] = [];
+  for (const [name, config] of Object.entries(servers)) {
+    try { await connectMcpServer(name, config, projectPath); connected.push(name); }
+    catch (e: any) { console.error(`[MCP] 连接 ${name} 失败:`, e.message); }
+  }
+  return connected;
 }
 
 // ── 工具注册表 ──
@@ -132,9 +320,10 @@ const BUILTIN_TOOLS: ToolDef[] = [
 
 // ── 工具执行器 ──
 
-/** 获取所有可用工具定义 */
-export function listTools(): ToolDef[] {
-  return BUILTIN_TOOLS;
+/** 获取所有可用工具定义（内置 + 已连外部 MCP） */
+export function listTools(): McpToolDef[] {
+  const builtin: McpToolDef[] = BUILTIN_TOOLS.map((t) => ({ ...t, _source: 'builtin' as const }));
+  return [...builtin, ...listExternalTools()];
 }
 
 /** 执行工具调用 */
@@ -230,6 +419,12 @@ async function executeToolImpl(call: ToolCall, projectPath: string, extraContext
     }
 
     default:
+      // 路由到外部 MCP server
+      if (call.name.includes('__')) {
+        const ext = await callExternalTool(call);
+        if (ext.error) throw new Error(ext.error);
+        return ext.result;
+      }
       throw new Error(`未知工具: ${call.name}`);
   }
 }
