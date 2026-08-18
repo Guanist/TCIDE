@@ -40,7 +40,27 @@ const { agentOrchestrator } = require('../core/agent/agent-orchestrator') as {
   };
 };
 
+// ── P0/P1/P2/P3 高级模块（CommonJS 单例，require 引入）──
+// 这些模块历史上只在 renderer 侧被调用，但 preload/IPC 从未接线，
+// 导致「代码熵评估/智能上下文/Git智能/仓库分析/无人值守/语义补全」等 README 宣称功能静默失效。
+/* eslint-disable @typescript-eslint/no-var-requires */
+const { entropyEvaluator }: any = require('../core/entropy/entropy-evaluator');
+const { entropyController }: any = require('../core/context/entropy-controller');
+const { contextTrimmer }: any = require('../core/trimmer/context-trimmer');
+const { smartTrimmer }: any = require('../core/trimmer/smart-trimmer');
+const { gitIntelligence }: any = require('../core/git/git-intelligence');
+const { warehouseAnalyzer }: any = require('../core/indexer/warehouse-analyzer');
+const { unattendedRunner }: any = require('../core/runner/unattended-runner');
+const { semanticChunker }: any = require('../core/chunker/semantic-chunker');
+const { autoHealManager }: any = require('../core/autoheal/autoheal-manager');
+const { lintManager }: any = require('../core/lint/lint-manager');
+const { perfOptimizer }: any = require('../core/perf/perf-optimizer');
+const { semanticCompletion }: any = require('../core/completion/semantic-completion');
+const { debugManager }: any = require('../core/debug/debug-manager');
+/* eslint-enable @typescript-eslint/no-var-requires */
+
 let currentAbortController: AbortController | null = null;
+let currentTaskRunner: any = null;
 let currentProjectPath: string | null = null;
 let projectRules: string = '';
 let memoryInjection: string = '';
@@ -302,12 +322,15 @@ export function setupIpcHandlers(): void {
     const config = getModelConfig();
     const adapter = createAdapterWithUsage(config);
     adapter.setSystemRules(projectRules);
-    const runner = new TaskRunner(adapter, fileService, (progress) => {
+    currentTaskRunner = new TaskRunner(adapter, fileService, (progress) => {
       const window = BrowserWindow.fromWebContents(event.sender)!;
       if (!window.isDestroyed()) window.webContents.send('task-progress', progress);
     });
-    return runner.run(tasks as Parameters<typeof runner.run>[0], projectRoot);
+    return currentTaskRunner.run(tasks as Parameters<typeof currentTaskRunner.run>[0], projectRoot);
   });
+
+  // 终止 TaskRunner（preload 的 abortTaskLoop 已 send 此通道）
+  ipcMain.on('task:abortLoop', () => { currentTaskRunner?.abort?.(); });
 
   // 终端命令
   ipcMain.handle('terminal:exec', async (_e, command: string, cwd: string) => {
@@ -1014,6 +1037,16 @@ export function setupSnapshotIpc(): void {
     return { base64: buffer.toString('base64'), name: path.basename(filePath) };
   });
 
+  // ── PDF data URL（renderer 预览用）──
+  ipcMain.handle('file:readPdfDataUrl', async (_e, filePath: string) => {
+    const fs = await import('fs');
+    if (!fs.existsSync(filePath)) throw new Error('文件不存在');
+    const stat = fs.statSync(filePath);
+    if (stat.size > 50 * 1024 * 1024) throw new Error('PDF 文件过大（最大 50MB）');
+    const buffer = fs.readFileSync(filePath);
+    return `data:application/pdf;base64,${buffer.toString('base64')}`;
+  });
+
   // ── 配置导入/导出 ──
   ipcMain.handle('config:export', async () => {
     const result = await dialog.showSaveDialog({
@@ -1566,3 +1599,329 @@ ipcMain.handle('apiConfigs:save', async (_e, data: { configs: any[]; activeId: s
   store.set('activeApiConfigId', data.activeId);
   return { success: true };
 });
+
+// ══════════════════════════════════════════════════════════════
+// P0/P1/P2/P3 高级模块 IPC 接线（补齐 README 宣称但从未实现的功能）
+// ══════════════════════════════════════════════════════════════
+
+// ── P0: Perf（内存/性能监控）──
+ipcMain.handle('perf:getMetrics', async () => {
+  perfOptimizer.start(30000);
+  return {
+    latest: perfOptimizer.getLatest(),
+    trend: perfOptimizer.getTrend(),
+    usagePercent: perfOptimizer.getUsagePercent(),
+    isCritical: perfOptimizer.isCritical(),
+  };
+});
+ipcMain.handle('perf:gcSweep', async () => {
+  return { swept: perfOptimizer.suggestGC() };
+});
+
+// ── P0: Lint ──
+ipcMain.handle('lint:file', async (event, filePath: string) => {
+  try {
+    const fs = await import('fs');
+    const pathMod = await import('path');
+    if (!fs.existsSync(filePath)) return [];
+    const content = fs.readFileSync(filePath, 'utf-8');
+    const ext = pathMod.extname(filePath).replace('.', '');
+    const langMap: Record<string, string> = {
+      ts: 'typescript', tsx: 'typescript', js: 'javascript', jsx: 'javascript',
+      mjs: 'javascript', cjs: 'javascript', py: 'python', go: 'go', rs: 'rust',
+    };
+    const language = langMap[ext] || 'text';
+    const issues = await lintManager.lintFile(filePath, content, language);
+    // 回填 filePath 并推送 renderer
+    for (const i of issues) i.filePath = filePath;
+    const win = BrowserWindow.fromWebContents(event.sender);
+    if (win && !win.isDestroyed()) {
+      win.webContents.send('lint:diagnostics', { filePath, diagnostics: issues });
+    }
+    return issues;
+  } catch (e: any) {
+    return [];
+  }
+});
+
+// ── P0: AutoHeal（编译错误模式匹配）──
+ipcMain.handle('autoheal:parseErrors', async (_e, output: string, projectPath: string) => {
+  try {
+    const lines = String(output || '').split('\n').filter(l => l.trim());
+    return autoHealManager.analyzeErrors(lines, projectPath);
+  } catch (e: any) {
+    return [];
+  }
+});
+
+// ── P0: Chunker（大文件语义切块）──
+ipcMain.handle('chunker:needsChunking', async (_e, filePath: string) => {
+  try {
+    const fs = await import('fs');
+    if (!fs.existsSync(filePath)) return false;
+    const stat = fs.statSync(filePath);
+    return stat.size > 200 * 1024; // >200KB 需要切块
+  } catch { return false; }
+});
+ipcMain.handle('chunker:chunkFile', async (_e, filePath: string, language?: string) => {
+  try {
+    const fs = await import('fs');
+    const pathMod = await import('path');
+    const content = fs.readFileSync(filePath, 'utf-8');
+    const lang = language || (pathMod.extname(filePath).replace('.', '') || 'javascript');
+    const chunks = semanticChunker.chunkFile(content, lang);
+    return { success: true, chunks };
+  } catch (e: any) {
+    return { success: false, chunks: [], error: e.message };
+  }
+});
+
+// ── P0: Batch Search（跨文件批量搜索）──
+ipcMain.handle('batch:search', async (_e, projectPath: string, query: string, options?: any) => {
+  try {
+    const fs = await import('fs');
+    const pathMod = await import('path');
+    const maxResults = options?.maxResults || 100;
+    const matches: Array<{ filePath: string; line: number; lineContent: string }> = [];
+    const searchDir = (dir: string) => {
+      if (matches.length >= maxResults) return;
+      try {
+        for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+          if (matches.length >= maxResults) return;
+          const full = pathMod.join(dir, entry.name);
+          if (entry.name.startsWith('.') || ['node_modules', 'dist', 'build', '.git'].includes(entry.name)) continue;
+          if (entry.isDirectory()) { searchDir(full); continue; }
+          try {
+            const stat = fs.statSync(full);
+            if (stat.size > 500 * 1024) continue;
+            const lines = fs.readFileSync(full, 'utf-8').split('\n');
+            for (let i = 0; i < lines.length; i++) {
+              if (lines[i].toLowerCase().includes(query.toLowerCase())) {
+                matches.push({ filePath: full, line: i + 1, lineContent: lines[i].trim() });
+                if (matches.length >= maxResults) return;
+              }
+            }
+          } catch { /* skip */ }
+        }
+      } catch { /* skip */ }
+    };
+    searchDir(projectPath);
+    return { count: matches.length, matches };
+  } catch (e: any) {
+    return { count: 0, matches: [], error: e.message };
+  }
+});
+
+// ── P0: Format（基于语言服务/简单规则格式化）──
+ipcMain.handle('file:format', async (_e, filePath: string) => {
+  try {
+    const fs = await import('fs');
+    const pathMod = await import('path');
+    const text = fs.readFileSync(filePath, 'utf-8');
+    const ext = pathMod.extname(filePath).toLowerCase();
+    let formatted = text;
+    if (ext === '.json' || ext === '.jsonc') {
+      try { formatted = JSON.stringify(JSON.parse(text), null, 2); } catch { /* keep original */ }
+    } else {
+      // 简单规范化：统一行尾缩进 + 去除行尾空白
+      formatted = text.split('\n').map(l => l.replace(/\s+$/, '')).join('\n');
+    }
+    return { success: true, formatted };
+  } catch (e: any) {
+    return { success: false, formatted: '', error: e.message };
+  }
+});
+
+// ── P1: Git Intelligence（智能 commit message）──
+ipcMain.handle('gitintel:generateCommitMessage', async (_e, projectPath: string, options?: any) => {
+  try {
+    gitIntelligence.init(projectPath);
+    // 注入 AI 摘要（走现有模型配置）
+    gitIntelligence.setAISummarize(async (files: any[], diff: string) => {
+      try {
+        const config = getModelConfig();
+        const adapter = createAdapterWithUsage(config);
+        const summary = await adapter.send([
+          { role: 'system', content: '你是 Git 提交信息助手，用 Conventional Commit 格式输出一句话摘要（feat/fix/refactor 等），不超过 60 字符。' },
+          { role: 'user', content: `变更文件:\n${files.map((f: any) => f.path || f).join('\n')}\n\nDiff:\n${diff}` },
+        ]);
+        return summary?.trim?.() || '';
+      } catch { return ''; }
+    });
+    const result = await gitIntelligence.generateCommitMessage(projectPath, options || {});
+    return result;
+  } catch (e: any) {
+    return { message: 'chore: minor update', breakdown: [], error: e.message };
+  }
+});
+
+// ── P1: Semantic Completion（语义补全）──
+ipcMain.handle('completion:get', async (_e, params: any) => {
+  try {
+    const { filePath, language, prefix, line, column } = params || {};
+    const projectRoot = params?.projectRoot || currentProjectPath || '';
+    semanticCompletion.init(projectRoot);
+    // 注入 AI 补全
+    semanticCompletion.setAIComplete(async (context: string, lang: string, opts: any) => {
+      try {
+        const config = getModelConfig();
+        const adapter = createAdapterWithUsage(config);
+        return await adapter.send([
+          { role: 'system', content: '你是代码补全助手，只输出需要补全的代码片段，不要解释。' },
+          { role: 'user', content: `语言:${lang}\n上下文:\n${context}` },
+        ]);
+      } catch { return ''; }
+    });
+    const completions = await semanticCompletion.getCompletions({
+      filePath, language, prefix,
+      suffix: '',
+      cursorLine: line, cursorColumn: column,
+      projectRoot,
+    });
+    // renderer 期望 { text } 单条结构
+    const best = completions?.[0];
+    return { text: best?.insertText || best?.label || '' };
+  } catch (e: any) {
+    return { text: '', error: e.message };
+  }
+});
+
+// ── P2: Warehouse Analyzer（仓库语义/调用链/影响分析）──
+ipcMain.handle('warehouse:init', async (_e, projectPath: string) => {
+  if (!projectPath) return false;
+  try { warehouseAnalyzer.init(projectPath); return true; } catch { return false; }
+});
+ipcMain.handle('warehouse:analyzeAll', async (_e, onProgress?: boolean) => {
+  try {
+    const result = await warehouseAnalyzer.analyzeAll();
+    return { success: true, ...result };
+  } catch (e: any) {
+    return { success: false, error: e.message };
+  }
+});
+ipcMain.handle('warehouse:getCallChain', async (_e, symbolName: string, filePath: string, direction?: string) => {
+  try {
+    return warehouseAnalyzer.getCallChain(symbolName, filePath, direction || 'both');
+  } catch (e: any) {
+    return { error: e.message };
+  }
+});
+ipcMain.handle('warehouse:getImpactAnalysis', async (_e, filePath: string) => {
+  try {
+    return warehouseAnalyzer.getImpactAnalysis(filePath);
+  } catch (e: any) {
+    return { error: e.message };
+  }
+});
+
+// ── P2: Unattended Runner（无人值守执行）──
+ipcMain.handle('runner:init', async (_e, projectPath: string) => {
+  if (!projectPath) return false;
+  try { unattendedRunner.init(projectPath); return true; } catch { return false; }
+});
+ipcMain.handle('runner:execute', async (event, plan: any) => {
+  try {
+    const projectRoot = currentProjectPath || '';
+    if (!projectRoot) return { success: false, error: '未打开项目' };
+    unattendedRunner.init(projectRoot);
+    const win = BrowserWindow.fromWebContents(event.sender);
+    unattendedRunner.onLog = (entry: any) => {
+      if (win && !win.isDestroyed()) win.webContents.send('runner:log', entry);
+    };
+    unattendedRunner.onStepChange = (d: any) => {
+      if (win && !win.isDestroyed()) win.webContents.send('runner:stepChange', d);
+    };
+
+    // plan 是文本描述，拆解为步骤；每步 action 用 CoderAgent 真实读写文件
+    const text = typeof plan === 'string' ? plan : JSON.stringify(plan);
+    const config = getModelConfig();
+    const adapter = createAdapterWithUsage(config);
+    adapter.setSystemRules(projectRules);
+    const coder = new CoderAgent(adapter, fileService);
+
+    // 用 AI 把文本计划拆成步骤描述
+    let steps: Array<{ id: string; desc: string }> = [];
+    try {
+      const planResp = await adapter.send([
+        { role: 'system', content: '把用户的需求拆解为可执行步骤。只输出 JSON 数组，每项 {id, desc}，desc 用中文，最多 5 步。' },
+        { role: 'user', content: text },
+      ], { temperature: 0.2, maxTokens: 1024 });
+      const jsonMatch = planResp.match(/\[[\s\S]*\]/);
+      if (jsonMatch) steps = JSON.parse(jsonMatch[0]);
+    } catch { /* fallback */ }
+    if (!Array.isArray(steps) || steps.length === 0) {
+      steps = [{ id: 'exec', desc: text.slice(0, 100) || '执行用户请求' }];
+    }
+
+    const runnablePlan = steps.map((s, i) => ({
+      id: s.id || `step_${i}`,
+      desc: s.desc || `步骤 ${i + 1}`,
+      action: async (_root: string, _ctx: any) => {
+        const res = await coder.run({ id: s.id || `step_${i}`, desc: s.desc, files: [] } as any, projectRoot);
+        if (!res.success) throw new Error(res.output || 'CoderAgent 执行失败');
+        return res.output;
+      },
+    }));
+
+    const result = await unattendedRunner.execute(runnablePlan);
+    return result;
+  } catch (e: any) {
+    return { success: false, error: e.message };
+  }
+});
+
+// ── P3: Entropy Evaluator（代码熵评估）──
+ipcMain.handle('entropy:init', async (_e, projectPath: string) => {
+  if (!projectPath) return false;
+  try { entropyEvaluator.init(projectPath); return true; } catch { return false; }
+});
+ipcMain.handle('entropy:evaluate', async (event) => {
+  try {
+    const win = BrowserWindow.fromWebContents(event.sender);
+    const result = await entropyEvaluator.evaluate((p: any) => {
+      if (win && !win.isDestroyed()) win.webContents.send('entropy:progress', p);
+    });
+    return result;
+  } catch (e: any) {
+    return { score: 50, grade: 'C', error: e.message };
+  }
+});
+
+// ── P3: Entropy Controller（会话管理建议）──
+ipcMain.handle('entropyCtrl:init', async (_e, projectPath: string) => {
+  if (!projectPath) return false;
+  try { entropyController.init(projectPath); return true; } catch { return false; }
+});
+ipcMain.handle('entropyCtrl:tick', async (_e, state: any) => {
+  try {
+    // renderer 传入 { messageCount, projectPath }，适配为 controller 期望的 { messages, ... }
+    const adapted: any = { ...(state || {}) };
+    if (adapted.messageCount != null && !adapted.messages) {
+      adapted.messages = Array.from({ length: Math.min(adapted.messageCount, 200) }, (_, i) => ({
+        role: i % 2 === 0 ? 'user' : 'assistant',
+        content: `turn_${i}`,
+      }));
+    }
+    return entropyController.tick(adapted);
+  } catch (e: any) { return { shouldTrim: false, error: e.message }; }
+});
+ipcMain.handle('entropyCtrl:getSessionRecommendation', async () => {
+  try { return entropyController.getSessionRecommendation(); } catch (e: any) { return { shouldRestart: false, error: e.message }; }
+});
+
+// ── P0/P3: Context Trimmer（智能上下文压缩）──
+ipcMain.handle('context:init', async (_e, projectPath: string) => {
+  if (!projectPath) return false;
+  try { contextTrimmer.init(projectPath); return true; } catch { return false; }
+});
+ipcMain.handle('context:startTrim', async () => {
+  try { contextTrimmer.startBackgroundTrim(); return true; } catch { return false; }
+});
+
+// ── P0: Debug（断点管理）──
+ipcMain.handle('debug:getState', async () => debugManager.getState());
+ipcMain.handle('debug:setBreakpoint', async (_e, filePath: string, line: number, column?: number, condition?: string) => {
+  return debugManager.setBreakpoint(filePath, line, column, condition);
+});
+ipcMain.handle('debug:removeBreakpoint', async (_e, id: string) => debugManager.removeBreakpoint(id));
+ipcMain.handle('debug:getBreakpoints', async (_e, filePath?: string) => debugManager.getBreakpoints(filePath));

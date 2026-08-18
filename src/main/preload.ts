@@ -114,6 +114,11 @@ const api = {
   abortAI: (): void =>
     ipcRenderer.send('ai:abort'),
 
+  abortTask: (): void => {
+    ipcRenderer.send('ai:abort');
+    ipcRenderer.send('task:abortLoop');
+  },
+
   getModelConfig: (): Promise<ModelConfig | null> =>
     ipcRenderer.invoke('model:getConfig'),
 
@@ -427,6 +432,14 @@ const api = {
       'memory-cleanup',
       'usage:balance-warning',
       'pet-state-change',
+      'lsp:message',
+      'entropy:progress',
+      'runner:log',
+      'runner:stepChange',
+      'debug:event',
+      'lint:diagnostics',
+      'orchestrator:phase',
+      'orchestrator:taskProgress',
     ];
     if (validChannels.includes(channel)) {
       ipcRenderer.on(channel, callback);
@@ -454,6 +467,85 @@ const api = {
 
   addRecentProject: (projectPath: string): Promise<void> =>
     ipcRenderer.invoke('project:addRecent', projectPath),
+
+  // ── P0: Perf / Lint / AutoHeal / Chunker / Batch Search / Format ──
+  perfGetMetrics: (): Promise<any> => ipcRenderer.invoke('perf:getMetrics'),
+  perfGcSweep: (): Promise<any> => ipcRenderer.invoke('perf:gcSweep'),
+  lintFile: (filePath: string, projectPath?: string): Promise<any> =>
+    ipcRenderer.invoke('lint:file', filePath),
+  autohealParseErrors: (output: string, projectPath: string): Promise<any> =>
+    ipcRenderer.invoke('autoheal:parseErrors', output, projectPath),
+  chunkerNeedsChunking: (filePath: string): Promise<boolean> =>
+    ipcRenderer.invoke('chunker:needsChunking', filePath),
+  chunkerChunkFile: (filePath: string, language?: string): Promise<any> =>
+    ipcRenderer.invoke('chunker:chunkFile', filePath, language),
+  batchSearch: (projectPath: string, query: string, options?: any): Promise<any> =>
+    ipcRenderer.invoke('batch:search', projectPath, query, options),
+  formatFile: (filePath: string, content?: string): Promise<any> =>
+    ipcRenderer.invoke('file:format', filePath, content),
+
+  // ── P1: Git Intelligence / Semantic Completion ──
+  gitintelGenerateCommitMessage: (projectPath: string, options?: any): Promise<any> =>
+    ipcRenderer.invoke('gitintel:generateCommitMessage', projectPath, options),
+  completionGet: (params: any): Promise<any> =>
+    ipcRenderer.invoke('completion:get', params),
+
+  // ── P2: Warehouse / Runner ──
+  warehouseInit: (projectPath: string): Promise<boolean> =>
+    ipcRenderer.invoke('warehouse:init', projectPath),
+  warehouseAnalyzeAll: (): Promise<any> =>
+    ipcRenderer.invoke('warehouse:analyzeAll'),
+  warehouseGetCallChain: (symbolName: string, filePath: string, direction?: string): Promise<any> =>
+    ipcRenderer.invoke('warehouse:getCallChain', symbolName, filePath, direction),
+  warehouseGetImpactAnalysis: (filePath: string): Promise<any> =>
+    ipcRenderer.invoke('warehouse:getImpactAnalysis', filePath),
+  runnerInit: (projectPath: string): Promise<boolean> =>
+    ipcRenderer.invoke('runner:init', projectPath),
+  runnerExecute: (plan: any): Promise<any> =>
+    ipcRenderer.invoke('runner:execute', plan),
+  onRunnerLog: (cb: (entry: any) => void): () => void => {
+    const h = (_e: IpcRendererEvent, entry: any) => cb(entry);
+    ipcRenderer.on('runner:log', h);
+    return () => ipcRenderer.removeListener('runner:log', h);
+  },
+  onRunnerStepChange: (cb: (d: any) => void): () => void => {
+    const h = (_e: IpcRendererEvent, d: any) => cb(d);
+    ipcRenderer.on('runner:stepChange', h);
+    return () => ipcRenderer.removeListener('runner:stepChange', h);
+  },
+
+  // ── P3: Entropy / Context Trimmer ──
+  entropyInit: (projectPath: string): Promise<boolean> =>
+    ipcRenderer.invoke('entropy:init', projectPath),
+  entropyEvaluate: (): Promise<any> =>
+    ipcRenderer.invoke('entropy:evaluate'),
+  entropyCtrlInit: (projectPath: string): Promise<boolean> =>
+    ipcRenderer.invoke('entropyCtrl:init', projectPath),
+  entropyCtrlTick: (state: any): Promise<any> =>
+    ipcRenderer.invoke('entropyCtrl:tick', state),
+  entropyCtrlGetSessionRecommendation: (): Promise<any> =>
+    ipcRenderer.invoke('entropyCtrl:getSessionRecommendation'),
+  onEntropyProgress: (cb: (p: any) => void): () => void => {
+    const h = (_e: IpcRendererEvent, p: any) => cb(p);
+    ipcRenderer.on('entropy:progress', h);
+    return () => ipcRenderer.removeListener('entropy:progress', h);
+  },
+  contextInit: (projectPath: string): Promise<boolean> =>
+    ipcRenderer.invoke('context:init', projectPath),
+  contextStartTrim: (): Promise<boolean> =>
+    ipcRenderer.invoke('context:startTrim'),
+
+  // ── P0: Debug ──
+  onDebugEvent: (cb: (e: any) => void): () => void => {
+    const h = (_e: IpcRendererEvent, e: any) => cb(e);
+    ipcRenderer.on('debug:event', h);
+    return () => ipcRenderer.removeListener('debug:event', h);
+  },
+  onLintDiagnostics: (cb: (d: any) => void): () => void => {
+    const h = (_e: IpcRendererEvent, d: any) => cb(d);
+    ipcRenderer.on('lint:diagnostics', h);
+    return () => ipcRenderer.removeListener('lint:diagnostics', h);
+  },
 
   // ── LSP 语言服务 ──
   lspStart: (language: string, projectPath: string): Promise<{ success: boolean; error?: string }> =>
@@ -498,6 +590,9 @@ const api = {
   // ── MCP 工具 ──
   mcpListTools: (): Promise<Array<{ name: string; description: string; parameters: Record<string, unknown> }>> =>
     ipcRenderer.invoke('mcp:listTools'),
+
+  mcpConnectedServers: (): Promise<string[]> =>
+    ipcRenderer.invoke('mcp:connectedServers'),
 
   mcpCallTool: (call: { id: string; name: string; arguments: Record<string, unknown> }, projectPath: string, extraContext?: { openFiles?: Array<{ path: string; name: string; language: string }> }): Promise<{ id: string; result: string; error?: string }> =>
     ipcRenderer.invoke('mcp:callTool', call, projectPath, extraContext),

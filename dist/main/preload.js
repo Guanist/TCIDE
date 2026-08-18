@@ -30,6 +30,10 @@ const api = {
     sendToAI: (messages, options) => electron_1.ipcRenderer.invoke('ai:send', messages, options),
     sendToAIStream: (messages, options) => electron_1.ipcRenderer.invoke('ai:send-stream', messages, options),
     abortAI: () => electron_1.ipcRenderer.send('ai:abort'),
+    abortTask: () => {
+        electron_1.ipcRenderer.send('ai:abort');
+        electron_1.ipcRenderer.send('task:abortLoop');
+    },
     getModelConfig: () => electron_1.ipcRenderer.invoke('model:getConfig'),
     saveModelConfig: (config) => electron_1.ipcRenderer.invoke('model:saveConfig', config),
     getApiConfigs: () => electron_1.ipcRenderer.invoke('apiConfigs:get'),
@@ -133,6 +137,14 @@ const api = {
             'memory-cleanup',
             'usage:balance-warning',
             'pet-state-change',
+            'lsp:message',
+            'entropy:progress',
+            'runner:log',
+            'runner:stepChange',
+            'debug:event',
+            'lint:diagnostics',
+            'orchestrator:phase',
+            'orchestrator:taskProgress',
         ];
         if (validChannels.includes(channel)) {
             electron_1.ipcRenderer.on(channel, callback);
@@ -149,6 +161,59 @@ const api = {
     // ── 最近项目 ──
     getRecentProjects: () => electron_1.ipcRenderer.invoke('project:getRecent'),
     addRecentProject: (projectPath) => electron_1.ipcRenderer.invoke('project:addRecent', projectPath),
+    // ── P0: Perf / Lint / AutoHeal / Chunker / Batch Search / Format ──
+    perfGetMetrics: () => electron_1.ipcRenderer.invoke('perf:getMetrics'),
+    perfGcSweep: () => electron_1.ipcRenderer.invoke('perf:gcSweep'),
+    lintFile: (filePath, projectPath) => electron_1.ipcRenderer.invoke('lint:file', filePath),
+    autohealParseErrors: (output, projectPath) => electron_1.ipcRenderer.invoke('autoheal:parseErrors', output, projectPath),
+    chunkerNeedsChunking: (filePath) => electron_1.ipcRenderer.invoke('chunker:needsChunking', filePath),
+    chunkerChunkFile: (filePath, language) => electron_1.ipcRenderer.invoke('chunker:chunkFile', filePath, language),
+    batchSearch: (projectPath, query, options) => electron_1.ipcRenderer.invoke('batch:search', projectPath, query, options),
+    formatFile: (filePath, content) => electron_1.ipcRenderer.invoke('file:format', filePath, content),
+    // ── P1: Git Intelligence / Semantic Completion ──
+    gitintelGenerateCommitMessage: (projectPath, options) => electron_1.ipcRenderer.invoke('gitintel:generateCommitMessage', projectPath, options),
+    completionGet: (params) => electron_1.ipcRenderer.invoke('completion:get', params),
+    // ── P2: Warehouse / Runner ──
+    warehouseInit: (projectPath) => electron_1.ipcRenderer.invoke('warehouse:init', projectPath),
+    warehouseAnalyzeAll: () => electron_1.ipcRenderer.invoke('warehouse:analyzeAll'),
+    warehouseGetCallChain: (symbolName, filePath, direction) => electron_1.ipcRenderer.invoke('warehouse:getCallChain', symbolName, filePath, direction),
+    warehouseGetImpactAnalysis: (filePath) => electron_1.ipcRenderer.invoke('warehouse:getImpactAnalysis', filePath),
+    runnerInit: (projectPath) => electron_1.ipcRenderer.invoke('runner:init', projectPath),
+    runnerExecute: (plan) => electron_1.ipcRenderer.invoke('runner:execute', plan),
+    onRunnerLog: (cb) => {
+        const h = (_e, entry) => cb(entry);
+        electron_1.ipcRenderer.on('runner:log', h);
+        return () => electron_1.ipcRenderer.removeListener('runner:log', h);
+    },
+    onRunnerStepChange: (cb) => {
+        const h = (_e, d) => cb(d);
+        electron_1.ipcRenderer.on('runner:stepChange', h);
+        return () => electron_1.ipcRenderer.removeListener('runner:stepChange', h);
+    },
+    // ── P3: Entropy / Context Trimmer ──
+    entropyInit: (projectPath) => electron_1.ipcRenderer.invoke('entropy:init', projectPath),
+    entropyEvaluate: () => electron_1.ipcRenderer.invoke('entropy:evaluate'),
+    entropyCtrlInit: (projectPath) => electron_1.ipcRenderer.invoke('entropyCtrl:init', projectPath),
+    entropyCtrlTick: (state) => electron_1.ipcRenderer.invoke('entropyCtrl:tick', state),
+    entropyCtrlGetSessionRecommendation: () => electron_1.ipcRenderer.invoke('entropyCtrl:getSessionRecommendation'),
+    onEntropyProgress: (cb) => {
+        const h = (_e, p) => cb(p);
+        electron_1.ipcRenderer.on('entropy:progress', h);
+        return () => electron_1.ipcRenderer.removeListener('entropy:progress', h);
+    },
+    contextInit: (projectPath) => electron_1.ipcRenderer.invoke('context:init', projectPath),
+    contextStartTrim: () => electron_1.ipcRenderer.invoke('context:startTrim'),
+    // ── P0: Debug ──
+    onDebugEvent: (cb) => {
+        const h = (_e, e) => cb(e);
+        electron_1.ipcRenderer.on('debug:event', h);
+        return () => electron_1.ipcRenderer.removeListener('debug:event', h);
+    },
+    onLintDiagnostics: (cb) => {
+        const h = (_e, d) => cb(d);
+        electron_1.ipcRenderer.on('lint:diagnostics', h);
+        return () => electron_1.ipcRenderer.removeListener('lint:diagnostics', h);
+    },
     // ── LSP 语言服务 ──
     lspStart: (language, projectPath) => electron_1.ipcRenderer.invoke('lsp:start', language, projectPath),
     lspStop: (language, projectPath) => electron_1.ipcRenderer.invoke('lsp:stop', language, projectPath),
@@ -169,6 +234,7 @@ const api = {
     gitCheckout: (branch, projectPath) => electron_1.ipcRenderer.invoke('git:checkout', branch, projectPath),
     // ── MCP 工具 ──
     mcpListTools: () => electron_1.ipcRenderer.invoke('mcp:listTools'),
+    mcpConnectedServers: () => electron_1.ipcRenderer.invoke('mcp:connectedServers'),
     mcpCallTool: (call, projectPath, extraContext) => electron_1.ipcRenderer.invoke('mcp:callTool', call, projectPath, extraContext),
     sendToAIWithTools: (messages, options) => electron_1.ipcRenderer.invoke('ai:send-with-tools', messages, options),
     // ── 项目长期记忆 + 向量索引（Step 3）──

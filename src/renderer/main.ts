@@ -2236,7 +2236,6 @@ function createSession(name?: string): ChatSession {
 async function saveSessionsToDisk(): Promise<void> {
   if (!state.projectPath) return;
   try {
-    const p = (window as any).path || require('path');
     const tcideDir = `${state.projectPath}/.tcide/chat`;
     // 通过 API 创建目录
     await window.api.writeFile(`${tcideDir}/.gitkeep`, '');
@@ -6523,9 +6522,16 @@ function triggerChunkerForFile(filePath: string): void {
 // P0: Perf
 // ═══════════════════════════════════════════════
 function updateStatusBarPerf(): void {
-  (window as any).api.perfGetMetrics().then((m: any) => {
-    if (m && m.openCount > 0) { /* metrics available */ }
-  }).catch(() => {});
+  // perfGetMetrics 可能未被 preload 暴露（IPC 未接线），必须可选调用 + 同步保护，
+  // 否则同步抛 TypeError 会中断模块顶层求值，导致后续 let 声明（如 projectRules）永远停在 TDZ。
+  try {
+    const perfGetMetrics = (window as any).api?.perfGetMetrics;
+    if (typeof perfGetMetrics === 'function') {
+      perfGetMetrics.call((window as any).api).then((m: any) => {
+        if (m && m.openCount > 0) { /* metrics available */ }
+      }).catch(() => {});
+    }
+  } catch (_) { /* 静默：perf 指标仅用于状态栏展示，缺失不影响核心功能 */ }
 }
 
 // ═══════════════════════════════════════════════
@@ -6590,7 +6596,12 @@ function initP0ProjectServices(projectPath: string): void {
   api.contextInit(projectPath).then(() => { api.contextStartTrim().catch(() => {}); }).catch(() => {});
   initProjectMemory(projectPath).catch(() => {});
   initVectorIndex(projectPath).catch(() => {});
-  setInterval(() => { api.perfGcSweep().catch(() => {}); }, 60000);
+  setInterval(() => {
+    try {
+      const perfGcSweep = api?.perfGcSweep;
+      if (typeof perfGcSweep === 'function') perfGcSweep.call(api).catch(() => {});
+    } catch (_) {}
+  }, 60000);
 }
 
 // ═══════════════════════════════════════════════
