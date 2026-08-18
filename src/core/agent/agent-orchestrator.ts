@@ -321,9 +321,16 @@ class AgentOrchestrator {
     async _runCoderFix(rejected, context) {
         const results = [];
         for (const item of rejected) {
+            // 回灌 reviewer 的完整意见给 coder（Step 5）
+            const issuesText = (item.issues || []).map((iss, i) => `${i + 1}. ${iss}`).join('\n');
+            const feedback = [
+                `FIX review feedback: ${item.issues?.join('; ') || 'code review issues'}.`,
+                item.suggestion ? `Reviewer suggestion: ${item.suggestion}` : '',
+                issuesText ? `\nIssues found:\n${issuesText}` : '',
+            ].filter(Boolean).join('\n');
             this._emitTaskProgress(item.taskId, 'fixing', `修复审查意见: ${item.issues?.join(', ')}`);
             const result = await this._runSingleCoder(
-                { id: item.taskId, desc: `FIX review feedback: ${item.issues?.join('; ')}. ${item.suggestion || ''}`, dep: [], files: [], priority: 0, attempts: 0, maxAttempts: 1 },
+                { id: item.taskId, desc: feedback, dep: [], files: [], priority: 0, attempts: 0, maxAttempts: 1 },
                 context
             );
             results.push(result);
@@ -388,4 +395,5 @@ class AgentOrchestrator {
         return this.pipeline;
     }
 }
-exports.agentOrchestrator = new AgentOrchestrator();
+
+exports.agentOrchestrator = new AgentOrchestrator();

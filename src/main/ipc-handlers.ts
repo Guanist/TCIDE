@@ -19,9 +19,31 @@ import * as path from 'path';
 import { lspManager, LspLanguage } from './lsp-manager';
 import { listTools, executeTool, ToolCall, loadMcpServers, disconnectAllMcp, listConnectedServers } from './mcp-tools';
 
+// ── 项目长期记忆 + 向量索引（CommonJS 模块，require 引入单例）──
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const { vectorIndexer } = require('../core/indexer/vector-indexer') as {
+  vectorIndexer: { init: (p: string) => void; indexAll: (cb?: unknown) => Promise<{ indexed: number; skipped: number }>; search: (q: string, o?: any) => Array<{ file: string; symbol: string; text: string; type: string; score: number }>; getStats: () => any };
+};
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const { projectMemory } = require('../core/memory/project-memory') as {
+  projectMemory: { init: (p: string) => void; getMemoryInjection: () => string; searchPatterns: (q: string) => any[]; searchDecisions: (q: string) => any[] };
+};
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const { agentOrchestrator } = require('../core/agent/agent-orchestrator') as {
+  agentOrchestrator: {
+    init: (p: string, adapter: any) => void;
+    run: (req: string, ctx?: any) => Promise<any>;
+    abort: () => void;
+    onPhaseChange: ((cb: (e: { phase: string; data: any }) => void) => void) | null;
+    onTaskProgress: ((cb: (e: { taskId: string; status: string; message: string }) => void) => void) | null;
+    getPipelineStatus: () => any[];
+  };
+};
+
 let currentAbortController: AbortController | null = null;
 let currentProjectPath: string | null = null;
 let projectRules: string = '';
+let memoryInjection: string = '';
 const fileService = new FileService();
 
 function getModelConfig(): ModelConfig {
@@ -146,12 +168,49 @@ export function setupIpcHandlers(): void {
       // 自动按项目配置拉起外部 MCP server
       try { const connected = await loadMcpServers(projectPath); if (connected.length) console.log('[MCP] 已连接:', connected.join(', ')); }
       catch (e: any) { console.error('[MCP] 加载失败:', e.message); }
+      // 初始化项目长期记忆 + 向量索引（Step 3）
+      try {
+        projectMemory.init(projectPath);
+        memoryInjection = projectMemory.getMemoryInjection();
+        vectorIndexer.init(projectPath);
+        // 后台异步全量索引（不阻塞打开）
+        setTimeout(() => { vectorIndexer.indexAll().catch((e: any) => console.warn('[VectorIndex] 索引失败:', e.message)); }, 1500);
+      } catch (e: any) { console.error('[Memory] 初始化失败:', e.message); }
       return;
     }
     throw new Error(`项目路径不存在: ${projectPath}`);
   });
 
   ipcMain.handle('project:getPath', async () => currentProjectPath);
+
+  // ── 项目长期记忆 + 向量索引（Step 3）──
+  ipcMain.handle('memory:init', async (_e, projectPath: string) => {
+    if (!projectPath) return false;
+    try {
+      projectMemory.init(projectPath);
+      memoryInjection = projectMemory.getMemoryInjection();
+      return true;
+    } catch { return false; }
+  });
+  ipcMain.handle('memory:getInjection', async () => memoryInjection);
+  ipcMain.handle('memory:search', async (_e, query: string) => {
+    if (!query) return [];
+    const patterns = projectMemory.searchPatterns(query) || [];
+    const decisions = projectMemory.searchDecisions(query) || [];
+    return { patterns, decisions };
+  });
+  ipcMain.handle('vector:init', async (_e, projectPath: string) => {
+    if (!projectPath) return false;
+    try { vectorIndexer.init(projectPath); return true; } catch { return false; }
+  });
+  ipcMain.handle('vector:indexAll', async () => {
+    try { return await vectorIndexer.indexAll(); } catch (e: any) { return { indexed: 0, skipped: 0, error: e.message }; }
+  });
+  ipcMain.handle('vector:search', async (_e, query: string, options?: any) => {
+    if (!query) return [];
+    try { return vectorIndexer.search(query, options); } catch { return []; }
+  });
+  ipcMain.handle('vector:stats', async () => vectorIndexer.getStats());
 
   // AI 发送（非流式）
   ipcMain.handle('ai:send', async (_e, messages: ChatMessage[], options) => {
@@ -1226,14 +1285,11 @@ ipcMain.handle('lsp:installGuide', async (_e, language: string) => {
 });
 
 // 设置LSP消息回调 — 将服务器消息转发给渲染进程
-let lspMessageCallback: ((event: any, data: any) => void) | null = null;
 lspManager.onServerMessage = (language: string, message: unknown) => {
-  if (lspMessageCallback) {
-    // 通过 webContents.send 发送到渲染进程
-    const win = BrowserWindow.getAllWindows()[0];
-    if (win && !win.isDestroyed()) {
-      win.webContents.send('lsp:message', { language, message });
-    }
+  // 通过 webContents.send 发送到渲染进程
+  const win = BrowserWindow.getAllWindows()[0];
+  if (win && !win.isDestroyed()) {
+    win.webContents.send('lsp:message', { language, message });
   }
 };
 
@@ -1260,6 +1316,59 @@ ipcMain.handle('mcp:callTool', async (_e, call: ToolCall, projectPath: string, e
 });
 
 // ── AI Chat with Tools (function calling) ──
+
+/** 自动验证命令检测（Step 4）：优先 npm test/lint，回退 build/tsc */
+function detectVerifyCommand(projectRoot: string): string | null {
+  try {
+    const fs = require('fs');
+    const path = require('path');
+    const pkgPath = path.join(projectRoot, 'package.json');
+    if (fs.existsSync(pkgPath)) {
+      const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf-8'));
+      const s = pkg.scripts || {};
+      if (s.test) return 'npm test';
+      if (s.lint) return 'npm run lint';
+      if (s['type-check']) return 'npm run type-check';
+      if (s.build) return 'npm run build';
+    }
+    if (fs.existsSync(path.join(projectRoot, 'pyproject.toml')) || fs.existsSync(path.join(projectRoot, 'pytest.ini'))) return 'pytest -q';
+    if (fs.existsSync(path.join(projectRoot, 'go.mod'))) return 'go test ./...';
+    if (fs.existsSync(path.join(projectRoot, 'Cargo.toml'))) return 'cargo test -q';
+    return null;
+  } catch { return null; }
+}
+
+// ── 多 Agent Orchestrator（Step 5 接线）──
+ipcMain.handle('orchestrator:init', async (_e, projectPath: string) => {
+  if (!projectPath) return false;
+  const config = getModelConfig();
+  const adapter = createAdapterWithUsage(config);
+  adapter.setSystemRules(projectRules);
+  agentOrchestrator.init(projectPath, adapter);
+  return true;
+});
+ipcMain.handle('orchestrator:run', async (event, requirement: string, context?: any) => {
+  const win = BrowserWindow.fromWebContents(event.sender);
+  if (win && !win.isDestroyed()) {
+    agentOrchestrator.onPhaseChange = (e) => {
+      if (!win.isDestroyed()) win.webContents.send('orchestrator:phase', e);
+    };
+    agentOrchestrator.onTaskProgress = (e) => {
+      if (!win.isDestroyed()) win.webContents.send('orchestrator:taskProgress', e);
+    };
+  }
+  try {
+    return await agentOrchestrator.run(requirement, context || {});
+  } catch (e: any) {
+    return { success: false, error: e.message };
+  }
+});
+ipcMain.handle('orchestrator:abort', async () => {
+  agentOrchestrator.abort();
+  return true;
+});
+ipcMain.handle('orchestrator:status', async () => agentOrchestrator.getPipelineStatus());
+
 ipcMain.handle('ai:send-with-tools', async (event, messages: Array<{ role: string; content: string | null; tool_calls?: Array<{ id: string; type: string; function: { name: string; arguments: string } }>; tool_call_id?: string; name?: string }>, options?: { model?: string }) => {
   const config = getModelConfig();
   const adapter = createAdapterWithUsage(config);
@@ -1274,7 +1383,12 @@ ipcMain.handle('ai:send-with-tools', async (event, messages: Array<{ role: strin
   // Add tools to the request
   const tools = listTools().map(t => ({ type: 'function' as const, function: { name: t.name, description: t.description, parameters: t.parameters } }));
 
+  // 注入项目记忆 + 规则作为 system 消息（Step 3）：主循环用 fetch 直连，需手动拼 system 段
   let conversation = [...messages];
+  const sysText = [memoryInjection, projectRules].filter(Boolean).join('\n');
+  if (sysText) {
+    conversation = [{ role: 'system', content: sysText }, ...conversation];
+  }
 
   // 通知渲染进程：自主循环开始
   if (!win.isDestroyed()) {
@@ -1290,7 +1404,7 @@ ipcMain.handle('ai:send-with-tools', async (event, messages: Array<{ role: strin
     // Build request body
     const body = JSON.stringify({
       model: options?.model || config.model || 'deepseek-v4-pro',
-      messages: conversation.filter(m => m.role !== 'system'),
+      messages: conversation,
       tools,
       tool_choice: 'auto',
       stream: false,
@@ -1319,6 +1433,7 @@ ipcMain.handle('ai:send-with-tools', async (event, messages: Array<{ role: strin
       conversation.push({ role: 'assistant', content: msg.content || '', tool_calls: msg.tool_calls });
 
       // Execute each tool call
+      let wroteFiles = false;
       for (const tc of msg.tool_calls) {
         const toolCall: ToolCall = {
           id: tc.id,
@@ -1339,6 +1454,7 @@ ipcMain.handle('ai:send-with-tools', async (event, messages: Array<{ role: strin
 
         // Execute tool
         const result = await executeTool(toolCall, currentProjectPath || process.cwd());
+        if (toolCall.name === 'write_file' && !result.error) wroteFiles = true;
 
         // Truncate result to avoid token overflow, but keep enough context
         const truncatedResult = result.result.length > MAX_TOOL_RESULT_CHARS
@@ -1365,6 +1481,27 @@ ipcMain.handle('ai:send-with-tools', async (event, messages: Array<{ role: strin
           name: tc.function.name,
           content: result.error || truncatedResult,
         });
+      }
+
+      // Step 4：本轮写入了文件 → 自动跑验证命令，结果回灌下一轮
+      if (wroteFiles && currentProjectPath) {
+        const verifyCmd = detectVerifyCommand(currentProjectPath);
+        if (verifyCmd) {
+          if (!win.isDestroyed()) {
+            win.webContents.send('ai-stream-chunk', JSON.stringify({ type: 'auto_verify', command: verifyCmd, round: round + 1 }));
+          }
+          try {
+            const { execSync } = require('child_process');
+            const out = execSync(verifyCmd, { cwd: currentProjectPath, timeout: 60000, encoding: 'utf-8', maxBuffer: 1024 * 1024 });
+            const okMsg = `[自动验证] ${verifyCmd} 通过 ✅\n${out.slice(0, 2000)}`;
+            conversation.push({ role: 'user', content: okMsg });
+            if (!win.isDestroyed()) win.webContents.send('ai-stream-chunk', JSON.stringify({ type: 'auto_verify_result', command: verifyCmd, success: true, output: out.slice(0, 2000) }));
+          } catch (e: any) {
+            const failMsg = `[自动验证] ${verifyCmd} 失败 ❌\n${(e.stderr || e.stdout || e.message || '').slice(0, 3000)}\n请分析并修复后重试。`;
+            conversation.push({ role: 'user', content: failMsg });
+            if (!win.isDestroyed()) win.webContents.send('ai-stream-chunk', JSON.stringify({ type: 'auto_verify_result', command: verifyCmd, success: false, output: (e.stderr || e.stdout || e.message || '').slice(0, 3000) }));
+          }
+        }
       }
 
       continue; // Another round to get final response

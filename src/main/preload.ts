@@ -505,6 +505,42 @@ const api = {
   sendToAIWithTools: (messages: Array<{ role: string; content: string | null; tool_calls?: unknown; tool_call_id?: string; name?: string }>, options?: { model?: string }): Promise<string> =>
     ipcRenderer.invoke('ai:send-with-tools', messages, options),
 
+  // ── 项目长期记忆 + 向量索引（Step 3）──
+  memoryInit: (projectPath: string): Promise<boolean> =>
+    ipcRenderer.invoke('memory:init', projectPath),
+  memoryGetInjection: (): Promise<string> =>
+    ipcRenderer.invoke('memory:getInjection'),
+  memorySearch: (query: string): Promise<{ patterns: unknown[]; decisions: unknown[] }> =>
+    ipcRenderer.invoke('memory:search', query),
+  vectorInit: (projectPath: string): Promise<boolean> =>
+    ipcRenderer.invoke('vector:init', projectPath),
+  vectorIndexAll: (): Promise<{ indexed: number; skipped: number }> =>
+    ipcRenderer.invoke('vector:indexAll'),
+  vectorSearch: (query: string, options?: Record<string, unknown>): Promise<unknown[]> =>
+    ipcRenderer.invoke('vector:search', query, options),
+  vectorStats: (): Promise<Record<string, unknown>> =>
+    ipcRenderer.invoke('vector:stats'),
+
+  // ── 多 Agent Orchestrator（Step 5）──
+  orchestratorInit: (projectPath: string): Promise<boolean> =>
+    ipcRenderer.invoke('orchestrator:init', projectPath),
+  orchestratorRun: (requirement: string, context?: Record<string, unknown>): Promise<unknown> =>
+    ipcRenderer.invoke('orchestrator:run', requirement, context),
+  orchestratorAbort: (): Promise<boolean> =>
+    ipcRenderer.invoke('orchestrator:abort'),
+  orchestratorStatus: (): Promise<unknown[]> =>
+    ipcRenderer.invoke('orchestrator:status'),
+  onOrchestratorPhase: (callback: (e: { phase: string; data: unknown }) => void): (() => void) => {
+    const listener = (_evt: IpcRendererEvent, e: { phase: string; data: unknown }) => callback(e);
+    ipcRenderer.on('orchestrator:phase', listener);
+    return () => ipcRenderer.removeListener('orchestrator:phase', listener);
+  },
+  onOrchestratorTaskProgress: (callback: (e: { taskId: string; status: string; message: string }) => void): (() => void) => {
+    const listener = (_evt: IpcRendererEvent, e: { taskId: string; status: string; message: string }) => callback(e);
+    ipcRenderer.on('orchestrator:taskProgress', listener);
+    return () => ipcRenderer.removeListener('orchestrator:taskProgress', listener);
+  },
+
   // ── 像素宠物 ──
   petSetState: (state: string, label?: string): void =>
     ipcRenderer.send('pet-set-state', state, label),
