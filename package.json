@@ -1,6 +1,6 @@
 {
   "name": "tcide",
-  "productName": "TCIDE",
+  "productName": "虎猫 TCIDE",
   "version": "0.0.1",
   "versionName": "v0.0.1",
   "description": "铏庣尗 TCIDE 鈥?涓汉涓撳睘 AI 缂栫▼ IDE",
@@ -35,7 +35,7 @@
   },
   "build": {
     "appId": "com.tcide.app",
-    "productName": "TCIDE",
+    "productName": "虎猫 TCIDE",
     "electronDist": "node_modules/electron/dist",
     "electronVersion": "28.0.0",
     "directories": {

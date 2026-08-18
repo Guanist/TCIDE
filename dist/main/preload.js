@@ -171,6 +171,29 @@ const api = {
     mcpListTools: () => electron_1.ipcRenderer.invoke('mcp:listTools'),
     mcpCallTool: (call, projectPath, extraContext) => electron_1.ipcRenderer.invoke('mcp:callTool', call, projectPath, extraContext),
     sendToAIWithTools: (messages, options) => electron_1.ipcRenderer.invoke('ai:send-with-tools', messages, options),
+    // ── 项目长期记忆 + 向量索引（Step 3）──
+    memoryInit: (projectPath) => electron_1.ipcRenderer.invoke('memory:init', projectPath),
+    memoryGetInjection: () => electron_1.ipcRenderer.invoke('memory:getInjection'),
+    memorySearch: (query) => electron_1.ipcRenderer.invoke('memory:search', query),
+    vectorInit: (projectPath) => electron_1.ipcRenderer.invoke('vector:init', projectPath),
+    vectorIndexAll: () => electron_1.ipcRenderer.invoke('vector:indexAll'),
+    vectorSearch: (query, options) => electron_1.ipcRenderer.invoke('vector:search', query, options),
+    vectorStats: () => electron_1.ipcRenderer.invoke('vector:stats'),
+    // ── 多 Agent Orchestrator（Step 5）──
+    orchestratorInit: (projectPath) => electron_1.ipcRenderer.invoke('orchestrator:init', projectPath),
+    orchestratorRun: (requirement, context) => electron_1.ipcRenderer.invoke('orchestrator:run', requirement, context),
+    orchestratorAbort: () => electron_1.ipcRenderer.invoke('orchestrator:abort'),
+    orchestratorStatus: () => electron_1.ipcRenderer.invoke('orchestrator:status'),
+    onOrchestratorPhase: (callback) => {
+        const listener = (_evt, e) => callback(e);
+        electron_1.ipcRenderer.on('orchestrator:phase', listener);
+        return () => electron_1.ipcRenderer.removeListener('orchestrator:phase', listener);
+    },
+    onOrchestratorTaskProgress: (callback) => {
+        const listener = (_evt, e) => callback(e);
+        electron_1.ipcRenderer.on('orchestrator:taskProgress', listener);
+        return () => electron_1.ipcRenderer.removeListener('orchestrator:taskProgress', listener);
+    },
     // ── 像素宠物 ──
     petSetState: (state, label) => electron_1.ipcRenderer.send('pet-set-state', state, label),
     petHitTest: (x, y) => electron_1.ipcRenderer.invoke('pet-hit-test', x, y),
