@@ -62,6 +62,15 @@ function createWindow(): void {
   mainWindow.webContents.on('did-finish-load', () => console.log('[Main] did-finish-load'));
   mainWindow.webContents.on('did-fail-load', (_e, code, desc, url) => console.error('[Main] did-fail-load:', code, desc, url));
   mainWindow.webContents.on('did-fail-provisional-load', (_e, code, desc, url) => console.error('[Main] did-fail-provisional-load:', code, desc, url));
+
+  // 外链（如「获取API密钥」「文档」）一律转系统默认浏览器，禁止在应用内开新窗口
+  mainWindow.webContents.setWindowOpenHandler(({ url }) => {
+    const u = url.toLowerCase();
+    if (u.startsWith('http://') || u.startsWith('https://')) {
+      import('electron').then(({ shell }) => shell.openExternal(url)).catch(() => {});
+    }
+    return { action: 'deny' };
+  });
   mainWindow.webContents.on('console-message', (_e, level, message) => console.log('[Renderer]', message));
   
   mainWindow.on('close', (event) => {
@@ -95,7 +104,7 @@ function showAboutDialog(): void {
   const aboutIconPath = isDev
     ? path.join(__dirname, '..', '..', 'resources', 'about-icon.png')
     : path.join(process.resourcesPath, 'about-icon.png');
-  let appVersion = 'v1.5.0-p0';
+  let appVersion = 'v0.0.1';
   try {
     const pkgPath = isDev
       ? path.join(__dirname, '..', '..', 'package.json')
@@ -108,7 +117,7 @@ function showAboutDialog(): void {
     type: 'info',
     title: '关于 虎猫 TCIDE',
     message: '虎猫 TCIDE ' + appVersion,
-    detail: '作者：文森特骆\n公众号：文森特骆\n备注：PyClaw 作者骆戡的爸爸\n\n个人专属超级 AI 编程 IDE',
+    detail: '作者：文森特骆\n公众号：文森特骆\n备注：PyClaw 作者骆戡的爸爸\n\n个人 AI 编程 IDE',
     icon: nativeImage.createFromPath(aboutIconPath),
   });
 }
