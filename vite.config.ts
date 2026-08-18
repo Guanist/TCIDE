@@ -16,12 +16,17 @@ const petPlugin = {
     const src = pathLib.join(__dirname, 'src', 'renderer', 'pet-window.html');
     const dst = pathLib.join(__dirname, 'dist', 'renderer', 'pet-window.html');
     if (fs.existsSync(src)) fs.copyFileSync(src, dst);
-    // Copy p0/p1/p2 modules from save
-    const saveDir = pathLib.join(__dirname, 'dist', 'renderer', 'assets_save');
+    // Restore p0/p1/p2 global modules after emptyOutDir wiped them.
+    // Source of truth: recovered-modules/ (git-tracked, clean UTF-8).
     const assetsDir = pathLib.join(__dirname, 'dist', 'renderer', 'assets');
-    if (fs.existsSync(saveDir)) {
-      for (const f of fs.readdirSync(saveDir)) {
-        fs.copyFileSync(pathLib.join(saveDir, f), pathLib.join(assetsDir, f));
+    const recoveredDir = pathLib.join(__dirname, 'recovered-modules');
+    fs.mkdirSync(assetsDir, { recursive: true });
+    for (const f of ['p0-modules.js', 'p1-modules.js', 'p2-modules.js']) {
+      const srcPath = pathLib.join(recoveredDir, f);
+      if (fs.existsSync(srcPath)) {
+        fs.copyFileSync(srcPath, pathLib.join(assetsDir, f));
+      } else {
+        console.warn(`[vite] 缺少 ${srcPath}，跳过恢复`);
       }
     }
   },

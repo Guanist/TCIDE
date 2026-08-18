@@ -1,7 +1,7 @@
-﻿/*  TCIDE P1 鍔熻兘鍓嶇閫昏緫
-   鏂囦欢鍚嶏細dist/renderer/assets/p1-modules.js
-   鐢?index.html 閫氳繃 <script src=...> 鍔犺浇
-   P1: Zen Mode 瀹屽杽 / 鏍囩椤靛寮?/ 闈㈠寘灞?/ 绌虹姸鎬?/ 鏂板缓椤圭洰鍚戝
+/*  TCIDE P1 功能前端逻辑
+   文件名：dist/renderer/assets/p1-modules.js
+   由 index.html 通过 <script src=...> 加载
+   P1: Zen Mode 完善 / 标签页增强 / 面包屑 / 空状态 / 新建项目向导
 */
 
 (function(){
@@ -10,37 +10,39 @@ var $ = function(id){ return document.getElementById(id); };
 var $$ = function(sel){ return document.querySelectorAll(sel); };
 var on = function(el,ev,fn){ if(el)el.addEventListener(ev,fn); };
 
-// 鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺?// 1. Zen Mode 瀹屽杽 鈥?CSS 绫绘柟妗堬紝GPU鍔犻€燂紝缁堢鑱斿姩锛岀紪杈戝櫒灞呬腑
-// 鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺?(function(){
+// ═══════════════════════════════════════
+// 1. Zen Mode 完善 — CSS 类方案，GPU加速，终端联动，编辑器居中
+// ═══════════════════════════════════════
+(function(){
     var zenActive = false;
     var savedTerminalVisible = false;
 
-    /* 鐢?CSS 绫诲垏鎹紝鎵€鏈夊姩鐢昏蛋 CSS transition */
+    /* 用 CSS 类切换，所有动画走 CSS transition */
     function enterZen() {
         zenActive = true;
         document.body.classList.add('tc-zen-mode');
 
-        /* 璁板綍缁堢鐘舵€?*/
+        /* 记录终端状态 */
         var pa = $('panel-area');
         savedTerminalVisible = pa && !pa.classList.contains('hidden');
 
-        /* 缁堢鑱斿姩闅愯棌 */
+        /* 终端联动隐藏 */
         if (pa) pa.classList.add('hidden');
         var pr = $('panel-resizer');
         if (pr) pr.classList.add('hidden');
 
-        /* 缂栬緫鍣ㄥ尯鍩熷眳涓?*/
+        /* 编辑器区域居中 */
         var ea = $('editor-area');
         if (ea) ea.classList.add('zen-centered');
 
-        showToast('Zen 涓撴敞妯″紡 路 Ctrl+Shift+M 閫€鍑?, 'info', 2000);
+        showToast('Zen 专注模式 · Ctrl+Shift+M 退出', 'info', 2000);
     }
 
     function exitZen() {
         zenActive = false;
         document.body.classList.remove('tc-zen-mode');
 
-        /* 鎭㈠缁堢 */
+        /* 恢复终端 */
         if (savedTerminalVisible) {
             var pa = $('panel-area');
             if (pa) pa.classList.remove('hidden');
@@ -51,7 +53,7 @@ var on = function(el,ev,fn){ if(el)el.addEventListener(ev,fn); };
         var ea = $('editor-area');
         if (ea) ea.classList.remove('zen-centered');
 
-        showToast('宸查€€鍑?Zen 妯″紡', 'info', 1500);
+        showToast('已退出 Zen 模式', 'info', 1500);
     }
 
     window.__tcide_toggleZen = function() {
@@ -59,11 +61,11 @@ var on = function(el,ev,fn){ if(el)el.addEventListener(ev,fn); };
         else enterZen();
     };
 
-    /* 瑕嗙洊鍛戒护闈㈡澘涓殑 Zen 妯″紡鍥炶皟 */
+    /* 覆盖命令面板中的 Zen 模式回调 */
     var origPalette = window.__tcide_showCommandPalette;
-    /* 鍦?CP 鐨?Zen 鍛戒护 action 閲岀洿鎺ュ紩鐢ㄦ湰鍑芥暟鍗冲彲 */
+    /* 在 CP 的 Zen 命令 action 里直接引用本函数即可 */
 
-    /* 蹇嵎閿?*/
+    /* 快捷键 */
     document.addEventListener('keydown', function(e){
         if ((e.ctrlKey||e.metaKey) && e.shiftKey && e.code === 'KeyM') {
             e.preventDefault();
@@ -71,40 +73,42 @@ var on = function(el,ev,fn){ if(el)el.addEventListener(ev,fn); };
         }
     });
 
-    /* 濡傛灉瀛樺湪鏃х殑 toggleZenMode锛岃鐩栧畠 */
+    /* 如果存在旧的 toggleZenMode，覆盖它 */
     if (typeof window.toggleZenMode === 'undefined' || !window._zenPatched) {
         window.toggleZenMode = window.__tcide_toggleZen;
         window._zenPatched = true;
     }
 
-    console.log('[P1] Zen Mode 灏辩华 (CSS class 鏂规)');
+    console.log('[P1] Zen Mode 就绪 (CSS class 方案)');
 })();
 
-// 鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺?// 2. 缂栬緫鍣ㄦ爣绛鹃〉澧炲己 鈥?鍏抽棴鎸夐挳/鍙抽敭鑿滃崟/鏈繚瀛樻寚绀哄櫒
-// 鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺?(function(){
+// ═══════════════════════════════════════
+// 2. 编辑器标签页增强 — 关闭按钮/右键菜单/未保存指示器
+// ═══════════════════════════════════════
+(function(){
     var tabsContainer = $('editor-tabs');
-    if (!tabsContainer) { console.log('[P1] editor-tabs 瀹瑰櫒鏈壘鍒帮紝寤惰繜鍒濆鍖?); setTimeout(arguments.callee, 1000); return; }
+    if (!tabsContainer) { console.log('[P1] editor-tabs 容器未找到，延迟初始化'); setTimeout(arguments.callee, 1000); return; }
 
     var contextMenu = null;
     var activeTabEl = null;
 
-    /* 鏈繚瀛樿窡韪?*/
+    /* 未保存跟踪 */
     window.__tcide_unsavedTabs = window.__tcide_unsavedTabs || {};
     window.__tcide_tabPaths = window.__tcide_tabPaths || {};
 
-    /* 鍒涘缓鍙抽敭鑿滃崟 */
+    /* 创建右键菜单 */
     function createContextMenu() {
         if (contextMenu) return;
         contextMenu = document.createElement('div');
         contextMenu.id = 'tab-context-menu';
         contextMenu.className = 'tab-context-menu';
         contextMenu.innerHTML =
-            '<div class="tab-menu-item" data-action="close">鍏抽棴</div>' +
-            '<div class="tab-menu-item" data-action="close-others">鍏抽棴鍏朵粬</div>' +
-            '<div class="tab-menu-item" data-action="close-right">鍏抽棴鍙充晶</div>' +
+            '<div class="tab-menu-item" data-action="close">关闭</div>' +
+            '<div class="tab-menu-item" data-action="close-others">关闭其他</div>' +
+            '<div class="tab-menu-item" data-action="close-right">关闭右侧</div>' +
             '<div class="tab-menu-sep"></div>' +
-            '<div class="tab-menu-item" data-action="copy-path">澶嶅埗璺緞</div>' +
-            '<div class="tab-menu-item" data-action="reveal-file">鍦ㄦ枃浠剁鐞嗗櫒涓樉绀?/div>';
+            '<div class="tab-menu-item" data-action="copy-path">复制路径</div>' +
+            '<div class="tab-menu-item" data-action="reveal-file">在文件管理器中显示</div>';
         document.body.appendChild(contextMenu);
 
         contextMenu.addEventListener('click', function(e) {
@@ -161,7 +165,7 @@ var on = function(el,ev,fn){ if(el)el.addEventListener(ev,fn); };
                 var fp = window.__tcide_tabPaths && window.__tcide_tabPaths[activeTabEl.dataset.tabId || ''];
                 if (fp) {
                     navigator.clipboard.writeText(fp).then(function() {
-                        showToast('璺緞宸插鍒?, 'success');
+                        showToast('路径已复制', 'success');
                     }).catch(function() {
                         showToast(fp, 'info', 5000);
                     });
@@ -179,52 +183,52 @@ var on = function(el,ev,fn){ if(el)el.addEventListener(ev,fn); };
     function closeTab(tabEl) {
         if (!tabEl) return;
         var clickEvent = new MouseEvent('click', { bubbles: true });
-        /* 濡傛灉 tab 涓婃湁 data-path锛屽皾璇曡Е鍙戜繚瀛樻鏌?*/
+        /* 如果 tab 上有 data-path，尝试触发保存检查 */
         var closeBtn = tabEl.querySelector('.tab-close-btn');
         if (closeBtn) {
-            /* 妯℃嫙鍘熸湁鍏抽棴閫昏緫锛氳Е鍙戝師鏈?tab 鍒囨崲鏈哄埗涓殑鍏抽棴 */
+            /* 模拟原有关闭逻辑：触发原有 tab 切换机制中的关闭 */
             tabEl.dispatchEvent(new CustomEvent('tcide-close-tab', { bubbles: true }));
         }
-        /* 鍥為€€锛氫粠 DOM 涓Щ闄?*/
+        /* 回退：从 DOM 中移除 */
         if (tabEl.parentNode) tabEl.remove();
         document.dispatchEvent(new CustomEvent('tcide-tab-closed', { detail: tabEl.dataset.tabId }));
     }
 
-    /* 澧炲己鎵€鏈?tab 鈥?MutationObserver 鐩戝惉鏂板 */
+    /* 增强所有 tab — MutationObserver 监听新增 */
     function enhanceTab(tab) {
         if (tab.dataset.tcEnhanced === '1') return;
         tab.dataset.tcEnhanced = '1';
 
-        /* 鍏抽棴鎸夐挳 */
+        /* 关闭按钮 */
         var closeBtn = document.createElement('span');
         closeBtn.className = 'tab-close-btn';
-        closeBtn.innerHTML = '脳';
-        closeBtn.title = '鍏抽棴';
+        closeBtn.innerHTML = '×';
+        closeBtn.title = '关闭';
         closeBtn.addEventListener('click', function(e) {
             e.stopPropagation();
             closeTab(tab);
         });
         tab.appendChild(closeBtn);
 
-        /* 鏈繚瀛樻寚绀哄櫒 */
+        /* 未保存指示器 */
         updateUnsavedDot(tab);
 
-        /* 鍙抽敭鑿滃崟 */
+        /* 右键菜单 */
         tab.addEventListener('contextmenu', function(e) {
             showContextMenu(e, tab);
         });
 
-        /* 涓敭鍏抽棴 */
+        /* 中键关闭 */
         tab.addEventListener('mousedown', function(e) {
-            if (e.button === 1) { /* 涓敭 */
+            if (e.button === 1) { /* 中键 */
                 e.preventDefault();
                 closeTab(tab);
             }
         });
 
-        /* 鍙屽嚮鍏抽棴 */
+        /* 双击关闭 */
         tab.addEventListener('dblclick', function(e) {
-            /* 涓嶅弻鍑诲叧闂紝瀹规槗璇Е銆傚闇€寮€鍚彇娑堜笅闈㈡敞閲?*/
+            /* 不双击关闭，容易误触。如需开启取消下面注释 */
             // closeTab(tab);
         });
     }
@@ -237,7 +241,7 @@ var on = function(el,ev,fn){ if(el)el.addEventListener(ev,fn); };
             if (!existingDot) {
                 var dot = document.createElement('span');
                 dot.className = 'tab-dirty-dot';
-                dot.innerHTML = '鈼?;
+                dot.innerHTML = '●';
                 tab.insertBefore(dot, tab.firstChild);
             }
         } else {
@@ -245,7 +249,7 @@ var on = function(el,ev,fn){ if(el)el.addEventListener(ev,fn); };
         }
     }
 
-    /* 鐩戝惉缂栬緫鍣ㄥ彉鏇存潵鏍囪鏈繚瀛?*/
+    /* 监听编辑器变更来标记未保存 */
     function watchEditorChanges() {
         if (typeof monaco === 'undefined' || !monaco.editor) {
             setTimeout(watchEditorChanges, 500);
@@ -255,7 +259,7 @@ var on = function(el,ev,fn){ if(el)el.addEventListener(ev,fn); };
         try {
             monaco.editor.onDidCreateModel(function(model) {
                 model.onDidChangeContent(function() {
-                    /* 鏍囪褰撳墠 tab 涓烘湭淇濆瓨 */
+                    /* 标记当前 tab 为未保存 */
                     var activeTab = tabsContainer.querySelector('.editor-tab.active');
                     if (activeTab && activeTab.dataset.tabId) {
                         window.__tcide_unsavedTabs = window.__tcide_unsavedTabs || {};
@@ -265,11 +269,11 @@ var on = function(el,ev,fn){ if(el)el.addEventListener(ev,fn); };
                 });
             });
         } catch(e) {
-            console.log('[P1] Monaco 鐩戝惉鍒濆鍖栧け璐?', e);
+            console.log('[P1] Monaco 监听初始化失败:', e);
         }
     }
 
-    /* 鐩戝惉 Monaco 淇濆瓨浜嬩欢鏉ユ竻闄ゆ湭淇濆瓨鏍囪 */
+    /* 监听 Monaco 保存事件来清除未保存标记 */
     function watchSaveEvents() {
         document.addEventListener('keydown', function(e) {
             if ((e.ctrlKey || e.metaKey) && e.code === 'KeyS') {
@@ -285,14 +289,14 @@ var on = function(el,ev,fn){ if(el)el.addEventListener(ev,fn); };
         });
     }
 
-    /* MutationObserver 鐩戝惉鏂?tab */
+    /* MutationObserver 监听新 tab */
     var observer = new MutationObserver(function(mutations) {
         mutations.forEach(function(m) {
             m.addedNodes.forEach(function(node) {
                 if (node.nodeType === 1 && node.classList && node.classList.contains('editor-tab')) {
                     enhanceTab(node);
                 }
-                /* 涔熸鏌ュ瓙鑺傜偣 */
+                /* 也检查子节点 */
                 if (node.nodeType === 1 && node.querySelectorAll) {
                     node.querySelectorAll('.editor-tab').forEach(enhanceTab);
                 }
@@ -302,29 +306,32 @@ var on = function(el,ev,fn){ if(el)el.addEventListener(ev,fn); };
 
     observer.observe(tabsContainer, { childList: true, subtree: true });
 
-    /* 澧炲己宸叉湁 tabs */
+    /* 增强已有 tabs */
     tabsContainer.querySelectorAll('.editor-tab').forEach(enhanceTab);
-    /* 寤惰繜鍐嶆澧炲己锛堢瓑寰呭姩鎬佹覆鏌擄級 */
+    /* 延迟再次增强（等待动态渲染） */
     setTimeout(function() { tabsContainer.querySelectorAll('.editor-tab').forEach(enhanceTab); }, 2000);
 
     createContextMenu();
     watchEditorChanges();
     watchSaveEvents();
 
-    console.log('[P1] 鏍囩椤靛寮哄氨缁?);
+    console.log('[P1] 标签页增强就绪');
 })();
 
-// 鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺?// 3. 闈㈠寘灞戝鑸?// 鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺?(function(){
+// ═══════════════════════════════════════
+// 3. 面包屑导航
+// ═══════════════════════════════════════
+(function(){
     var bar = $('breadcrumb-bar');
     var pathEl = $('breadcrumb-path');
     var symEl = $('breadcrumb-symbol');
-    if (!bar || !pathEl) { console.log('[P1] 闈㈠寘灞戝鍣ㄦ湭鎵惧埌'); return; }
+    if (!bar || !pathEl) { console.log('[P1] 面包屑容器未找到'); return; }
 
     var lastPath = '';
     var lastSymbol = '';
 
     function extractSymbols(code, lineNum) {
-        /* 浠庡厜鏍囨墍鍦ㄨ鍚戜笂鏌ユ壘鏈€杩戠殑 class/function/method */
+        /* 从光标所在行向上查找最近的 class/function/method */
         var lines = code.split('\n');
         var candidates = [];
         for (var i = 0; i < Math.min(lineNum, lines.length); i++) {
@@ -339,7 +346,7 @@ var on = function(el,ev,fn){ if(el)el.addEventListener(ev,fn); };
             m = line.match(/^\s*(public|private|protected)?\s*(\w+)\s+(\w+)\s*\([^)]*\)\s*\{/);
             if (m && m[3] && m[3].charCodeAt(0) > 96) candidates.push({ type: 'method', name: m[3] + '()', line: i });
         }
-        /* 鎵惧厜鏍囨墍鍦ㄨ涔嬪墠鏈€杩戠殑澹版槑 */
+        /* 找光标所在行之前最近的声明 */
         var closest = null;
         for (var j = candidates.length - 1; j >= 0; j--) {
             if (candidates[j].line < lineNum) {
@@ -351,7 +358,7 @@ var on = function(el,ev,fn){ if(el)el.addEventListener(ev,fn); };
 
     function updateBreadcrumb() {
         if (!bar) return;
-        /* 鑾峰彇褰撳墠鏂囦欢璺緞 */
+        /* 获取当前文件路径 */
         var fp = '';
         if (window.editor && window.editor.getModel) {
             var model = window.editor.getModel();
@@ -359,7 +366,7 @@ var on = function(el,ev,fn){ if(el)el.addEventListener(ev,fn); };
                 fp = model.uri.fsPath || model.uri.path || '';
             }
         }
-        /* 灏濊瘯浠?project root 鑾峰彇鐩稿璺緞 */
+        /* 尝试从 project root 获取相对路径 */
         var root = window.__tcide_projectRoot || '';
         if (root && fp.startsWith(root)) {
             fp = fp.substring(root.length).replace(/\\/g, '/').replace(/^\//, '');
@@ -367,20 +374,20 @@ var on = function(el,ev,fn){ if(el)el.addEventListener(ev,fn); };
 
         if (fp !== lastPath) {
             lastPath = fp;
-            /* 鏋勫缓闈㈠寘灞戯細灏嗚矾寰勬寜 / 鎷嗗垎 */
+            /* 构建面包屑：将路径按 / 拆分 */
             var parts = fp.split('/').filter(Boolean);
             var html = '';
             if (parts.length > 0) {
-                html += '<span class="bc-sep">馃搧</span> ';
+                html += '<span class="bc-sep">📁</span> ';
                 parts.forEach(function(part, i) {
-                    if (i > 0) html += '<span class="bc-arrow">鈥?/span> ';
+                    if (i > 0) html += '<span class="bc-arrow">›</span> ';
                     html += '<span class="bc-segment' + (i === parts.length - 1 ? ' bc-file' : '') + '">' + escapeHtml(part) + '</span> ';
                 });
             }
-            pathEl.innerHTML = html || '<span class="bc-empty">鏃犳枃浠?/span>';
+            pathEl.innerHTML = html || '<span class="bc-empty">无文件</span>';
         }
 
-        /* 鏇存柊绗﹀彿浣嶇疆 */
+        /* 更新符号位置 */
         updateSymbol();
     }
 
@@ -392,7 +399,7 @@ var on = function(el,ev,fn){ if(el)el.addEventListener(ev,fn); };
         if (!pos) return;
         var code = model.getValue();
         var sym = extractSymbols(code, pos.lineNumber);
-        var newSym = sym ? '鈥?' + sym.name : '';
+        var newSym = sym ? '› ' + sym.name : '';
         if (newSym !== lastSymbol) {
             lastSymbol = newSym;
             symEl.textContent = newSym;
@@ -403,18 +410,18 @@ var on = function(el,ev,fn){ if(el)el.addEventListener(ev,fn); };
         return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
     }
 
-    /* 鏄剧ず / 闅愯棌 */
+    /* 显示 / 隐藏 */
     function show() { if(bar) bar.classList.remove('hidden'); }
     function hide() { if(bar) bar.classList.add('hidden'); }
 
-    /* 鏈夋枃浠舵墦寮€鏃舵樉绀?*/
+    /* 有文件打开时显示 */
     window.__tcide_showBreadcrumb = show;
     window.__tcide_hideBreadcrumb = hide;
 
-    /* 瀹氭椂鏇存柊 */
+    /* 定时更新 */
     setInterval(updateBreadcrumb, 2000);
 
-    /* 蹇嵎閿垏鎹㈡樉绀?*/
+    /* 快捷键切换显示 */
     document.addEventListener('keydown', function(e) {
         if ((e.ctrlKey||e.metaKey) && e.shiftKey && e.code === 'KeyB') {
             e.preventDefault();
@@ -422,14 +429,17 @@ var on = function(el,ev,fn){ if(el)el.addEventListener(ev,fn); };
         }
     });
 
-    /* 鍒濆 */
+    /* 初始 */
     setTimeout(show, 1500);
 
-    console.log('[P1] 闈㈠寘灞戝鑸氨缁?);
+    console.log('[P1] 面包屑导航就绪');
 })();
 
-// 鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺?// 4. 绌虹姸鎬佸紩瀵?// 鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺?(function(){
-    /* 鏂囦欢鏍戠┖鐘舵€?*/
+// ═══════════════════════════════════════
+// 4. 空状态引导
+// ═══════════════════════════════════════
+(function(){
+    /* 文件树空状态 */
     function checkFileTree() {
         var tree = $('file-tree');
         if (!tree) return;
@@ -439,7 +449,7 @@ var on = function(el,ev,fn){ if(el)el.addEventListener(ev,fn); };
             if (!emptyState) {
                 var div = document.createElement('div');
                 div.className = 'empty-state-filetree empty-state';
-                div.innerHTML = '<div class="empty-state-icon">馃搨</div><div class="empty-state-title">鏆傛棤鏂囦欢</div><div class="empty-state-desc">鎵撳紑椤圭洰寮€濮?(Ctrl+O)</div>';
+                div.innerHTML = '<div class="empty-state-icon">📂</div><div class="empty-state-title">暂无文件</div><div class="empty-state-desc">打开项目开始 (Ctrl+O)</div>';
                 tree.appendChild(div);
             }
         } else {
@@ -447,16 +457,16 @@ var on = function(el,ev,fn){ if(el)el.addEventListener(ev,fn); };
         }
     }
 
-    /* 鎼滅储绌虹姸鎬?*/
+    /* 搜索空状态 */
     function checkSearchResults() {
         var results = $('search-results');
         if (!results) return;
         if (results.children.length === 0) {
-            results.innerHTML = '<div class="empty-state"><div class="empty-state-icon">馃攳</div><div class="empty-state-title">杈撳叆鎼滅储鍐呭</div><div class="empty-state-desc">Ctrl+Shift+F 鎵撳紑椤圭洰绾ф悳绱?/div></div>';
+            results.innerHTML = '<div class="empty-state"><div class="empty-state-icon">🔍</div><div class="empty-state-title">输入搜索内容</div><div class="empty-state-desc">Ctrl+Shift+F 打开项目级搜索</div></div>';
         }
     }
 
-    /* 浠诲姟鍒楄〃绌虹姸鎬?*/
+    /* 任务列表空状态 */
     function checkTaskList() {
         var list = $('task-list');
         if (!list) return;
@@ -466,13 +476,13 @@ var on = function(el,ev,fn){ if(el)el.addEventListener(ev,fn); };
             if (!empty) {
                 var div = document.createElement('div');
                 div.className = 'task-empty empty-state';
-                div.innerHTML = '<div class="empty-state-icon">馃搵</div><div class="empty-state-title">鏆傛棤浠诲姟</div><div class="empty-state-desc">鍦?AI 瀵硅瘽涓娇鐢?/task 鍙戣捣浠诲姟</div>';
+                div.innerHTML = '<div class="empty-state-icon">📋</div><div class="empty-state-title">暂无任务</div><div class="empty-state-desc">在 AI 对话中使用 /task 发起任务</div>';
                 list.appendChild(div);
             }
         }
     }
 
-    /* 闂闈㈡澘绌虹姸鎬?*/
+    /* 问题面板空状态 */
     function checkProblems() {
         var list = $('problems-list');
         if (!list) return;
@@ -487,14 +497,14 @@ var on = function(el,ev,fn){ if(el)el.addEventListener(ev,fn); };
         }
     }
 
-    /* 瀹氭椂妫€鏌?*/
+    /* 定时检查 */
     setInterval(function() {
         checkFileTree();
         checkTaskList();
         checkProblems();
     }, 3000);
 
-    /* 鍒濆妫€鏌?*/
+    /* 初始检查 */
     setTimeout(function() {
         checkFileTree();
         checkSearchResults();
@@ -502,21 +512,23 @@ var on = function(el,ev,fn){ if(el)el.addEventListener(ev,fn); };
         checkProblems();
     }, 2000);
 
-    console.log('[P1] 绌虹姸鎬佸紩瀵煎氨缁?);
+    console.log('[P1] 空状态引导就绪');
 })();
 
-// 鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺?// 5. 鏂板缓椤圭洰鍚戝
-// 鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺?(function(){
+// ═══════════════════════════════════════
+// 5. 新建项目向导
+// ═══════════════════════════════════════
+(function(){
     var TEMPLATES = [
-        { id: 'blank', name: '绌虹櫧椤圭洰', desc: '绌虹殑鐩綍缁撴瀯锛屼粠闆跺紑濮?, icon: '馃搫' },
-        { id: 'node', name: 'Node.js', desc: 'package.json + 鍩虹閰嶇疆', icon: '猬? },
-        { id: 'python', name: 'Python', desc: '铏氭嫙鐜 + 鍩虹鑴氭湰', icon: '馃悕' },
-        { id: 'frontend', name: '鍓嶇 (HTML/JS/CSS)', desc: 'index.html + 鍩虹鏍峰紡', icon: '馃寪' },
-        { id: 'kotlin', name: 'Kotlin / Android', desc: 'Gradle 椤圭洰楠ㄦ灦', icon: '馃摫' },
+        { id: 'blank', name: '空白项目', desc: '空的目录结构，从零开始', icon: '📄' },
+        { id: 'node', name: 'Node.js', desc: 'package.json + 基础配置', icon: '⬢' },
+        { id: 'python', name: 'Python', desc: '虚拟环境 + 基础脚本', icon: '🐍' },
+        { id: 'frontend', name: '前端 (HTML/JS/CSS)', desc: 'index.html + 基础样式', icon: '🌐' },
+        { id: 'kotlin', name: 'Kotlin / Android', desc: 'Gradle 项目骨架', icon: '📱' },
     ];
 
     function show() {
-        /* 绉婚櫎宸叉湁 modal */
+        /* 移除已有 modal */
         var existing = $('new-project-modal');
         if (existing) existing.remove();
 
@@ -533,24 +545,24 @@ var on = function(el,ev,fn){ if(el)el.addEventListener(ev,fn); };
 
         overlay.innerHTML =
             '<div class="modal-box np-modal">' +
-            '<h3>馃啎 鏂板缓椤圭洰</h3>' +
-            '<div class="form-group"><label>椤圭洰鍚嶇О</label><input id="np-name" type="text" placeholder="濡? my-app" /></div>' +
-            '<div class="form-group"><label>椤圭洰浣嶇疆</label><div class="np-location-row"><input id="np-location" type="text" placeholder="鐐瑰嚮閫夋嫨..."/><button id="np-browse" class="btn-browse">娴忚...</button></div></div>' +
-            '<div class="form-group"><label>椤圭洰妯℃澘</label></div>' +
+            '<h3>🆕 新建项目</h3>' +
+            '<div class="form-group"><label>项目名称</label><input id="np-name" type="text" placeholder="如: my-app" /></div>' +
+            '<div class="form-group"><label>项目位置</label><div class="np-location-row"><input id="np-location" type="text" placeholder="点击选择..."/><button id="np-browse" class="btn-browse">浏览...</button></div></div>' +
+            '<div class="form-group"><label>项目模板</label></div>' +
             '<div class="np-templates">' + tmplHtml + '</div>' +
             '<div class="modal-actions">' +
-            '<button class="btn-cancel">鍙栨秷</button>' +
-            '<button class="btn-ok" id="np-create">鍒涘缓椤圭洰</button>' +
+            '<button class="btn-cancel">取消</button>' +
+            '<button class="btn-ok" id="np-create">创建项目</button>' +
             '</div></div>';
 
         document.body.appendChild(overlay);
         overlay.style.display = 'flex';
 
-        /* 浜嬩欢缁戝畾 */
+        /* 事件绑定 */
         overlay.querySelector('.btn-cancel').onclick = function() { overlay.remove(); };
         overlay.addEventListener('click', function(e) { if (e.target === overlay) overlay.remove(); });
 
-        /* 娴忚鎸夐挳 */
+        /* 浏览按钮 */
         var browseBtn = overlay.querySelector('#np-browse');
         var locInput = overlay.querySelector('#np-location');
         if (browseBtn && window.api && window.api.selectDirectory) {
@@ -559,21 +571,21 @@ var on = function(el,ev,fn){ if(el)el.addEventListener(ev,fn); };
                     var dir = await window.api.selectDirectory();
                     if (dir) locInput.value = dir;
                 } catch(e) {
-                    /* 鍥為€€锛氫娇鐢ㄥ師鐢?openProject 椋庢牸 */
+                    /* 回退：使用原生 openProject 风格 */
                     var result = await window.api.openProject();
                     if (result) locInput.value = result;
                 }
             };
         }
-        /* 鍥為€€锛氱偣鍑荤洿鎺ユ墦寮€鏂囦欢澶瑰璇濇 */
+        /* 回退：点击直接打开文件夹对话框 */
         if (browseBtn && !window.api) {
             browseBtn.onclick = function() {
-                showToast('鎵撳紑椤圭洰瀵硅瘽妗?..', 'info');
+                showToast('打开项目对话框...', 'info');
                 if (window.api && window.api.openProject) window.api.openProject();
             };
         }
 
-        /* 妯℃澘閫夋嫨 */
+        /* 模板选择 */
         var cards = overlay.querySelectorAll('.np-template-card');
         var selectedTpl = 'blank';
         cards.forEach(function(card) {
@@ -584,17 +596,17 @@ var on = function(el,ev,fn){ if(el)el.addEventListener(ev,fn); };
             });
         });
 
-        /* 鍒涘缓 */
+        /* 创建 */
         var createBtn = overlay.querySelector('#np-create');
         createBtn.onclick = async function() {
             var name = overlay.querySelector('#np-name').value.trim();
             var location = locInput.value.trim();
-            if (!name) { showToast('璇疯緭鍏ラ」鐩悕绉?, 'warning'); return; }
-            if (!location) { showToast('璇烽€夋嫨椤圭洰浣嶇疆', 'warning'); return; }
+            if (!name) { showToast('请输入项目名称', 'warning'); return; }
+            if (!location) { showToast('请选择项目位置', 'warning'); return; }
 
             createBtn.disabled = true;
-            createBtn.textContent = '鍒涘缓涓?..';
-            showLoading('姝ｅ湪鍒涘缓椤圭洰...');
+            createBtn.textContent = '创建中...';
+            showLoading('正在创建项目...');
 
             try {
                 var projectPath = location.replace(/\\/g, '/').replace(/\/$/, '') + '/' + name;
@@ -602,27 +614,27 @@ var on = function(el,ev,fn){ if(el)el.addEventListener(ev,fn); };
                 if (window.api && window.api.createProject) {
                     await window.api.createProject({ name: name, path: projectPath, template: selectedTpl });
                 } else {
-                    /* 鍥為€€锛氶€氳繃 IPC 鍙戦€佸垱寤鸿姹?*/
-                    /* 鏆傛椂鐢ㄧ畝鍗曟柟寮?*/
+                    /* 回退：通过 IPC 发送创建请求 */
+                    /* 暂时用简单方式 */
                 }
 
                 hideLoading();
                 overlay.remove();
-                showToast('椤圭洰鍒涘缓鎴愬姛锛?, 'success');
+                showToast('项目创建成功！', 'success');
 
-                /* 灏濊瘯鎵撳紑鏂伴」鐩?*/
+                /* 尝试打开新项目 */
                 if (window.api && window.api.openProjectPath) {
                     window.api.openProjectPath(projectPath);
                 }
             } catch(e) {
                 hideLoading();
-                showToast('鍒涘缓澶辫触: ' + (e.message || '鏈煡閿欒'), 'error');
+                showToast('创建失败: ' + (e.message || '未知错误'), 'error');
                 createBtn.disabled = false;
-                createBtn.textContent = '鍒涘缓椤圭洰';
+                createBtn.textContent = '创建项目';
             }
         };
 
-        /* 鑷姩鑱氱劍 */
+        /* 自动聚焦 */
         setTimeout(function() {
             var nameInput = overlay.querySelector('#np-name');
             if (nameInput) nameInput.focus();
@@ -631,7 +643,7 @@ var on = function(el,ev,fn){ if(el)el.addEventListener(ev,fn); };
 
     window.__tcide_showNewProject = show;
 
-    /* 缁戝畾娆㈣繋椤电殑鏂板缓鎸夐挳 */
+    /* 绑定欢迎页的新建按钮 */
     setTimeout(function() {
         var btn = $('welcome-new-project');
         if (btn) btn.addEventListener('click', function() { show(); });
@@ -639,18 +651,20 @@ var on = function(el,ev,fn){ if(el)el.addEventListener(ev,fn); };
         if (btn2) btn2.addEventListener('click', function() { show(); });
     }, 1500);
 
-    console.log('[P1] 鏂板缓椤圭洰鍚戝灏辩华');
+    console.log('[P1] 新建项目向导就绪');
 })();
 
-// 鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺?// 6. UI 涓€鑷存€т紭鍖?鈥?娉ㄥ叆 CSS 鍙橀噺 + 閫氱敤杩囨浮
-// 鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺?(function(){
-    /* 濡傛灉椤甸潰宸叉湁 tc-vars 鍒欒烦杩?*/
-    if (document.getElementById('tc-vars-style')) { console.log('[P1] CSS 鍙橀噺宸插瓨鍦紝璺宠繃'); return; }
+// ═══════════════════════════════════════
+// 6. UI 一致性优化 — 注入 CSS 变量 + 通用过渡
+// ═══════════════════════════════════════
+(function(){
+    /* 如果页面已有 tc-vars 则跳过 */
+    if (document.getElementById('tc-vars-style')) { console.log('[P1] CSS 变量已存在，跳过'); return; }
 
     var style = document.createElement('style');
     style.id = 'tc-vars-style';
     style.textContent =
-        '/* TCIDE UI 涓€鑷存€?CSS 鍙橀噺 */\n' +
+        '/* TCIDE UI 一致性 CSS 变量 */\n' +
         ':root {\n' +
         '  --tc-bg-primary: #1e1e1e;\n' +
         '  --tc-bg-secondary: #252526;\n' +
@@ -671,7 +685,7 @@ var on = function(el,ev,fn){ if(el)el.addEventListener(ev,fn); };
         '  --tc-radius: 4px;\n' +
         '  --tc-transition: 200ms ease;\n' +
         '}\n' +
-        '/* 閫氱敤杩囨浮 */\n' +
+        '/* 通用过渡 */\n' +
         '.activity-btn, .editor-tab, .panel-tab, .ai-tab, .sidebar *, .ai-panel *, .tree-item, .chat-message {\n' +
         '  transition: background-color var(--tc-transition), color var(--tc-transition), border-color var(--tc-transition), opacity var(--tc-transition);\n' +
         '}\n' +
@@ -680,19 +694,21 @@ var on = function(el,ev,fn){ if(el)el.addEventListener(ev,fn); };
         '}\n' +
         'button:active { transform: scale(0.97); }\n' +
         '.icon-btn:active { transform: scale(0.92); }\n' +
-        '/* 鑱氱劍鐜?*/\n' +
+        '/* 聚焦环 */\n' +
         'input:focus-visible, button:focus-visible, textarea:focus-visible, select:focus-visible {\n' +
         '  outline: 1px solid var(--tc-accent);\n' +
         '  outline-offset: -1px;\n' +
         '}\n';
 
     document.head.appendChild(style);
-    console.log('[P1] CSS 鍙橀噺宸叉敞鍏?);
+    console.log('[P1] CSS 变量已注入');
 })();
 
-// 鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺?// 7. 鍏ㄥ眬蹇嵎閿寮?+ 鑿滃崟鍛戒护鐩戝惉
-// 鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺?(function(){
-    /* 鐩戝惉涓昏繘绋嬭彍鍗曞懡浠?*/
+// ═══════════════════════════════════════
+// 7. 全局快捷键增强 + 菜单命令监听
+// ═══════════════════════════════════════
+(function(){
+    /* 监听主进程菜单命令 */
     if (window.api && window.api.onMenuAction) {
         window.api.onMenuAction(function(action) {
             switch(action) {
@@ -705,9 +721,9 @@ var on = function(el,ev,fn){ if(el)el.addEventListener(ev,fn); };
                 case 'show-shortcuts':
                     var hd = $('help-dialog'); if(hd) hd.classList.remove('hidden');
                     break;
-                case 'save-all': /* 瑙﹀彂鍏ㄤ繚瀛?*/ break;
-                case 'find': /* 瑙﹀彂 Monaco 鏌ユ壘 */ break;
-                case 'replace': /* 瑙﹀彂 Monaco 鏇挎崲 */ break;
+                case 'save-all': /* 触发全保存 */ break;
+                case 'find': /* 触发 Monaco 查找 */ break;
+                case 'replace': /* 触发 Monaco 替换 */ break;
                 case 'toggle-ai-panel': 
                     var ap = $('ai-panel'); if(ap) ap.classList.toggle('hidden');
                     break;
@@ -716,29 +732,29 @@ var on = function(el,ev,fn){ if(el)el.addEventListener(ev,fn); };
                     var pa = $('panel-area'); if(pa) pa.classList.toggle('hidden');
                     var pr = $('panel-resizer'); if(pr) pr.classList.toggle('hidden');
                     break;
-                case 'send-to-builder': /* AI 闈㈡澘鎿嶄綔 */ break;
-                case 'abort-task': /* AI 闈㈡澘鎿嶄綔 */ break;
-                case 'clear-chat': /* AI 闈㈡澘鎿嶄綔 */ break;
+                case 'send-to-builder': /* AI 面板操作 */ break;
+                case 'abort-task': /* AI 面板操作 */ break;
+                case 'clear-chat': /* AI 面板操作 */ break;
                 case 'open-settings': 
                     var st = document.querySelector('.ai-tab[data-tab="settings"]');
                     if(st) st.click();
                     break;
-                default: console.log('[P1] 鏈鐞嗙殑鑿滃崟鍛戒护:', action);
+                default: console.log('[P1] 未处理的菜单命令:', action);
             }
         });
     }
 
-    /* 棰濆蹇嵎閿?*/
+    /* 额外快捷键 */
     document.addEventListener('keydown', function(e) {
-        /* Ctrl+Shift+N 鈥?鏂板缓椤圭洰 */
+        /* Ctrl+Shift+N — 新建项目 */
         if ((e.ctrlKey||e.metaKey) && e.shiftKey && e.code === 'KeyN') {
             e.preventDefault();
             window.__tcide_showNewProject && window.__tcide_showNewProject();
         }
     });
 
-    console.log('[P1] 蹇嵎閿寮哄氨缁?);
+    console.log('[P1] 快捷键增强就绪');
 })();
 
-console.log('[P1] 鎵€鏈?P1 妯″潡鍔犺浇瀹屾垚');
+console.log('[P1] 所有 P1 模块加载完成');
 })();
