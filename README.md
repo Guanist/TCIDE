@@ -3,7 +3,17 @@
 > Builder → Coder → Compile → Deploy
 
 [![Release](https://img.shields.io/github/v/release/Guanist/TCIDE?color=ff8c00)](https://github.com/Guanist/TCIDE/releases)
-[![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![License](https://img.shields.io/badge/license-GPLv3-blue.svg)](LICENSE)
+
+## 分支说明
+
+| 分支 | 说明 | 技术栈 |
+|------|------|--------|
+| **main** | TypeScript Electron 桌面版 | Electron 33 + TypeScript + Monaco + xterm.js + Vite + SQLite |
+| **tcide-py** | Python 重写版 | Python 3.11 + FastAPI + PyWebView + Monaco (CDN) |
+
+- `main` 是主要开发分支，包含完整 Electron 桌面 IDE
+- `tcide-py` 是 Python 重写版，独立仓库内容，通过 `git checkout tcide-py` 切换
 
 ## 核心差异
 
@@ -38,8 +48,25 @@ Monaco Editor + LSP、文件树、搜索、Git、xterm.js 终端、文件预览�
 
 ## 快速开始
 
-下载 Release 便携版 EXE，双击运行。设置 → 填入 API Key → 保存。
+### TS 版（main 分支）
 
-## 技术栈
+```bash
+git clone https://github.com/Guanist/TCIDE.git
+cd TCIDE
+npm install
+npm run build
+npm run dist:portable
+```
 
-Electron 33 + TypeScript + Monaco + xterm.js + Vite + SQLite | MIT
+### Python 版（tcide-py 分支）
+
+```bash
+git clone -b tcide-py https://github.com/Guanist/TCIDE.git
+cd TCIDE
+pip install -r requirements.txt
+python main.py
+```
+
+## 许可证
+
+[GNU General Public License v3.0](LICENSE)
