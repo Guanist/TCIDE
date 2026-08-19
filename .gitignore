@@ -15,3 +15,6 @@ release/win-unpacked/
 release/builder-debug.yml
 release/latest.yml
 *.bak
+
+# 清理: py-tcide 目录 (Python版通过 git checkout tcide-py 访问)
+py-tcide/
