@@ -7,6 +7,9 @@ _*
 task-artifacts/
 package-lock.json
 
+# IDE 内部上下文
+.tcide/
+
 # Build artifacts
 _new_app.asar
 release/*.exe
