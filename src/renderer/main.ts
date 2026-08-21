@@ -2163,6 +2163,42 @@ function populateModelSelector(): void {
   updateModelStatusDot();
 }
 
+function populateHeaderModelSelector(): void {
+  const sel = document.getElementById('model-select-header') as HTMLSelectElement;
+  if (!sel) return;
+  sel.innerHTML = '<option value="">选择模型...</option>';
+  const provider = state.config.provider || 'deepseek';
+  const providerModels = modelListCache.filter(m => m.provider === provider);
+  const otherModels = modelListCache.filter(m => m.provider !== provider);
+  const providerIcons: Record<string, string> = {
+    deepseek: '🐋', huoshan: '🌋', ollama: '🦙', anthropic: '🧠', custom: '⚙️',
+  };
+  if (providerModels.length > 0) {
+    const icon = providerIcons[provider] || '🔌';
+    const group = document.createElement('optgroup');
+    group.label = icon + ' ' + provider;
+    for (const m of providerModels) {
+      const opt = document.createElement('option');
+      opt.value = m.id;
+      opt.textContent = m.name + (m.reasoning ? ' 🧠' : '');
+      if (state.config.model === m.id) opt.selected = true;
+      group.appendChild(opt);
+    }
+    sel.appendChild(group);
+  }
+  if (otherModels.length > 0) {
+    const group = document.createElement('optgroup');
+    group.label = '其他';
+    for (const m of otherModels) {
+      const opt = document.createElement('option');
+      opt.value = m.id;
+      opt.textContent = m.name + ' (' + m.provider + ')';
+      group.appendChild(opt);
+    }
+    sel.appendChild(group);
+  }
+}
+
 function updateModelStatusDot(): void {
   const dot = document.getElementById('model-status');
   if (!dot) return;
@@ -3402,6 +3438,7 @@ async function loadModelList(): Promise<void> {
     modelListCache = await window.api.listModelMeta() as ModelItem[];
     renderModelList();
     populateModelSelector();
+    populateHeaderModelSelector();
     updateModelIndicator();
   } catch (err) {
     console.error('[Settings] 加载模型列表失败:', err);
@@ -5180,13 +5217,26 @@ function setupEventListeners(): void {
 
   // ── Header 模型选择器 ──
   document.getElementById('model-select-header')?.addEventListener('change', (e) => {
-    const model = (e.target as HTMLSelectElement).value;
-    if (model) {
-      state.config.model = model;
-      document.getElementById('chat-footer-model')!.textContent = model;
-      // 同步更新旧的选择器
-      const quickSelect = document.getElementById('quick-model-select') as HTMLSelectElement;
-      if (quickSelect) quickSelect.value = model;
+    const modelId = (e.target as HTMLSelectElement).value;
+    if (modelId) {
+      const meta = modelListCache.find(m => m.id === modelId);
+      if (meta) {
+        state.config.provider = meta.provider;
+        state.config.model = meta.id;
+        // 自动填充 baseUrl
+        const defaultBaseUrls: Record<string, string> = {
+          deepseek: 'https://api.deepseek.com/v1',
+          huoshan: 'https://ark.cn-beijing.volces.com/api/v3',
+          anthropic: 'https://api.anthropic.com',
+          ollama: 'http://localhost:11434/v1',
+          custom: '',
+        };
+        state.config.baseUrl = defaultBaseUrls[meta.provider] || '';
+        document.getElementById('chat-footer-model')!.textContent = meta.name;
+        updateModelIndicator();
+        showToast(`已切换到 ${meta.name}`, 'info');
+        saveConfig().catch(() => {});
+      }
     }
   });
 
