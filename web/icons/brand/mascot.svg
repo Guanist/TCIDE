@@ -1,0 +1,75 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- 虎猫 TCIDE 吉祥物 SVG -->
+  <defs>
+    <linearGradient id="fur" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#FF8C00"/>
+      <stop offset="100%" style="stop-color:#FFA500"/>
+    </linearGradient>
+    <linearGradient id="stripes" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#000000;stop-opacity:0.8"/>
+      <stop offset="100%" style="stop-color:#1A1A1A;stop-opacity:0.6"/>
+    </linearGradient>
+  </defs>
+  
+  <!-- 身体 -->
+  <ellipse cx="256" cy="320" rx="120" ry="100" fill="url(#fur)"/>
+  
+  <!-- 头部 -->
+  <circle cx="256" cy="200" r="100" fill="url(#fur)"/>
+  
+  <!-- 耳朵 -->
+  <polygon points="180,140 160,80 220,120" fill="#FF8C00"/>
+  <polygon points="332,140 352,80 292,120" fill="#FF8C00"/>
+  <polygon points="190,135 175,95 215,125" fill="#FFB347"/>
+  <polygon points="322,135 337,95 297,125" fill="#FFB347"/>
+  
+  <!-- 眼睛 -->
+  <ellipse cx="220" cy="190" rx="18" ry="20" fill="#FFFFFF"/>
+  <ellipse cx="292" cy="190" rx="18" ry="20" fill="#FFFFFF"/>
+  <circle cx="225" cy="195" r="10" fill="#2D5016"/>
+  <circle cx="297" cy="195" r="10" fill="#2D5016"/>
+  <circle cx="228" cy="192" r="4" fill="#000000"/>
+  <circle cx="300" cy="192" r="4" fill="#000000"/>
+  
+  <!-- 鼻子 -->
+  <ellipse cx="256" cy="230" rx="12" ry="8" fill="#FF6B6B"/>
+  
+  <!-- 嘴巴 -->
+  <path d="M 240 245 Q 256 260 272 245" stroke="#000000" stroke-width="3" fill="none"/>
+  <path d="M 248 248 Q 256 255 264 248" stroke="#FF6B6B" stroke-width="2" fill="none"/>
+  
+  <!-- 胡须 -->
+  <line x1="180" y1="225" x2="130" y2="220" stroke="#000000" stroke-width="2"/>
+  <line x1="180" y1="235" x2="130" y2="235" stroke="#000000" stroke-width="2"/>
+  <line x1="332" y1="225" x2="382" y2="220" stroke="#000000" stroke-width="2"/>
+  <line x1="332" y1="235" x2="382" y2="235" stroke="#000000" stroke-width="2"/>
+  
+  <!-- 条纹 -->
+  <path d="M 200 150 Q 210 180 215 210" stroke="url(#stripes)" stroke-width="12" fill="none" opacity="0.7"/>
+  <path d="M 256 140 Q 256 180 256 220" stroke="url(#stripes)" stroke-width="14" fill="none" opacity="0.7"/>
+  <path d="M 312 150 Q 302 180 297 210" stroke="url(#stripes)" stroke-width="12" fill="none" opacity="0.7"/>
+  
+  <!-- 尾巴 -->
+  <path d="M 376 320 Q 420 280 440 240 Q 450 220 440 250 Q 430 300 400 340" 
+        stroke="#FF8C00" stroke-width="25" fill="none" stroke-linecap="round"/>
+  <path d="M 376 320 Q 420 280 440 240 Q 450 220 440 250 Q 430 300 400 340" 
+        stroke="#000000" stroke-width="8" fill="none" stroke-linecap="round" opacity="0.5"/>
+  
+  <!-- 爪子 -->
+  <ellipse cx="210" cy="400" rx="25" ry="15" fill="#FF8C00"/>
+  <ellipse cx="302" cy="400" rx="25" ry="15" fill="#FF8C00"/>
+  <circle cx="210" cy="400" r="8" fill="#FFFFFF" opacity="0.8"/>
+  <circle cx="302" cy="400" r="8" fill="#FFFFFF" opacity="0.8"/>
+  
+  <!-- 键盘 (代表编程) -->
+  <rect x="180" y="380" width="152" height="60" rx="8" fill="#2D2D2D"/>
+  <rect x="190" y="390" width="20" height="12" rx="2" fill="#3D3D3D"/>
+  <rect x="216" y="390" width="20" height="12" rx="2" fill="#3D3D3D"/>
+  <rect x="242" y="390" width="20" height="12" rx="2" fill="#3D3D3D"/>
+  <rect x="268" y="390" width="20" height="12" rx="2" fill="#3D3D3D"/>
+  <rect x="294" y="390" width="20" height="12" rx="2" fill="#3D3D3D"/>
+  <rect x="190" y="408" width="20" height="12" rx="2" fill="#3D3D3D"/>
+  <rect x="216" y="408" width="20" height="12" rx="2" fill="#3D3D3D"/>
+  <rect x="242" y="408" width="44" height="12" rx="2" fill="#FF8C00"/>
+  <rect x="294" y="408" width="20" height="12" rx="2" fill="#3D3D3D"/>
+</svg>
