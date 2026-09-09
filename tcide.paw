@@ -15,6 +15,11 @@
   <Row expand>
     <!-- 左侧：文件浏览器（可滚动） -->
     <Column>
+      <!-- 像素宠物虎猫 -->
+      <Text color="accent">🐱 虎猫宠物</Text>
+      <Text>{$state.pet_frame}</Text>
+      <Text color="subtext">{$state.pet_status_label}</Text>
+      <Divider/>
       <Row>
         <Input placeholder="项目路径，回车打开" on_enter="open_target_enter" bind="open_target" value="{$state.open_target}"/>
         <Button on_click="open_project_btn">打开</Button>
@@ -71,6 +76,17 @@
           <Input placeholder="Model" bind="ai_model" value="{$state.ai_model}"/>
           <Button on_click="save_settings">保存设置</Button>
         </Tab>
+        <Tab label="自动编程">
+          <Text color="subtext">双 Agent 自动编程：Builder 规划 → Coder 编码 → 验证 → 审查 → 提交</Text>
+          <Input placeholder="描述任务，例如：给终端加一个清空按钮" on_enter="run_auto_task_enter" bind="auto_task" value="{$state.auto_task}"/>
+          <Row>
+            <Button on_click="run_auto_task">运行</Button>
+            <Button on_click="auto_clear">清空日志</Button>
+          </Row>
+          <Scroll expand>
+            <Text>{$state.auto_log}</Text>
+          </Scroll>
+        </Tab>
       </Tabs>
     </Column>
   </Row>
@@ -78,10 +94,25 @@
 
 <script>
 import os
+import html
+import time
 import tcide_client
+from PySide6.QtCore import QTimer
 
 URL = os.environ.get("TCIDE_URL", "http://127.0.0.1:18420")
 client = tcide_client.TCIDEClient(URL)
+
+# ── 像素宠物虎猫 ──
+PET_FRAMES = {
+    "idle":       ("  /\\_/\\  \n ( -.- )  Zzz\n  > ^ <  ", "😴 待命中"),
+    "building":   ("  /\\_/\\  \n ( o.o )  💡\n  > ^ <  ", "💡 规划中"),
+    "coding":     ("  /\\_/\\  \n ( O.O )  ⌨️\n  > ^ <  ", "⌨️ 编码中"),
+    "verifying":  ("  /\\_/\\  \n ( O.O )  🔍\n  > ^ <  ", "🔍 验证中"),
+    "reviewing":  ("  /\\_/\\  \n ( -.- )  📝\n  > ^ <  ", "📝 审查中"),
+    "committing": ("  /\\_/\\  \n ( o.o )  💾\n  > ^ <  ", "💾 提交中"),
+    "done":       ("  /\\_/\\  \n ( ^_^ )  ✨\n  > ^ <  ", "✨ 完成"),
+    "error":      ("  /\\_/\\  \n ( ;_; )  💔\n  > ^ <  ", "💔 出错"),
+}
 
 # ── 初始状态 ──
 state.project = "(未打开项目)"
@@ -105,12 +136,23 @@ state.ai_input = ""
 state.commit_msg = ""
 state.last_cmd = ""
 
+# 像素宠物 + 自动编程
+state.auto_task = ""
+state.auto_running = False
+state.auto_lines = []
+state.auto_log = "<pre>🐱 虎猫待命中。输入任务并点击「运行」，它会自动规划、编码、验证并提交。</pre>"
+state.pet_status = "idle"
+_pf, _pl = PET_FRAMES["idle"]
+state.pet_frame = "<pre>" + html.escape(_pf) + "</pre>"
+state.pet_status_label = html.escape(_pl)
+
 # ── 辅助 ──
 def _do_open(path):
     r = client.open_project(path)
     if r.get("success"):
         state.project = r.get("name", "?")
         state.dir = path
+        client.project_dir = path
         _load_dir(path)
         state.branch = client.branch()
     else:
@@ -269,7 +311,79 @@ def git_commit():
 
 def save_settings():
     client.save_settings(state.ai_provider, state.ai_baseurl, state.ai_apikey, state.ai_model)
+    client.ai_configure(state.ai_provider, state.ai_baseurl, state.ai_apikey, state.ai_model)
+    pet_update("idle", "⚙️ AI 配置已保存并激活")
     app.refresh()
+
+# ── 像素宠物 / 双 Agent 自动编程 ──
+_timer = [None]
+_watch = [False]
+
+def _safe_refresh():
+    try:
+        app.refresh()
+    except Exception:
+        pass
+
+def _ensure_watch():
+    if not _watch[0]:
+        t = QTimer()
+        t.setInterval(500)
+        t.timeout.connect(lambda: _safe_refresh())
+        t.start()
+        _timer[0] = t
+        _watch[0] = True
+
+def pet_update(phase, msg):
+    frame, label = PET_FRAMES.get(phase, PET_FRAMES["idle"])
+    state.pet_status = phase
+    state.pet_frame = "<pre>" + html.escape(frame) + "</pre>"
+    state.pet_status_label = html.escape(label)
+    lines = list(state.auto_lines)
+    lines.append(msg)
+    state.auto_lines = lines
+    state.auto_log = "<pre>" + html.escape("\n".join(lines)) + "</pre>"
+
+def auto_clear():
+    state.auto_lines = []
+    state.auto_log = ""
+    pet_update("idle", "🐱 日志已清空")
+    app.refresh()
+
+def _auto_done(res, err):
+    state.auto_running = False
+    if _timer[0] is not None:
+        _timer[0].stop()
+        _timer[0] = None
+    _watch[0] = False
+    if err is not None:
+        pet_update("error", "❌ 异常: " + str(err))
+    elif res and res.get("success"):
+        pet_update("done", "🎉 完成！改动已提交。")
+    else:
+        pet_update("error", "⚠️ 未完全成功: " + str((res or {}).get("error", "")))
+    app.refresh()
+
+def run_auto_task():
+    t = (state.auto_task or "").strip()
+    if not t:
+        pet_update("idle", "⚠️ 先输入要让虎猫做的任务，再点运行。")
+        return
+    if state.auto_running:
+        pet_update("idle", "⏳ 上一个自动编程任务还在跑…")
+        return
+    _ensure_watch()
+    state.auto_running = True
+    state.auto_lines = []
+    state.auto_log = ""
+    pet_update("building", "🐱 虎猫开始自动编程： " + t)
+    def _worker():
+        return client.run_auto_task(t, progress=pet_update)
+    app.invoke_async(_worker, done=_auto_done)
+
+def run_auto_task_enter(name):
+    state.auto_task = (name or "").strip()
+    run_auto_task()
 
 _startup()
 </script>

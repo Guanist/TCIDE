@@ -36,6 +36,7 @@ class TCIDEClient:
     def __init__(self, base_url: str):
         self.base = base_url.rstrip("/")
         self.http = httpx.Client(base_url=self.base, timeout=60)
+        self.project_dir = ""
 
     # ── 项目 / 文件 ──
     def open_project(self, path: str) -> dict:
@@ -91,7 +92,150 @@ class TCIDEClient:
         except Exception:
             pass
 
-    # ── rich 渲染 ──
+    # ── AI Agents: Builder / Coder / Reviewer 自动编程循环 ──
+    def ai_configure(self, provider: str, base_url: str, api_key: str, model: str) -> None:
+        try:
+            self.http.post(
+                "/api/ai/configure",
+                json={"provider": provider, "base_url": base_url,
+                      "api_key": api_key, "model": model},
+            )
+        except Exception:
+            pass
+
+    def ai_build(self, requirement: str, project_context: str = "") -> dict:
+        try:
+            return self.http.post(
+                "/api/ai/build",
+                json={"requirement": requirement, "project_context": project_context},
+            ).json()
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+
+    def ai_code(self, task: str, project_context: str = "", file_contents: dict | None = None) -> dict:
+        try:
+            return self.http.post(
+                "/api/ai/code",
+                json={"task": task, "project_context": project_context,
+                      "file_contents": file_contents or {}},
+            ).json()
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+
+    def ai_review(self, requirement: str, file_changes: dict) -> dict:
+        try:
+            return self.http.post(
+                "/api/ai/review",
+                json={"code": requirement, "context": file_changes},
+            ).json()
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+
+    def _project_context(self) -> str:
+        return "项目根目录: " + (self.project_dir or ".")
+
+    def _detect_test_command(self) -> str:
+        d = self.project_dir or "."
+        checks = [
+            ("package.json", "npm test"),
+            ("pytest.ini", "pytest"),
+            ("setup.py", "pytest"),
+            ("pyproject.toml", "pytest"),
+            ("go.mod", "go test ./..."),
+            ("Cargo.toml", "cargo test"),
+            ("Makefile", "make test"),
+        ]
+        for fname, cmd in checks:
+            if os.path.exists(os.path.join(d, fname)):
+                return cmd
+        return ""
+
+    def run_auto_task(self, requirement: str, progress=None) -> dict:
+        """双 Agent 自动编程循环：Builder -> Coder(落盘+执行) -> 验证 -> 审查 -> 提交。
+
+        progress(phase, msg) 回调用于实时驱动像素宠物与日志。
+        phase: building | coding | verifying | reviewing | committing | done | error
+        """
+        def report(phase: str, msg: str):
+            if progress:
+                try:
+                    progress(phase, msg)
+                except Exception:
+                    pass
+
+        report("building", "🐱 虎猫开始分析需求并拆解任务…")
+        ctx = self._project_context()
+        b = self.ai_build(requirement, ctx)
+        if not b.get("success"):
+            report("error", "❌ Builder 失败: " + str(b.get("error", "")))
+            return {"success": False, "phase": "build", "error": b.get("error")}
+        tasks = b.get("tasks", []) or []
+        report("building", f"📋 已规划 {len(tasks)} 个任务")
+        for t in tasks:
+            report("building", f"  · [{t.get('id', '?')}] {t.get('description', '')}")
+
+        changed: dict = {}
+        for t in tasks:
+            tid = t.get("id", "?")
+            report("coding", f"⌨️ 编码任务 {tid}: {t.get('description', '')}")
+            files_ctx = {}
+            for fp in (t.get("files", []) or []):
+                try:
+                    files_ctx[fp] = self.read_file(fp).get("content", "")
+                except Exception:
+                    pass
+            c = self.ai_code(t.get("description", ""), ctx, files_ctx)
+            if not c.get("success"):
+                report("error", f"❌ Coder 任务 {tid} 失败: {c.get('error', '')}")
+                return {"success": False, "phase": "code", "error": c.get("error"), "changed": changed}
+            for a in (c.get("actions", []) or []):
+                act = a.get("action", "")
+                if act == "write_file":
+                    p = a.get("path", "")
+                    w = self.write_file(p, a.get("content", ""))
+                    if w.get("success"):
+                        changed[p] = a.get("content", "")
+                        report("coding", f"  ✏️ 写入 {p}")
+                    else:
+                        report("coding", f"  ⚠️ 写入失败 {p}: {w.get('error', '')}")
+                elif act == "run_command":
+                    r = self.exec(a.get("command", ""), cwd=self.project_dir or ".")
+                    report("coding", f"  🔧 `{a.get('command', '')}` → exit {r.get('exitCode')}")
+                elif act == "read_file":
+                    report("coding", f"  👀 读取 {a.get('path', '')}")
+            report("coding", f"  ✓ {c.get('summary', '')}")
+
+        # 验证
+        report("verifying", "🔍 运行构建/测试验证…")
+        test_cmd = self._detect_test_command()
+        if test_cmd:
+            r = self.exec(test_cmd, cwd=self.project_dir or ".")
+            ok = r.get("exitCode") == 0
+            report("verifying", f"  {'✅' if ok else '⚠️'} {test_cmd} → exit {r.get('exitCode')}")
+            if r.get("stderr"):
+                report("verifying", "  " + r.get("stderr", "")[:300])
+        else:
+            report("verifying", "  （未发现测试/构建命令，跳过验证）")
+
+        # 审查
+        report("reviewing", "📝 审查改动…")
+        try:
+            rv = self.ai_review(requirement, changed)
+            approved = rv.get("approved", True)
+            report("reviewing", f"  {'✅' if approved else '⚠️'} {rv.get('summary', '')}")
+        except Exception as e:
+            report("reviewing", f"  ⚠️ 审查出错: {e}")
+
+        # 提交
+        report("committing", "💾 提交改动到 Git…")
+        try:
+            self.git_commit(f"虎猫自动编程: {requirement[:60]}")
+            report("committing", "  ✓ 已提交")
+        except Exception as e:
+            report("committing", f"  ⚠️ 提交失败(可能无改动): {e}")
+
+        report("done", "🎉 自动编程结束。")
+        return {"success": True, "changed": changed, "tasks": len(tasks)}
     @staticmethod
     def _con() -> Console:
         return Console(record=True, width=110, markup=True)
