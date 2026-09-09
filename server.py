@@ -368,6 +368,34 @@ async def ai_configure(request: Request):
     return ai.configure(body)
 
 
+@app.post("/api/ai/test")
+async def ai_test(request: Request):
+    """测试 AI 连接"""
+    body = await request.json()
+    try:
+        # 转换前端的 camelCase 为 snake_case
+        config = {
+            "provider": body.get("provider", "openai-compatible"),
+            "base_url": body.get("baseUrl", body.get("base_url", "")),
+            "api_key": body.get("apiKey", body.get("api_key", "")),
+            "model": body.get("model", ""),
+            "max_tokens": body.get("maxTokens", body.get("max_tokens", 4096)),
+            "temperature": body.get("temperature", 0.7),
+        }
+        # 先配置
+        ai.configure(config)
+        # 发送测试消息
+        adapter = ai.get_adapter()
+        if not adapter:
+            return {"success": False, "error": "LLM adapter not configured"}
+        from adapters.llm import Message
+        messages = [Message(role="user", content="Hi, reply with one word: OK")]
+        result = await adapter.chat(messages)
+        return {"success": True, "response": result[:100]}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
 @app.post("/api/ai/chat")
 async def ai_chat(request: Request):
     body = await request.json()
