@@ -1,4 +1,4 @@
-﻿"""
+"""
 TCIDE Python - FastAPI 后端服务
 """
 import asyncio
@@ -641,6 +641,21 @@ async def set_settings(request: Request):
 @app.get("/api/settings/ai")
 async def get_ai_settings():
     return settings.get_setting("ai", {})
+
+# ── Model registry ──
+MODELS = [
+    {"id": "deepseek-chat", "name": "DeepSeek Chat", "provider": "deepseek", "context": 64000, "maxTokens": 8192, "cost": "¥1/百万token"},
+    {"id": "deepseek-reasoner", "name": "DeepSeek Reasoner", "provider": "deepseek", "context": 64000, "maxTokens": 8192, "cost": "¥4/百万token", "reasoning": True},
+    {"id": "deepseek-v4-pro", "name": "DeepSeek V4 Pro", "provider": "deepseek", "context": 128000, "maxTokens": 16384, "cost": "¥2/百万token"},
+    {"id": "MiMo-7B-RL", "name": "Xiaomi MiMo 7B RL", "provider": "xiaomi", "context": 32000, "maxTokens": 4096, "cost": "免费/开源", "reasoning": True},
+    {"id": "MiMo-7B-SFT", "name": "Xiaomi MiMo 7B SFT", "provider": "xiaomi", "context": 32000, "maxTokens": 4096, "cost": "免费/开源"},
+    {"id": "MiMo-7B-Base", "name": "Xiaomi MiMo 7B Base", "provider": "xiaomi", "context": 32000, "maxTokens": 4096, "cost": "免费/开源"},
+]
+
+@app.get("/api/settings/models")
+async def list_models():
+    return MODELS
+
 
 
 @app.post("/api/settings/ai")

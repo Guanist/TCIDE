@@ -1,4 +1,4 @@
-/**
+﻿/**
  * TCIDE Electron → Python Backend Bridge Shim
  * 
  * Replaces window.electron / window.api (Electron IPC) with fetch() calls
@@ -162,7 +162,7 @@
     getModelConfig: () => apiCall('GET', '/api/settings/ai'),
     saveModelConfig: (cfg) => apiCall('POST', '/api/settings/ai', cfg),
     getModelMeta: () => apiCall('GET', '/api/settings'),
-    listModelMeta: () => apiCall('GET', '/api/settings'),
+    listModelMeta: () => apiCall('GET', '/api/settings/models'),
     exportConfig: () => apiCall('GET', '/api/settings'),
     importConfig: (cfg) => apiCall('POST', '/api/settings', cfg),
 
@@ -249,3 +249,4 @@
 
   console.log('[TCIDE] Electron shim loaded — API bridged to Python backend');
 })();
+
