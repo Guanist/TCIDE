@@ -12,3 +12,4 @@ release/
 dist/
 build/
 *.egg-info/
+.tcide/
