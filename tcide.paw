@@ -1,0 +1,233 @@
+<!--
+  TCIDE · pawui + rich 前端
+  原生 PySide6 窗口（pawui）做 IDE 外壳，rich 渲染终端 / AI / Git / 代码预览。
+  后端 = 同仓库 FastAPI 服务（main.py 启动）。
+-->
+<Window title="TCIDE · pawui + rich" theme="dark" width="1200" height="800">
+  <Row>
+    <Text color="subtext">项目: {$state.project}</Text>
+    <Text color="subtext">分支: {$state.branch}</Text>
+  </Row>
+  <Divider/>
+
+  <Row expand>
+    <!-- 左侧：文件浏览器 -->
+    <Column>
+      <Row>
+        <Input placeholder="项目路径，回车打开" on_enter="open_target_enter" bind="open_target" value="{$state.open_target}"/>
+        <Button on_click="open_project_btn">打开</Button>
+      </Row>
+      <Row>
+        <Text color="subtext">{$state.dir}</Text>
+        <Button on_click="up_dir">上级</Button>
+      </Row>
+      <For each="item" in="{$state.items}">
+        <Input value="{$item.name}" on_enter="row_activate"/>
+      </For>
+    </Column>
+
+    <!-- 右侧：功能面板 -->
+    <Column expand>
+      <Tabs expand>
+        <Tab label="终端">
+          <Text>{$state.term_html}</Text>
+          <Input placeholder="命令，回车执行" on_enter="run_cmd" bind="cmd" value="{$state.cmd}"/>
+        </Tab>
+        <Tab label="AI 助手">
+          <Text>{$state.ai_html}</Text>
+          <Input placeholder="消息，回车发送" on_enter="send_ai" bind="ai_input" value="{$state.ai_input}"/>
+        </Tab>
+        <Tab label="Git">
+          <Text>{$state.git_html}</Text>
+          <Input placeholder="提交信息" bind="commit_msg" value="{$state.commit_msg}"/>
+          <Row>
+            <Button on_click="git_refresh">刷新状态</Button>
+            <Button on_click="git_commit">提交</Button>
+          </Row>
+        </Tab>
+        <Tab label="文件预览">
+          <Text color="subtext">{$state.preview_name}</Text>
+          <Text>{$state.preview_html}</Text>
+          <Button on_click="open_external">外部编辑器打开</Button>
+        </Tab>
+        <Tab label="设置">
+          <Text>AI 配置</Text>
+          <Input placeholder="Provider" bind="ai_provider" value="{$state.ai_provider}"/>
+          <Input placeholder="Base URL" bind="ai_baseurl" value="{$state.ai_baseurl}"/>
+          <Input placeholder="API Key" bind="ai_apikey" show="true" value="{$state.ai_apikey}"/>
+          <Input placeholder="Model" bind="ai_model" value="{$state.ai_model}"/>
+          <Button on_click="save_settings">保存设置</Button>
+        </Tab>
+      </Tabs>
+    </Column>
+  </Row>
+</Window>
+
+<script>
+import os
+import tcide_client
+
+URL = os.environ.get("TCIDE_URL", "http://127.0.0.1:18420")
+client = tcide_client.TCIDEClient(URL)
+
+# ── 初始状态 ──
+state.project = "(未打开项目)"
+state.branch = ""
+state.dir = ""
+state.items = []
+state.open_target = ""
+state.preview_name = ""
+state.preview_path = ""
+state.preview_html = "<pre>在左侧文件树回车打开一个文件以预览。</pre>"
+state.term_html = "<pre>TCIDE 终端就绪。输入命令后回车执行。</pre>"
+state.ai_html = "<pre>AI 助手就绪。输入消息后回车发送。</pre>"
+state.git_html = "<pre>点击「刷新状态」加载 Git 信息。</pre>"
+state.ai_messages = []
+state.ai_provider = ""
+state.ai_baseurl = ""
+state.ai_apikey = ""
+state.ai_model = ""
+state.cmd = ""
+state.ai_input = ""
+state.commit_msg = ""
+
+# ── 辅助 ──
+def _do_open(path):
+    r = client.open_project(path)
+    if r.get("success"):
+        state.project = r.get("name", "?")
+        state.dir = path
+        _load_dir(path)
+        state.branch = client.branch()
+    else:
+        state.term_html = "<pre>打开失败: " + str(r.get("error", "")) + "</pre>"
+
+def _load_dir(path):
+    try:
+        state.items = client.list_dir(path) or []
+    except Exception as e:
+        state.items = []
+        state.term_html = "<pre>列目录失败: " + str(e) + "</pre>"
+
+def _startup():
+    proj = os.environ.get("TCIDE_PROJECT", "")
+    try:
+        if proj:
+            _do_open(proj)
+        s = client.get_settings()
+        ai = (s or {}).get("ai", {}) or {}
+        state.ai_provider = ai.get("provider", "")
+        state.ai_baseurl = ai.get("baseUrl", "")
+        state.ai_apikey = ai.get("apiKey", "")
+        state.ai_model = ai.get("model", "")
+    except Exception as e:
+        state.term_html = "<pre>连接后端失败: " + str(e) + "</pre>"
+
+# ── 事件 ──
+def open_target_enter(name):
+    name = (name or "").strip()
+    if name:
+        _do_open(name)
+        app.refresh()
+
+def open_project_btn():
+    p = (state.open_target or "").strip()
+    if p:
+        _do_open(p)
+        app.refresh()
+
+def up_dir():
+    if not state.dir:
+        return
+    parent = os.path.dirname(state.dir)
+    state.dir = parent
+    _load_dir(parent)
+    app.refresh()
+
+def row_activate(name):
+    name = (name or "").strip()
+    if not name:
+        return
+    item = next((i for i in state.items if i.get("name") == name), None)
+    if item:
+        target = item
+    else:
+        cand = os.path.join(state.dir or "", name)
+        if os.path.isdir(cand):
+            target = {"name": name, "path": cand, "type": "directory"}
+        elif os.path.isfile(cand):
+            target = {"name": name, "path": cand, "type": "file"}
+        else:
+            return
+    if target.get("type") == "directory":
+        state.dir = target["path"]
+        _load_dir(target["path"])
+    else:
+        try:
+            content = client.read_file(target["path"]).get("content", "")
+        except Exception as e:
+            content = "读取失败: " + str(e)
+        state.preview_name = target["name"]
+        state.preview_path = target["path"]
+        state.preview_html = client.render_code(target["name"], content)
+    app.refresh()
+
+def open_external():
+    p = state.preview_path
+    if p:
+        try:
+            os.startfile(p)
+        except Exception as e:
+            state.term_html = "<pre>打开失败: " + str(e) + "</pre>"
+    app.refresh()
+
+def run_cmd(cmd):
+    cmd = (cmd or "").strip()
+    if not cmd:
+        return
+    try:
+        res = client.exec(cmd, state.dir or ".")
+        state.term_html = client.render_terminal(cmd, res)
+    except Exception as e:
+        state.term_html = "<pre>执行失败: " + str(e) + "</pre>"
+    state.cmd = ""
+    app.refresh()
+
+def send_ai(text):
+    text = (text or "").strip()
+    if not text:
+        return
+    msgs = list(state.ai_messages)
+    msgs.append({"role": "user", "content": text})
+    reply = client.ai_chat(msgs)
+    msgs.append({"role": "assistant", "content": reply})
+    state.ai_messages = msgs
+    state.ai_html = client.render_ai(msgs)
+    state.ai_input = ""
+    app.refresh()
+
+def git_refresh():
+    try:
+        state.git_html = client.render_git(client.git_status())
+    except Exception as e:
+        state.git_html = "<pre>刷新失败: " + str(e) + "</pre>"
+    app.refresh()
+
+def git_commit():
+    msg = (state.commit_msg or "").strip()
+    if not msg:
+        return
+    try:
+        client.git_commit(msg)
+        state.git_html = client.render_git(client.git_status())
+    except Exception as e:
+        state.git_html = "<pre>提交失败: " + str(e) + "</pre>"
+    state.commit_msg = ""
+    app.refresh()
+
+def save_settings():
+    client.save_settings(state.ai_provider, state.ai_baseurl, state.ai_apikey, state.ai_model)
+    app.refresh()
+
+_startup()
+</script>

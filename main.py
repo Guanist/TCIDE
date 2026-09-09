@@ -79,12 +79,12 @@ def main():
             print("\n[TCIDE] Stopped")
         return
 
-    # 启动 PyWebView 桌面窗口
+    # 启动 pawui + rich 原生桌面窗口
     try:
-        import webview
+        import pawui
     except ImportError:
-        print("[TCIDE] pywebview not installed. Run: pip install pywebview")
-        print(f"[TCIDE] Falling back to browser. Open: {url}")
+        print("[TCIDE] pawui 未安装。运行: pip install pawui rich")
+        print(f"[TCIDE] 回退到浏览器打开: {url}")
         import webbrowser
         webbrowser.open(url)
         try:
@@ -94,31 +94,14 @@ def main():
             print("\n[TCIDE] Stopped")
         return
 
-    window = webview.create_window(
-        title="TCIDE",
-        url=url,
-        width=1400,
-        height=900,
-        min_size=(800, 600),
-        text_select=True,
-    )
-    # webview.start 会阻塞直到窗口关闭
-    # gui='edgechromium' 强制使用 Edge WebView2（Windows 上最稳定）
-    try:
-        webview.start(gui='edgechromium', debug=False)
-    except Exception:
-        try:
-            webview.start(debug=False)
-        except Exception as e:
-            print(f"[TCIDE] PyWebView failed: {e}")
-            print(f"[TCIDE] Open in browser: {url}")
-            import webbrowser
-            webbrowser.open(url)
-            try:
-                while True:
-                    time.sleep(1)
-            except KeyboardInterrupt:
-                pass
+    import os
+    os.environ["TCIDE_URL"] = url
+    if project_root:
+        os.environ["TCIDE_PROJECT"] = project_root
+
+    pawui_file = os.path.join(APP_DIR, "tcide.paw")
+    print(f"[TCIDE] 启动 pawui UI: {pawui_file}")
+    pawui.run(pawui_file)
     print("[TCIDE] Window closed")
 
 
