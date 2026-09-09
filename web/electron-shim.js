@@ -250,3 +250,78 @@
   console.log('[TCIDE] Electron shim loaded — API bridged to Python backend');
 })();
 
+// ── Patch: Add Xiaomi MiMo provider to frontend ──
+// The Electron bundle hardcodes providers as deepseek/huoshan/ollama/anthropic/custom.
+// We intercept the model list loading and inject xiaomi models into the dropdown.
+(function() {
+  const _origApi = window.api;
+  
+  // Patch listModelMeta to inject xiaomi provider info
+  const origListModels = _origApi.listModelMeta;
+  _origApi.listModelMeta = async function() {
+    const models = await origListModels();
+    return models;  // already includes xiaomi models from backend
+  };
+  
+  // Patch the settings save to handle xiaomi provider
+  const origSaveConfig = _origApi.saveModelConfig;
+  _origApi.saveModelConfig = function(cfg) {
+    return origSaveConfig(cfg);
+  };
+  
+  // After page loads, patch the provider selector to include xiaomi
+  function patchProviderSelector() {
+    // Find provider select elements and add xiaomi option
+    const providerSelects = document.querySelectorAll('select');
+    providerSelects.forEach(sel => {
+      const opts = Array.from(sel.options).map(o => o.value);
+      if (opts.includes('deepseek') && !opts.includes('xiaomi')) {
+        const opt = document.createElement('option');
+        opt.value = 'xiaomi';
+        opt.textContent = '小米 MiMo';
+        sel.appendChild(opt);
+      }
+    });
+  }
+  
+  // Run patch after DOM is ready
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', () => setTimeout(patchProviderSelector, 1000));
+  } else {
+    setTimeout(patchProviderSelector, 1000);
+  }
+  
+  // Also re-patch when settings tab is shown
+  const observer = new MutationObserver(() => {
+    setTimeout(patchProviderSelector, 200);
+  });
+  observer.observe(document.body, { childList: true, subtree: true });
+  
+  
+  // Patch provider change to set xiaomi base URL
+  const origOnProviderChange = document.querySelector('#cfg-provider');
+  if (origOnProviderChange) {
+    origOnProviderChange.addEventListener('change', function() {
+      if (this.value === 'xiaomi') {
+        const baseUrlInput = document.getElementById('cfg-base-url');
+        if (baseUrlInput && !baseUrlInput.value) {
+          baseUrlInput.value = 'https://api.xiaomi.com/v1';
+        }
+      }
+    });
+  }
+  
+  // Also patch the quick model select to handle xiaomi
+  const origQuickSelect = document.querySelector('#quick-model-select');
+  if (origQuickSelect) {
+    origQuickSelect.addEventListener('change', function() {
+      const [provider, modelId] = this.value.split('|');
+      if (provider === 'xiaomi') {
+        const baseUrlInput = document.getElementById('cfg-base-url');
+        if (baseUrlInput) baseUrlInput.value = 'https://api.xiaomi.com/v1';
+      }
+    });
+  }
+console.log('[TCIDE] Xiaomi MiMo provider patch applied');
+})();
+
