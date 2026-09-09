@@ -15,9 +15,14 @@ sys.path.insert(0, PROJECT_ROOT)
 
 def start_server():
     """Run the FastAPI server in a background thread."""
-    # Import here so the module path is already set
-    import server
-    uvicorn.run(server.app, host="127.0.0.1", port=18420, log_level="warning")
+    import traceback
+    try:
+        import server
+        print(f"[TCIDE] Server module loaded OK")
+        uvicorn.run(server.app, host="127.0.0.1", port=18420, log_level="warning")
+    except Exception as e:
+        print(f"[TCIDE] Server FAILED: {e}")
+        traceback.print_exc()
 
 
 def main():
