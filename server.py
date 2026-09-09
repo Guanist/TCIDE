@@ -121,6 +121,33 @@ async def recent_projects():
     return {"projects": settings.get_recent_projects()}
 
 
+@app.get("/api/project/rules")
+async def get_project_rules():
+    try:
+        rules_path = os.path.join(files._project_root, ".tcide", "rules.json") if files._project_root else ""
+        if rules_path and os.path.exists(rules_path):
+            with open(rules_path, "r", encoding="utf-8") as f:
+                return {"rules": json.load(f)}
+        return {"rules": ""}
+    except Exception as e:
+        return {"rules": "", "error": str(e)}
+
+
+@app.post("/api/project/rules")
+async def set_project_rules(request: Request):
+    body = await request.json()
+    try:
+        if files._project_root:
+            tcide_dir = os.path.join(files._project_root, ".tcide")
+            os.makedirs(tcide_dir, exist_ok=True)
+            rules_path = os.path.join(tcide_dir, "rules.json")
+            with open(rules_path, "w", encoding="utf-8") as f:
+                json.dump(body.get("rules", ""), f, ensure_ascii=False, indent=2)
+        return {"success": True}
+    except Exception as e:
+        return {"error": str(e)}
+
+
 # ── 文件操作 ──
 
 @app.get("/api/files/list")
@@ -171,7 +198,11 @@ async def delete_file(request: Request):
 @app.post("/api/files/rename")
 async def rename_file(request: Request):
     body = await request.json()
-    return files.rename_file(body["oldPath"], body["newPath"])
+    old_path = body.get("oldPath") or body.get("old_path", "")
+    new_path = body.get("newPath") or body.get("new_path", "")
+    if not old_path or not new_path:
+        return {"error": "Missing oldPath/newPath or old_path/new_path"}
+    return files.rename_file(old_path, new_path)
 
 
 @app.post("/api/files/mkdir")
