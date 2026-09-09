@@ -387,13 +387,13 @@ async def ai_test(request: Request):
         # 发送测试消息
         adapter = ai.get_adapter()
         if not adapter:
-            return {"success": False, "error": "LLM adapter not configured"}
+            return {"success": False, "message": "LLM adapter not configured"}
         from adapters.llm import Message
         messages = [Message(role="user", content="Hi, reply with one word: OK")]
         result = await adapter.chat(messages)
-        return {"success": True, "response": result[:100]}
+        return {"success": True, "message": result[:100]}
     except Exception as e:
-        return {"success": False, "error": str(e)}
+        return {"success": False, "message": str(e)}
 
 
 @app.post("/api/ai/chat")
