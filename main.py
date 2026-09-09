@@ -52,6 +52,20 @@ def main():
     parser.add_argument("--no-window", action="store_true", help="Run server only (no GUI)")
     args = parser.parse_args()
 
+    # 双击启动未带项目路径时，弹出文件夹选择框
+    if not args.project:
+        try:
+            import tkinter as tk
+            from tkinter import filedialog
+            _r = tk.Tk()
+            _r.withdraw()
+            _p = filedialog.askdirectory(title="选择要打开的项目目录")
+            _r.destroy()
+            if _p:
+                args.project = _p
+        except Exception:
+            pass
+
     project_root = os.path.abspath(args.project) if args.project else ""
     url = f"http://{args.host}:{args.port}"
 
