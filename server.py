@@ -31,7 +31,14 @@ async def lifespan(app: FastAPI):
     # 停止所有 LSP 服务器
     lsp.shutdown_all()
     # 断开所有 MCP 连接
-    mcp.disconnect_all()
+    try:
+        for s in mcp.get_servers().get("servers", []):
+            try:
+                mcp.disconnect_server(s.get("name"))
+            except Exception:
+                pass
+    except Exception:
+        pass
     print("[TCIDE] Server stopped")
 
 
@@ -64,11 +71,10 @@ async def open_project(request: Request):
     files.set_project_root(path)
     git_ops.set_project_root(path)
     mcp.set_project_root(path)
-    memory.set_project_root(path)
-    vector.set_project_root(path)
-    snapshot.set_project_root(path)
-    usage.set_project_root(path)
-    debug.set_project_root(path)
+    memory.init_memory(path)
+    vector.init_index(path)
+    snapshot.init_snapshots(path)
+    usage.init_usage(path)
     settings.add_recent_project(path)
     return {"success": True, "path": path, "name": os.path.basename(path)}
 
@@ -90,13 +96,29 @@ async def read_file(path: str):
     return files.read_file(path)
 
 
+def _project_root_of(path: str) -> str:
+    """向上回溯到含 .git 或 .tcide 的目录作为项目根"""
+    d = os.path.dirname(path) if os.path.isfile(path) else path
+    cur = os.path.abspath(d)
+    while True:
+        if os.path.isdir(os.path.join(cur, ".git")) or os.path.isdir(os.path.join(cur, ".tcide")):
+            return cur
+        parent = os.path.dirname(cur)
+        if parent == cur:
+            return d
+        cur = parent
+
+
 @app.post("/api/files/write")
 async def write_file(request: Request):
     body = await request.json()
     result = files.write_file(body["path"], body["content"])
-    # 自动快照
+    # 自动快照（best-effort，失败不影响保存）
     if result.get("success"):
-        snapshot.create_snapshot(body["path"], body["content"])
+        try:
+            snapshot.save_snapshot(_project_root_of(body["path"]), "save", body["path"], body["content"])
+        except Exception:
+            pass
     return result
 
 

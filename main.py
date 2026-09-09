@@ -94,7 +94,6 @@ def main():
             print("\n[TCIDE] Stopped")
         return
 
-    import os
     os.environ["TCIDE_URL"] = url
     if project_root:
         os.environ["TCIDE_PROJECT"] = project_root

@@ -32,7 +32,7 @@ def git_status() -> dict:
     files = []
     for line in r["stdout"].split("\n"):
         if len(line) >= 3:
-            files.append({"status": line[:2].strip(), "path": line[3:].strip()})
+            files.append({"status": line[:2].strip(), "path": line[2:].lstrip()})
     return {"success": True, "files": files}
 
 def git_diff(path: str = None) -> dict:
@@ -125,7 +125,7 @@ def git_smart_commit(message: str = None) -> dict:
     for line in status["stdout"].split("\n"):
         if len(line) >= 3:
             s = line[:2].strip()
-            f = line[3:].strip()
+            f = line[2:].lstrip()
             if s in ("A", "??"):
                 added.append(f)
             elif s == "D":
