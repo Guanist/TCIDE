@@ -60,6 +60,19 @@ async def lifespan(app: FastAPI):
         vector.init_index(_default_root)
         snapshot.init_snapshots(_default_root)
         usage.init_usage(_default_root)
+    # Auto-configure AI adapter from saved settings
+    try:
+        ai_cfg = settings.get_setting("ai", {})
+        if ai_cfg.get("apiKey"):
+            ai.configure({
+                "provider": ai_cfg.get("provider", "openai-compatible"),
+                "base_url": ai_cfg.get("baseUrl", ""),
+                "api_key": ai_cfg.get("apiKey", ""),
+                "model": ai_cfg.get("model", ""),
+            })
+            print(f"[TCIDE] AI configured: {ai_cfg.get('provider')}/{ai_cfg.get('model')}")
+    except Exception as e:
+        print(f"[TCIDE] AI config failed: {e}")
     print(f"[TCIDE] Server starting, project root: {files._project_root}")
     yield
     # 清理终端
@@ -363,9 +376,14 @@ async def ai_chat(request: Request):
     try:
         result = ""
         async for chunk in ai.chat_stream(messages, system_prompt):
-            if isinstance(chunk, dict) and "error" in chunk:
-                return {"error": chunk["error"]}
-            result += chunk
+            if isinstance(chunk, dict):
+                if "error" in chunk:
+                    return {"error": chunk["error"]}
+                delta = chunk.get("delta", "")
+                if delta:
+                    result += delta
+            elif isinstance(chunk, str):
+                result += chunk
         return {"response": result}
     except Exception as e:
         return {"error": str(e)}
