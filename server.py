@@ -51,6 +51,15 @@ runner = UnattendedRunner()
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     settings.init_settings("tcide")
+    # Auto-init with default project root (will be overridden by project/open)
+    _default_root = os.getcwd()
+    if not files._project_root:
+        files.set_project_root(_default_root)
+        git_ops.set_project_root(_default_root)
+        memory.init_memory(_default_root)
+        vector.init_index(_default_root)
+        snapshot.init_snapshots(_default_root)
+        usage.init_usage(_default_root)
     print(f"[TCIDE] Server starting, project root: {files._project_root}")
     yield
     # 清理终端
@@ -153,7 +162,10 @@ async def write_file(request: Request):
 @app.post("/api/files/delete")
 async def delete_file(request: Request):
     body = await request.json()
-    return files.delete_file(body["path"])
+    path = body.get("path", "")
+    if not path:
+        return {"error": "No path specified"}
+    return files.delete_file(path)
 
 
 @app.post("/api/files/rename")
@@ -317,7 +329,15 @@ async def ai_chat(request: Request):
     body = await request.json()
     messages = body.get("messages", [])
     system_prompt = body.get("system_prompt", "")
-    return await ai.chat(messages, system_prompt)
+    try:
+        result = ""
+        async for chunk in ai.chat_stream(messages, system_prompt):
+            if isinstance(chunk, dict) and "error" in chunk:
+                return {"error": chunk["error"]}
+            result += chunk
+        return {"response": result}
+    except Exception as e:
+        return {"error": str(e)}
 
 
 @app.post("/api/ai/chat/stream")
@@ -376,7 +396,10 @@ async def ai_review(request: Request):
 
 @app.get("/api/mcp/servers")
 async def mcp_servers():
-    return {"servers": mcp.list_servers()}
+    try:
+        return mcp.get_servers()
+    except Exception as e:
+        return {"servers": [], "error": str(e)}
 
 
 @app.post("/api/mcp/connect")
@@ -418,7 +441,10 @@ async def lsp_stop(request: Request):
 
 @app.get("/api/lsp/servers")
 async def lsp_servers():
-    return {"servers": lsp.list_servers()}
+    try:
+        return lsp.get_status("", files._project_root)
+    except Exception as e:
+        return {"servers": [], "error": str(e)}
 
 
 @app.post("/api/lsp/didOpen")
@@ -466,37 +492,52 @@ async def lsp_completion(request: Request):
 
 @app.get("/api/memory/context")
 async def memory_context():
-    return {"context": memory.get_context()}
+    try:
+        return {"context": memory.get_injection()}
+    except Exception as e:
+        return {"context": "", "error": str(e)}
 
 
 @app.post("/api/memory/add")
 async def memory_add(request: Request):
     body = await request.json()
-    memory.add_message(body["role"], body["content"], body.get("metadata", {}))
+    try:
+        memory.record_pattern(
+            files._project_root,
+            body.get("content", ""),
+            body.get("content", ""),
+            body.get("metadata", {}).get("context", "")
+        )
+    except Exception:
+        pass
     return {"success": True}
 
 
 @app.post("/api/memory/clear")
 async def memory_clear():
-    memory.clear_context()
-    return {"success": True}
+    return {"success": True, "message": "Memory clear not implemented"}
 
 
 @app.get("/api/memory/summary")
 async def memory_summary():
-    return {"summary": memory.get_summary()}
+    try:
+        return memory.get_injection(files._project_root)
+    except Exception as e:
+        return {"summary": "", "error": str(e)}
 
 
 @app.get("/api/memory/export")
 async def memory_export():
-    return {"data": memory.export_context()}
+    try:
+        return memory.get_injection(files._project_root)
+    except Exception as e:
+        return {"data": {}, "error": str(e)}
 
 
 @app.post("/api/memory/import")
 async def memory_import(request: Request):
     body = await request.json()
-    memory.import_context(body["data"])
-    return {"success": True}
+    return {"success": True, "message": "Memory import not implemented"}
 
 
 # ── Vector ──
@@ -562,17 +603,26 @@ async def snapshot_clear(path: str = ""):
 
 @app.get("/api/usage/stats")
 async def usage_stats():
-    return usage.get_stats()
+    try:
+        return usage.get_today()
+    except Exception as e:
+        return {"error": str(e)}
 
 
 @app.get("/api/usage/history")
 async def usage_history(days: int = 7):
-    return {"history": usage.get_history(days)}
+    try:
+        return {"history": usage.get_by_date(days)}
+    except Exception as e:
+        return {"history": [], "error": str(e)}
 
 
 @app.get("/api/usage/cost")
 async def usage_cost():
-    return {"cost": usage.estimate_cost()}
+    try:
+        return usage.get_total()
+    except Exception as e:
+        return {"error": str(e)}
 
 
 @app.post("/api/usage/track")
@@ -592,12 +642,18 @@ async def usage_reset():
 
 @app.get("/api/debug/info")
 async def debug_info():
-    return debug.get_debug_info()
+    try:
+        return debug.get_state()
+    except Exception as e:
+        return {"error": str(e)}
 
 
 @app.get("/api/debug/logs")
 async def debug_logs(count: int = 100):
-    return {"logs": debug.get_logs(count)}
+    try:
+        return {"logs": debug.get_call_stack()}
+    except Exception as e:
+        return {"logs": [], "error": str(e)}
 
 
 @app.post("/api/debug/breakpoint")

@@ -26,6 +26,8 @@ def _run_git(args: list, timeout: int = 30) -> dict:
 
 def git_status() -> dict:
     """获取工作区状态"""
+    if not _project_root:
+        return {"success": True, "files": [], "branch": "unknown", "message": "No project open"}
     r = _run_git(["status", "--porcelain"])
     if not r["success"]:
         return r

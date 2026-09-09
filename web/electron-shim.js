@@ -98,7 +98,7 @@
 
     // Git
     getGitStatus: () => apiCall('GET', '/api/git/status'),
-    getGitBranch: () => apiCall('GET', '/api/git/branch'),
+    getGitBranch: () => apiCall('GET', '/api/git/branches'),
     gitListBranches: () => apiCall('GET', '/api/git/branches'),
     gitCheckout: (b) => apiCall('POST', '/api/git/checkout' + qp({branch: b})),
     commit: (msg) => apiCall('POST', '/api/git/commit', {message: msg}),
