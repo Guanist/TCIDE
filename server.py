@@ -1,4 +1,4 @@
-"""
+﻿"""
 TCIDE Python - FastAPI 后端服务
 """
 import asyncio
@@ -17,6 +17,34 @@ from fastapi.staticfiles import StaticFiles
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from api import files, git_ops, terminal, ai, settings, lsp, mcp, memory, vector, snapshot, usage, debug
+
+# ── Advanced Features ──
+from advanced import (
+    LSPClient, MCPManager, SemanticCompleter, EntropyEvaluator,
+    ContextTrimmer, AutoHealManager, WarehouseAnalyzer, GitIntelligence,
+    SnapshotManager, UsageTracker, DebugManager, PrivacyNet,
+    ProjectCompatManager, SemanticChunker, PerfOptimizer,
+    ProjectMemory, VectorIndexer, UnattendedRunner
+)
+
+lsp_client = LSPClient()
+mcp_manager = MCPManager()
+semantic = SemanticCompleter()
+entropy_eval = EntropyEvaluator()
+trimmer = ContextTrimmer()
+autoheal = AutoHealManager()
+warehouse = WarehouseAnalyzer()
+git_intel = GitIntelligence()
+snapshot_mgr = SnapshotManager(os.path.join(os.path.dirname(os.path.abspath(__file__)), '.tcide', 'snapshots.db'))
+usage_tracker = UsageTracker(os.path.join(os.path.dirname(os.path.abspath(__file__)), '.tcide', 'usage.db'))
+debugger = DebugManager()
+privacy = PrivacyNet()
+compat = ProjectCompatManager()
+chunker = SemanticChunker()
+perf = PerfOptimizer()
+memory_mgr = ProjectMemory(os.path.join(os.path.dirname(os.path.abspath(__file__)), '.tcide', 'memory.db'))
+vector_idx = VectorIndexer()
+runner = UnattendedRunner()
 
 # ── 生命周期 ──
 
@@ -672,3 +700,77 @@ async def terminal_ws(websocket: WebSocket, terminal_id: str):
             await websocket.close()
         except Exception:
             pass
+
+
+# ═══════════════════════════════════════════
+# New Advanced Endpoints (non-conflicting)
+# ═══════════════════════════════════════════
+
+@app.get("/api/entropy/evaluate")
+async def entropy_evaluate(file_path: str):
+    try:
+        with open(file_path, 'r', encoding='utf-8', errors='replace') as f:
+            return entropy_eval.evaluate(file_path, f.read())
+    except Exception as e:
+        return {"error": str(e)}
+
+@app.get("/api/entropy/project")
+async def entropy_project(project_root: str):
+    return entropy_eval.evaluate_project(project_root)
+
+@app.get("/api/autoheal/diagnose")
+async def autoheal_diagnose(error: str):
+    return autoheal.diagnose(error)
+
+@app.get("/api/autoheal/stats")
+async def autoheal_stats():
+    return autoheal.get_stats()
+
+@app.get("/api/warehouse/analyze")
+async def warehouse_analyze(project_root: str):
+    return warehouse.analyze(project_root)
+
+@app.get("/api/git/intelligence")
+async def git_intelligence(project_root: str):
+    return git_intel.analyze(project_root)
+
+@app.get("/api/compat/detect")
+async def compat_detect(project_root: str):
+    return compat.detect(project_root)
+
+@app.get("/api/chunker/chunk")
+async def chunker_chunk(file_path: str):
+    try:
+        with open(file_path, 'r', encoding='utf-8', errors='replace') as f:
+            return chunker.chunk_file(f.read(), file_path)
+    except Exception as e:
+        return {"error": str(e)}
+
+@app.get("/api/perf/slow")
+async def perf_slow(threshold_ms: float = 1000):
+    return perf.slow_operations(threshold_ms)
+
+@app.get("/api/privacy/rules")
+async def privacy_rules():
+    return privacy.list_rules()
+
+@app.post("/api/privacy/block")
+async def privacy_block(pattern: str):
+    privacy.add_block(pattern)
+    return {"status": "blocked", "pattern": pattern}
+
+@app.get("/api/perf/stats")
+async def perf_stats(operation: str = None):
+    return perf.stats(operation)
+
+@app.post("/api/runner/run")
+async def runner_run(task: str, max_retries: int = 3):
+    return runner.run_task(task, max_retries=max_retries)
+
+@app.post("/api/runner/abort")
+async def runner_abort():
+    return runner.abort()
+
+@app.get("/api/runner/status")
+async def runner_status():
+    return runner.get_status()

@@ -836,6 +836,238 @@ class APICallThread(QThread):
             self.result_ready.emit(None)
 
 
+class EntropyWidget(QWidget):
+    """Code entropy/complexity analyzer panel."""
+    def __init__(self, api_client, parent=None):
+        super().__init__(parent)
+        self.api = api_client
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(8, 8, 8, 8)
+        header = QLabel("Code Complexity")
+        header.setStyleSheet("font-weight: bold; font-size: 14px; color: #569cd6;")
+        layout.addWidget(header)
+        btn = QPushButton("Analyze Project")
+        btn.clicked.connect(self._analyze)
+        layout.addWidget(btn)
+        self.result = QTextEdit()
+        self.result.setReadOnly(True)
+        layout.addWidget(self.result)
+    def _analyze(self):
+        thread = APICallThread(self.api._get, "/api/entropy/project?project_root=" + os.getcwd())
+        thread.result_ready.connect(self._on_result)
+        thread.start()
+    def _on_result(self, r):
+        if r:
+            self.result.setText(json.dumps(r, indent=2, ensure_ascii=False))
+
+
+class WarehouseWidget(QWidget):
+    """Project analysis panel."""
+    def __init__(self, api_client, parent=None):
+        super().__init__(parent)
+        self.api = api_client
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(8, 8, 8, 8)
+        header = QLabel("Project Analysis")
+        header.setStyleSheet("font-weight: bold; font-size: 14px; color: #569cd6;")
+        layout.addWidget(header)
+        btn = QPushButton("Analyze")
+        btn.clicked.connect(self._analyze)
+        layout.addWidget(btn)
+        self.result = QTextEdit()
+        self.result.setReadOnly(True)
+        layout.addWidget(self.result)
+    def _analyze(self):
+        thread = APICallThread(self.api._get, "/api/warehouse/analyze?project_root=" + os.getcwd())
+        thread.result_ready.connect(self._on_result)
+        thread.start()
+    def _on_result(self, r):
+        if r:
+            self.result.setText(json.dumps(r, indent=2, ensure_ascii=False))
+
+
+class GitIntelWidget(QWidget):
+    """Git intelligence panel."""
+    def __init__(self, api_client, parent=None):
+        super().__init__(parent)
+        self.api = api_client
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(8, 8, 8, 8)
+        header = QLabel("Git Intelligence")
+        header.setStyleSheet("font-weight: bold; font-size: 14px; color: #569cd6;")
+        layout.addWidget(header)
+        btn = QPushButton("Analyze")
+        btn.clicked.connect(self._analyze)
+        layout.addWidget(btn)
+        self.result = QTextEdit()
+        self.result.setReadOnly(True)
+        layout.addWidget(self.result)
+    def _analyze(self):
+        thread = APICallThread(self.api._get, "/api/git/intelligence?project_root=" + os.getcwd())
+        thread.result_ready.connect(self._on_result)
+        thread.start()
+    def _on_result(self, r):
+        if r:
+            self.result.setText(json.dumps(r, indent=2, ensure_ascii=False))
+
+
+class AutoHealWidget(QWidget):
+    """Auto-heal diagnostics panel."""
+    def __init__(self, api_client, parent=None):
+        super().__init__(parent)
+        self.api = api_client
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(8, 8, 8, 8)
+        header = QLabel("Auto-Heal")
+        header.setStyleSheet("font-weight: bold; font-size: 14px; color: #569cd6;")
+        layout.addWidget(header)
+        layout.addWidget(QLabel("Paste error output:"))
+        self.error_input = QTextEdit()
+        self.error_input.setMaximumHeight(80)
+        layout.addWidget(self.error_input)
+        btn = QPushButton("Diagnose")
+        btn.clicked.connect(self._diagnose)
+        layout.addWidget(btn)
+        self.result = QTextEdit()
+        self.result.setReadOnly(True)
+        layout.addWidget(self.result)
+    def _diagnose(self):
+        error = self.error_input.toPlainText().strip()
+        if not error:
+            return
+        import urllib.parse
+        thread = APICallThread(self.api._get, "/api/autoheal/diagnose?error=" + urllib.parse.quote(error))
+        thread.result_ready.connect(self._on_result)
+        thread.start()
+    def _on_result(self, r):
+        if r:
+            self.result.setText(json.dumps(r, indent=2, ensure_ascii=False))
+
+
+class UsageWidget(QWidget):
+    """Usage statistics panel."""
+    def __init__(self, api_client, parent=None):
+        super().__init__(parent)
+        self.api = api_client
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(8, 8, 8, 8)
+        header = QLabel("Usage Statistics")
+        header.setStyleSheet("font-weight: bold; font-size: 14px; color: #569cd6;")
+        layout.addWidget(header)
+        btn = QPushButton("Refresh")
+        btn.clicked.connect(self._refresh)
+        layout.addWidget(btn)
+        self.result = QTextEdit()
+        self.result.setReadOnly(True)
+        layout.addWidget(self.result)
+    def _refresh(self):
+        thread = APICallThread(self.api._get, "/api/usage/total")
+        thread.result_ready.connect(self._on_result)
+        thread.start()
+    def _on_result(self, r):
+        if r:
+            self.result.setText(json.dumps(r, indent=2, ensure_ascii=False))
+
+
+class MemoryWidget(QWidget):
+    """Project memory and vector search panel."""
+    def __init__(self, api_client, parent=None):
+        super().__init__(parent)
+        self.api = api_client
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(8, 8, 8, 8)
+        header = QLabel("Project Memory")
+        header.setStyleSheet("font-weight: bold; font-size: 14px; color: #569cd6;")
+        layout.addWidget(header)
+        btn = QPushButton("Load Context")
+        btn.clicked.connect(self._load)
+        layout.addWidget(btn)
+        self.result = QTextEdit()
+        self.result.setReadOnly(True)
+        layout.addWidget(self.result)
+    def _load(self):
+        thread = APICallThread(self.api._get, "/api/memory/injection")
+        thread.result_ready.connect(self._on_result)
+        thread.start()
+    def _on_result(self, r):
+        if r:
+            self.result.setText(json.dumps(r, indent=2, ensure_ascii=False))
+
+
+class RunnerWidget(QWidget):
+    """Unattended runner panel."""
+    def __init__(self, api_client, pet_widget=None, parent=None):
+        super().__init__(parent)
+        self.api = api_client
+        self.pet = pet_widget
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(8, 8, 8, 8)
+        header = QLabel("Unattended Runner")
+        header.setStyleSheet("font-weight: bold; font-size: 14px; color: #569cd6;")
+        layout.addWidget(header)
+        self.task_input = QLineEdit()
+        self.task_input.setPlaceholderText("Task description...")
+        layout.addWidget(self.task_input)
+        btn_layout = QHBoxLayout()
+        run_btn = QPushButton("Run")
+        run_btn.clicked.connect(self._run)
+        btn_layout.addWidget(run_btn)
+        abort_btn = QPushButton("Abort")
+        abort_btn.clicked.connect(self._abort)
+        btn_layout.addWidget(abort_btn)
+        layout.addLayout(btn_layout)
+        self.result = QTextEdit()
+        self.result.setReadOnly(True)
+        layout.addWidget(self.result)
+    def _run(self):
+        task = self.task_input.text().strip()
+        if not task:
+            return
+        if self.pet:
+            self.pet.set_state("thinking")
+        import urllib.parse
+        thread = APICallThread(self.api._post, "/api/runner/run?task=" + urllib.parse.quote(task))
+        thread.result_ready.connect(self._on_result)
+        thread.start()
+    def _on_result(self, r):
+        if r:
+            self.result.setText(json.dumps(r, indent=2, ensure_ascii=False))
+        if self.pet:
+            self.pet.set_state("idle")
+    def _abort(self):
+        self.api._post("/api/runner/abort")
+        self.result.setText("Aborted")
+        if self.pet:
+            self.pet.set_state("idle")
+
+
+class LSPWidget(QWidget):
+    """LSP/MCP status panel."""
+    def __init__(self, api_client, parent=None):
+        super().__init__(parent)
+        self.api = api_client
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(8, 8, 8, 8)
+        header = QLabel("LSP / MCP")
+        header.setStyleSheet("font-weight: bold; font-size: 14px; color: #569cd6;")
+        layout.addWidget(header)
+        btn = QPushButton("Refresh Status")
+        btn.clicked.connect(self._refresh)
+        layout.addWidget(btn)
+        self.result = QTextEdit()
+        self.result.setReadOnly(True)
+        layout.addWidget(self.result)
+    def _refresh(self):
+        r1 = self.api._get("/api/lsp/servers")
+        r2 = self.api._get("/api/mcp/servers")
+        r3 = self.api._get("/api/mcp/tools")
+        self.result.setText(
+            f"LSP Servers:\n{json.dumps(r1, indent=2)}\n\n"
+            f"MCP Servers:\n{json.dumps(r2, indent=2)}\n\n"
+            f"MCP Tools:\n{json.dumps(r3, indent=2)}"
+        )
+
+
 class TCIDEWindow(QMainWindow):
     """Main TCIDE window with full IDE functionality."""
     
@@ -908,6 +1140,31 @@ class TCIDEWindow(QMainWindow):
         
         self.settings_widget = SettingsWidget(self.api)
         right_panel.addTab(self.settings_widget, "Settings")
+        
+        # ── Advanced Feature Panels ──
+        self.entropy_widget = EntropyWidget(self.api)
+        right_panel.addTab(self.entropy_widget, "Entropy")
+        
+        self.warehouse_widget = WarehouseWidget(self.api)
+        right_panel.addTab(self.warehouse_widget, "Project")
+        
+        self.git_intel_widget = GitIntelWidget(self.api)
+        right_panel.addTab(self.git_intel_widget, "Git Intel")
+        
+        self.autoheal_widget = AutoHealWidget(self.api)
+        right_panel.addTab(self.autoheal_widget, "Auto-Heal")
+        
+        self.usage_widget = UsageWidget(self.api)
+        right_panel.addTab(self.usage_widget, "Usage")
+        
+        self.memory_widget = MemoryWidget(self.api)
+        right_panel.addTab(self.memory_widget, "Memory")
+        
+        self.runner_widget = RunnerWidget(self.api, self.pet_widget)
+        right_panel.addTab(self.runner_widget, "Runner")
+        
+        self.lsp_widget = LSPWidget(self.api)
+        right_panel.addTab(self.lsp_widget, "LSP")
         
         main_splitter.addWidget(right_panel)
         
