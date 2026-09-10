@@ -94,7 +94,13 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="TCIDE", version="1.0.0", lifespan=lifespan)
 
-# 静态文件
+# 静态文件 — 从 web/ 目录提供 Electron UI
+web_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "web")
+if os.path.isdir(web_dir):
+    app.mount("/assets", StaticFiles(directory=os.path.join(web_dir, "assets")), name="web-assets")
+    app.mount("/icons", StaticFiles(directory=os.path.join(web_dir, "icons")), name="web-icons")
+    app.mount("/resources", StaticFiles(directory=os.path.join(web_dir, "resources")), name="web-resources")
+
 static_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "static")
 if os.path.isdir(static_dir):
     app.mount("/static", StaticFiles(directory=static_dir), name="static")
@@ -104,7 +110,7 @@ if os.path.isdir(static_dir):
 
 @app.get("/")
 async def index():
-    html_path = os.path.join(static_dir, "index.html")
+    html_path = os.path.join(web_dir, "index.html")
     if os.path.exists(html_path):
         return FileResponse(html_path, media_type="text/html")
     return HTMLResponse("<h1>TCIDE</h1><p>index.html not found</p>")

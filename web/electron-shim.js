@@ -271,6 +271,26 @@
         }
       });
     }
+
+    // Add show/hide toggle for API key input
+    const apiKeyInput = document.getElementById('cfg-api-key');
+    if (apiKeyInput && !apiKeyInput.dataset._toggleAdded) {
+      apiKeyInput.dataset._toggleAdded = '1';
+      apiKeyInput.style.width = 'calc(100% - 36px)';
+      apiKeyInput.style.display = 'inline-block';
+      const toggleBtn = document.createElement('button');
+      toggleBtn.type = 'button';
+      toggleBtn.textContent = '👁';
+      toggleBtn.title = '显示/隐藏 API Key';
+      toggleBtn.style.cssText = 'width:28px;height:28px;border:1px solid var(--border-subtle);background:var(--bg-secondary);color:var(--text-secondary);border-radius:4px;cursor:pointer;font-size:14px;vertical-align:middle;margin-left:4px;flex-shrink:0;';
+      let visible = false;
+      toggleBtn.onclick = function() {
+        visible = !visible;
+        apiKeyInput.type = visible ? 'text' : 'password';
+        toggleBtn.textContent = visible ? '🔒' : '👁';
+      };
+      apiKeyInput.parentNode.insertBefore(toggleBtn, apiKeyInput.nextSibling);
+    }
   }
 
   // ── Patch: Inject xiaomi into provider base URL map in compiled JS ──

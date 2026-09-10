@@ -135,9 +135,8 @@ class TCIDEWindow(QMainWindow):
         self.web_view = QWebEngineView(self)
         self.web_view.setPage(page)
         
-        # Load the Electron HTML
-        index_path = os.path.join(WEB_DIR, "index.html")
-        self.web_view.setUrl(QUrl.fromLocalFile(index_path))
+        # Load the Electron UI from FastAPI server (avoids file:// CORS issues)
+        self.web_view.setUrl(QUrl(f"http://127.0.0.1:{API_PORT}/"))
         
         layout.addWidget(self.web_view)
         
