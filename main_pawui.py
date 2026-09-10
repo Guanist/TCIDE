@@ -9,20 +9,42 @@ import time
 import uvicorn
 
 # Ensure project root is on the path
-PROJECT_ROOT = os.path.dirname(os.path.abspath(__file__))
+if getattr(sys, 'frozen', False):
+    # Running as PyInstaller exe
+    PROJECT_ROOT = os.path.dirname(sys.executable)
+    # Also add _internal for bundled modules
+    internal_dir = os.path.join(os.path.dirname(sys.executable), '_internal')
+    if os.path.isdir(internal_dir):
+        sys.path.insert(0, internal_dir)
+else:
+    PROJECT_ROOT = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, PROJECT_ROOT)
 
 
 def start_server():
     """Run the FastAPI server in a background thread."""
     import traceback
+    log_file = r"C:\Users\noirh\tcide_server.log"
+    
+    # Fix: PyInstaller windowed mode has sys.stdout = None
+    if sys.stdout is None:
+        sys.stdout = open(os.devnull, 'w')
+    if sys.stderr is None:
+        sys.stderr = open(os.devnull, 'w')
+    
     try:
+        with open(log_file, "w") as f:
+            f.write("Server thread starting...\n")
+            f.flush()
         import server
-        print(f"[TCIDE] Server module loaded OK")
+        with open(log_file, "a") as f:
+            f.write(f"Server module loaded, app={type(server.app)}\n")
+            f.flush()
         uvicorn.run(server.app, host="127.0.0.1", port=18420, log_level="warning")
     except Exception as e:
-        print(f"[TCIDE] Server FAILED: {e}")
-        traceback.print_exc()
+        with open(log_file, "a") as f:
+            f.write(f"Server FAILED: {e}\n")
+            traceback.print_exc(file=f)
 
 
 def main():

@@ -16,7 +16,14 @@ from PySide6.QtWebEngineCore import QWebEnginePage, QWebEngineProfile, QWebEngin
 from PySide6.QtCore import QBuffer, QIODevice
 
 # ── Path setup ──
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+if getattr(sys, 'frozen', False):
+    BASE_DIR = os.path.dirname(sys.executable)
+    # In PyInstaller, bundled files are in _internal
+    _internal = os.path.join(BASE_DIR, '_internal')
+    if os.path.isdir(_internal):
+        BASE_DIR = _internal
+else:
+    BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 WEB_DIR = os.path.join(BASE_DIR, "web")
 PET_ASSETS_DIR = os.path.join(BASE_DIR, "pet_assets")
 ICON_PATH = os.path.join(BASE_DIR, "cat_icon.ico")
@@ -143,6 +150,12 @@ class TCIDEWindow(QMainWindow):
         # Inject project path after page loads
         self.web_view.loadFinished.connect(self._on_load_finished)
         
+        # Wait for server to be ready before loading page
+        self._server_check_timer = QTimer(self)
+        self._server_check_timer.timeout.connect(self._try_load_page)
+        self._server_check_timer.start(200)
+        self._load_attempted = False
+        
         # System tray
         self._setup_tray()
         
@@ -159,6 +172,22 @@ class TCIDEWindow(QMainWindow):
         js = f"window.__tcide_projectRoot = {json.dumps(project)};"
         self.web_view.page().runJavaScript(js)
         print(f"[TCIDE] Page loaded, project: {project}")
+    
+    def _try_load_page(self):
+        """Poll until server is ready, then load the page."""
+        if self._load_attempted:
+            return
+        import urllib.request
+        try:
+            urllib.request.urlopen(f"http://127.0.0.1:{API_PORT}/api/health", timeout=1)
+            # Server is ready
+            self._server_check_timer.stop()
+            self._load_attempted = True
+            self.web_view.setUrl(QUrl(f"http://127.0.0.1:{API_PORT}/"))
+            print(f"[TCIDE] Server ready, loading page")
+        except Exception:
+            # Server not ready yet, try again
+            pass
     
     def _setup_tray(self):
         if not QSystemTrayIcon.isSystemTrayAvailable():
