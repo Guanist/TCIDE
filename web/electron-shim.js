@@ -196,6 +196,12 @@
     // Gradle
     gradleExec: (task) => apiCall('POST', '/api/exec', {command: 'gradle ' + task}),
 
+    // Missing methods
+    completionGet: (lang, uri, line, char, pp) => apiCall('POST', '/api/lsp/completion/get', {language: lang, uri, line, character: char, project_path: pp || ''}),
+    execCommand: (cmd) => apiCall('POST', '/api/exec', {command: cmd}),
+    gitintelGenerateCommitMessage: (diff, pp) => apiCall('POST', '/api/gitintel/commit-message', {diff: diff || '', project_path: pp || ''}),
+    openTerminal: (cwd) => apiCall('POST', '/api/terminal/open', {cwd: cwd || ''}),
+
     // Lint
     lintFile: (p) => apiCall('GET', '/api/lint' + qp({path: p})),
 

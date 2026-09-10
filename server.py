@@ -568,7 +568,73 @@ async def lsp_references(request: Request):
 @app.post("/api/lsp/completion")
 async def lsp_completion(request: Request):
     body = await request.json()
-    return {"items": lsp.completion(body["language"], body["uri"], body["line"], body["character"], body.get("project_path", ""))}
+    try:
+        result = lsp.send_request(
+            body["language"],
+            "textDocument/completion",
+            {
+                "textDocument": {"uri": body.get("uri", "")},
+                "position": {"line": body.get("line", 0), "character": body.get("character", 0)}
+            },
+            body.get("project_path", "")
+        )
+        return {"items": result.get("result", {}).get("items", []) if result else []}
+    except Exception as e:
+        return {"items": [], "error": str(e)}
+
+
+@app.post("/api/lsp/completion/get")
+async def lsp_completion_get(request: Request):
+    body = await request.json()
+    try:
+        result = lsp.send_request(
+            body["language"],
+            "textDocument/completion",
+            {
+                "textDocument": {"uri": body.get("uri", "")},
+                "position": {"line": body.get("line", 0), "character": body.get("character", 0)}
+            },
+            body.get("project_path", "")
+        )
+        return {"items": result.get("result", {}).get("items", []) if result else []}
+    except Exception as e:
+        return {"items": [], "error": str(e)}
+
+
+@app.post("/api/gitintel/commit-message")
+async def gitintel_commit_message(request: Request):
+    body = await request.json()
+    try:
+        diff = body.get("diff", "")
+        # Generate a simple commit message from diff
+        if not diff:
+            # Try to get staged diff
+            try:
+                result = git_ops._run_git(["diff", "--cached"])
+                diff = result if isinstance(result, str) else str(result)
+            except Exception:
+                pass
+        if diff:
+            # Simple heuristic: first few changed files
+            lines = diff.split("\n")
+            files = [l.split("/")[-1] for l in lines if l.startswith("diff --git")]
+            if files:
+                msg = f"update: {', '.join(files[:3])}"
+            else:
+                msg = "chore: update"
+        else:
+            msg = "chore: update"
+        return {"message": msg}
+    except Exception as e:
+        return {"message": "chore: update", "error": str(e)}
+
+
+@app.post("/api/terminal/open")
+async def open_terminal(request: Request):
+    body = await request.json()
+    result = terminal.create_terminal(body.get("cwd", files._project_root or os.getcwd()))
+    return result
+
 
 
 # ── Memory ──
