@@ -18,11 +18,61 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from api import files, git_ops, terminal, ai, settings, lsp, mcp, memory, vector, snapshot, usage, debug
 
+# ── Advanced Features ──
+from advanced import (
+    LSPClient, MCPManager, SemanticCompleter, EntropyEvaluator,
+    ContextTrimmer, AutoHealManager, WarehouseAnalyzer, GitIntelligence,
+    SnapshotManager, UsageTracker, DebugManager, PrivacyNet,
+    ProjectCompatManager, SemanticChunker, PerfOptimizer,
+    ProjectMemory, VectorIndexer, UnattendedRunner
+)
+
+lsp_client = LSPClient()
+mcp_manager = MCPManager()
+semantic = SemanticCompleter()
+entropy_eval = EntropyEvaluator()
+trimmer = ContextTrimmer()
+autoheal = AutoHealManager()
+warehouse = WarehouseAnalyzer()
+git_intel = GitIntelligence()
+snapshot_mgr = SnapshotManager(os.path.join(os.path.dirname(os.path.abspath(__file__)), '.tcide', 'snapshots.db'))
+usage_tracker = UsageTracker(os.path.join(os.path.dirname(os.path.abspath(__file__)), '.tcide', 'usage.db'))
+debugger = DebugManager()
+privacy = PrivacyNet()
+compat = ProjectCompatManager()
+chunker = SemanticChunker()
+perf = PerfOptimizer()
+memory_mgr = ProjectMemory(os.path.join(os.path.dirname(os.path.abspath(__file__)), '.tcide', 'memory.db'))
+vector_idx = VectorIndexer()
+runner = UnattendedRunner()
+
 # ── 生命周期 ──
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     settings.init_settings("tcide")
+    # Auto-init with default project root (will be overridden by project/open)
+    _default_root = os.getcwd()
+    if not files._project_root:
+        files.set_project_root(_default_root)
+        git_ops.set_project_root(_default_root)
+        memory.init_memory(_default_root)
+        vector.init_index(_default_root)
+        snapshot.init_snapshots(_default_root)
+        usage.init_usage(_default_root)
+    # Auto-configure AI adapter from saved settings
+    try:
+        ai_cfg = settings.get_setting("ai", {})
+        if ai_cfg.get("apiKey"):
+            ai.configure({
+                "provider": ai_cfg.get("provider", "openai-compatible"),
+                "base_url": ai_cfg.get("baseUrl", ""),
+                "api_key": ai_cfg.get("apiKey", ""),
+                "model": ai_cfg.get("model", ""),
+            })
+            print(f"[TCIDE] AI configured: {ai_cfg.get('provider')}/{ai_cfg.get('model')}")
+    except Exception as e:
+        print(f"[TCIDE] AI config failed: {e}")
     print(f"[TCIDE] Server starting, project root: {files._project_root}")
     yield
     # 清理终端
@@ -31,13 +81,26 @@ async def lifespan(app: FastAPI):
     # 停止所有 LSP 服务器
     lsp.shutdown_all()
     # 断开所有 MCP 连接
-    mcp.disconnect_all()
+    try:
+        for s in mcp.get_servers().get("servers", []):
+            try:
+                mcp.disconnect_server(s.get("name"))
+            except Exception:
+                pass
+    except Exception:
+        pass
     print("[TCIDE] Server stopped")
 
 
 app = FastAPI(title="TCIDE", version="1.0.0", lifespan=lifespan)
 
-# 静态文件
+# 静态文件 — 从 web/ 目录提供 Electron UI
+web_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "web")
+if os.path.isdir(web_dir):
+    app.mount("/assets", StaticFiles(directory=os.path.join(web_dir, "assets")), name="web-assets")
+    app.mount("/icons", StaticFiles(directory=os.path.join(web_dir, "icons")), name="web-icons")
+    app.mount("/resources", StaticFiles(directory=os.path.join(web_dir, "resources")), name="web-resources")
+
 static_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "static")
 if os.path.isdir(static_dir):
     app.mount("/static", StaticFiles(directory=static_dir), name="static")
@@ -47,7 +110,7 @@ if os.path.isdir(static_dir):
 
 @app.get("/")
 async def index():
-    html_path = os.path.join(static_dir, "index.html")
+    html_path = os.path.join(web_dir, "index.html")
     if os.path.exists(html_path):
         return FileResponse(html_path, media_type="text/html")
     return HTMLResponse("<h1>TCIDE</h1><p>index.html not found</p>")
@@ -64,11 +127,10 @@ async def open_project(request: Request):
     files.set_project_root(path)
     git_ops.set_project_root(path)
     mcp.set_project_root(path)
-    memory.set_project_root(path)
-    vector.set_project_root(path)
-    snapshot.set_project_root(path)
-    usage.set_project_root(path)
-    debug.set_project_root(path)
+    memory.init_memory(path)
+    vector.init_index(path)
+    snapshot.init_snapshots(path)
+    usage.init_usage(path)
     settings.add_recent_project(path)
     return {"success": True, "path": path, "name": os.path.basename(path)}
 
@@ -76,6 +138,33 @@ async def open_project(request: Request):
 @app.get("/api/project/recent")
 async def recent_projects():
     return {"projects": settings.get_recent_projects()}
+
+
+@app.get("/api/project/rules")
+async def get_project_rules():
+    try:
+        rules_path = os.path.join(files._project_root, ".tcide", "rules.json") if files._project_root else ""
+        if rules_path and os.path.exists(rules_path):
+            with open(rules_path, "r", encoding="utf-8") as f:
+                return {"rules": json.load(f)}
+        return {"rules": ""}
+    except Exception as e:
+        return {"rules": "", "error": str(e)}
+
+
+@app.post("/api/project/rules")
+async def set_project_rules(request: Request):
+    body = await request.json()
+    try:
+        if files._project_root:
+            tcide_dir = os.path.join(files._project_root, ".tcide")
+            os.makedirs(tcide_dir, exist_ok=True)
+            rules_path = os.path.join(tcide_dir, "rules.json")
+            with open(rules_path, "w", encoding="utf-8") as f:
+                json.dump(body.get("rules", ""), f, ensure_ascii=False, indent=2)
+        return {"success": True}
+    except Exception as e:
+        return {"error": str(e)}
 
 
 # ── 文件操作 ──
@@ -90,26 +179,49 @@ async def read_file(path: str):
     return files.read_file(path)
 
 
+def _project_root_of(path: str) -> str:
+    """向上回溯到含 .git 或 .tcide 的目录作为项目根"""
+    d = os.path.dirname(path) if os.path.isfile(path) else path
+    cur = os.path.abspath(d)
+    while True:
+        if os.path.isdir(os.path.join(cur, ".git")) or os.path.isdir(os.path.join(cur, ".tcide")):
+            return cur
+        parent = os.path.dirname(cur)
+        if parent == cur:
+            return d
+        cur = parent
+
+
 @app.post("/api/files/write")
 async def write_file(request: Request):
     body = await request.json()
     result = files.write_file(body["path"], body["content"])
-    # 自动快照
+    # 自动快照（best-effort，失败不影响保存）
     if result.get("success"):
-        snapshot.create_snapshot(body["path"], body["content"])
+        try:
+            snapshot.save_snapshot(_project_root_of(body["path"]), "save", body["path"], body["content"])
+        except Exception:
+            pass
     return result
 
 
 @app.post("/api/files/delete")
 async def delete_file(request: Request):
     body = await request.json()
-    return files.delete_file(body["path"])
+    path = body.get("path", "")
+    if not path:
+        return {"error": "No path specified"}
+    return files.delete_file(path)
 
 
 @app.post("/api/files/rename")
 async def rename_file(request: Request):
     body = await request.json()
-    return files.rename_file(body["oldPath"], body["newPath"])
+    old_path = body.get("oldPath") or body.get("old_path", "")
+    new_path = body.get("newPath") or body.get("new_path", "")
+    if not old_path or not new_path:
+        return {"error": "Missing oldPath/newPath or old_path/new_path"}
+    return files.rename_file(old_path, new_path)
 
 
 @app.post("/api/files/mkdir")
@@ -262,12 +374,53 @@ async def ai_configure(request: Request):
     return ai.configure(body)
 
 
+@app.post("/api/ai/test")
+async def ai_test(request: Request):
+    """测试 AI 连接"""
+    body = await request.json()
+    try:
+        # 转换前端的 camelCase 为 snake_case
+        config = {
+            "provider": body.get("provider", "openai-compatible"),
+            "base_url": body.get("baseUrl", body.get("base_url", "")),
+            "api_key": body.get("apiKey", body.get("api_key", "")),
+            "model": body.get("model", ""),
+            "max_tokens": body.get("maxTokens", body.get("max_tokens", 4096)),
+            "temperature": body.get("temperature", 0.7),
+        }
+        # 先配置
+        ai.configure(config)
+        # 发送测试消息
+        adapter = ai.get_adapter()
+        if not adapter:
+            return {"success": False, "message": "LLM adapter not configured"}
+        from adapters.llm import Message
+        messages = [Message(role="user", content="Hi, reply with one word: OK")]
+        result = await adapter.chat(messages)
+        return {"success": True, "message": result[:100]}
+    except Exception as e:
+        return {"success": False, "message": str(e)}
+
+
 @app.post("/api/ai/chat")
 async def ai_chat(request: Request):
     body = await request.json()
     messages = body.get("messages", [])
     system_prompt = body.get("system_prompt", "")
-    return await ai.chat(messages, system_prompt)
+    try:
+        result = ""
+        async for chunk in ai.chat_stream(messages, system_prompt):
+            if isinstance(chunk, dict):
+                if "error" in chunk:
+                    return {"error": chunk["error"]}
+                delta = chunk.get("delta", "")
+                if delta:
+                    result += delta
+            elif isinstance(chunk, str):
+                result += chunk
+        return {"response": result}
+    except Exception as e:
+        return {"error": str(e)}
 
 
 @app.post("/api/ai/chat/stream")
@@ -326,7 +479,10 @@ async def ai_review(request: Request):
 
 @app.get("/api/mcp/servers")
 async def mcp_servers():
-    return {"servers": mcp.list_servers()}
+    try:
+        return mcp.get_servers()
+    except Exception as e:
+        return {"servers": [], "error": str(e)}
 
 
 @app.post("/api/mcp/connect")
@@ -368,7 +524,10 @@ async def lsp_stop(request: Request):
 
 @app.get("/api/lsp/servers")
 async def lsp_servers():
-    return {"servers": lsp.list_servers()}
+    try:
+        return lsp.get_status("", files._project_root)
+    except Exception as e:
+        return {"servers": [], "error": str(e)}
 
 
 @app.post("/api/lsp/didOpen")
@@ -409,44 +568,125 @@ async def lsp_references(request: Request):
 @app.post("/api/lsp/completion")
 async def lsp_completion(request: Request):
     body = await request.json()
-    return {"items": lsp.completion(body["language"], body["uri"], body["line"], body["character"], body.get("project_path", ""))}
+    try:
+        result = lsp.send_request(
+            body["language"],
+            "textDocument/completion",
+            {
+                "textDocument": {"uri": body.get("uri", "")},
+                "position": {"line": body.get("line", 0), "character": body.get("character", 0)}
+            },
+            body.get("project_path", "")
+        )
+        return {"items": result.get("result", {}).get("items", []) if result else []}
+    except Exception as e:
+        return {"items": [], "error": str(e)}
+
+
+@app.post("/api/lsp/completion/get")
+async def lsp_completion_get(request: Request):
+    body = await request.json()
+    try:
+        result = lsp.send_request(
+            body["language"],
+            "textDocument/completion",
+            {
+                "textDocument": {"uri": body.get("uri", "")},
+                "position": {"line": body.get("line", 0), "character": body.get("character", 0)}
+            },
+            body.get("project_path", "")
+        )
+        return {"items": result.get("result", {}).get("items", []) if result else []}
+    except Exception as e:
+        return {"items": [], "error": str(e)}
+
+
+@app.post("/api/gitintel/commit-message")
+async def gitintel_commit_message(request: Request):
+    body = await request.json()
+    try:
+        diff = body.get("diff", "")
+        # Generate a simple commit message from diff
+        if not diff:
+            # Try to get staged diff
+            try:
+                result = git_ops._run_git(["diff", "--cached"])
+                diff = result if isinstance(result, str) else str(result)
+            except Exception:
+                pass
+        if diff:
+            # Simple heuristic: first few changed files
+            lines = diff.split("\n")
+            files = [l.split("/")[-1] for l in lines if l.startswith("diff --git")]
+            if files:
+                msg = f"update: {', '.join(files[:3])}"
+            else:
+                msg = "chore: update"
+        else:
+            msg = "chore: update"
+        return {"message": msg}
+    except Exception as e:
+        return {"message": "chore: update", "error": str(e)}
+
+
+@app.post("/api/terminal/open")
+async def open_terminal(request: Request):
+    body = await request.json()
+    result = terminal.create_terminal(body.get("cwd", files._project_root or os.getcwd()))
+    return result
+
 
 
 # ── Memory ──
 
 @app.get("/api/memory/context")
 async def memory_context():
-    return {"context": memory.get_context()}
+    try:
+        return {"context": memory.get_injection()}
+    except Exception as e:
+        return {"context": "", "error": str(e)}
 
 
 @app.post("/api/memory/add")
 async def memory_add(request: Request):
     body = await request.json()
-    memory.add_message(body["role"], body["content"], body.get("metadata", {}))
+    try:
+        memory.record_pattern(
+            files._project_root,
+            body.get("content", ""),
+            body.get("content", ""),
+            body.get("metadata", {}).get("context", "")
+        )
+    except Exception:
+        pass
     return {"success": True}
 
 
 @app.post("/api/memory/clear")
 async def memory_clear():
-    memory.clear_context()
-    return {"success": True}
+    return {"success": True, "message": "Memory clear not implemented"}
 
 
 @app.get("/api/memory/summary")
 async def memory_summary():
-    return {"summary": memory.get_summary()}
+    try:
+        return memory.get_injection(files._project_root)
+    except Exception as e:
+        return {"summary": "", "error": str(e)}
 
 
 @app.get("/api/memory/export")
 async def memory_export():
-    return {"data": memory.export_context()}
+    try:
+        return memory.get_injection(files._project_root)
+    except Exception as e:
+        return {"data": {}, "error": str(e)}
 
 
 @app.post("/api/memory/import")
 async def memory_import(request: Request):
     body = await request.json()
-    memory.import_context(body["data"])
-    return {"success": True}
+    return {"success": True, "message": "Memory import not implemented"}
 
 
 # ── Vector ──
@@ -512,17 +752,26 @@ async def snapshot_clear(path: str = ""):
 
 @app.get("/api/usage/stats")
 async def usage_stats():
-    return usage.get_stats()
+    try:
+        return usage.get_today()
+    except Exception as e:
+        return {"error": str(e)}
 
 
 @app.get("/api/usage/history")
 async def usage_history(days: int = 7):
-    return {"history": usage.get_history(days)}
+    try:
+        return {"history": usage.get_by_date(days)}
+    except Exception as e:
+        return {"history": [], "error": str(e)}
 
 
 @app.get("/api/usage/cost")
 async def usage_cost():
-    return {"cost": usage.estimate_cost()}
+    try:
+        return usage.get_total()
+    except Exception as e:
+        return {"error": str(e)}
 
 
 @app.post("/api/usage/track")
@@ -542,12 +791,18 @@ async def usage_reset():
 
 @app.get("/api/debug/info")
 async def debug_info():
-    return debug.get_debug_info()
+    try:
+        return debug.get_state()
+    except Exception as e:
+        return {"error": str(e)}
 
 
 @app.get("/api/debug/logs")
 async def debug_logs(count: int = 100):
-    return {"logs": debug.get_logs(count)}
+    try:
+        return {"logs": debug.get_call_stack()}
+    except Exception as e:
+        return {"logs": [], "error": str(e)}
 
 
 @app.post("/api/debug/breakpoint")
@@ -591,6 +846,21 @@ async def set_settings(request: Request):
 @app.get("/api/settings/ai")
 async def get_ai_settings():
     return settings.get_setting("ai", {})
+
+# ── Model registry ──
+MODELS = [
+    {"id": "deepseek-chat", "name": "DeepSeek Chat", "provider": "deepseek", "context": 64000, "maxTokens": 8192, "cost": "¥1/百万token"},
+    {"id": "deepseek-reasoner", "name": "DeepSeek Reasoner", "provider": "deepseek", "context": 64000, "maxTokens": 8192, "cost": "¥4/百万token", "reasoning": True},
+    {"id": "deepseek-v4-pro", "name": "DeepSeek V4 Pro", "provider": "deepseek", "context": 128000, "maxTokens": 16384, "cost": "¥2/百万token"},
+    {"id": "MiMo-7B-RL", "name": "Xiaomi MiMo 7B RL", "provider": "xiaomi", "context": 32000, "maxTokens": 4096, "cost": "免费/开源", "reasoning": True},
+    {"id": "MiMo-7B-SFT", "name": "Xiaomi MiMo 7B SFT", "provider": "xiaomi", "context": 32000, "maxTokens": 4096, "cost": "免费/开源"},
+    {"id": "MiMo-7B-Base", "name": "Xiaomi MiMo 7B Base", "provider": "xiaomi", "context": 32000, "maxTokens": 4096, "cost": "免费/开源"},
+]
+
+@app.get("/api/settings/models")
+async def list_models():
+    return MODELS
+
 
 
 @app.post("/api/settings/ai")
@@ -650,3 +920,77 @@ async def terminal_ws(websocket: WebSocket, terminal_id: str):
             await websocket.close()
         except Exception:
             pass
+
+
+# ═══════════════════════════════════════════
+# New Advanced Endpoints (non-conflicting)
+# ═══════════════════════════════════════════
+
+@app.get("/api/entropy/evaluate")
+async def entropy_evaluate(file_path: str):
+    try:
+        with open(file_path, 'r', encoding='utf-8', errors='replace') as f:
+            return entropy_eval.evaluate(file_path, f.read())
+    except Exception as e:
+        return {"error": str(e)}
+
+@app.get("/api/entropy/project")
+async def entropy_project(project_root: str):
+    return entropy_eval.evaluate_project(project_root)
+
+@app.get("/api/autoheal/diagnose")
+async def autoheal_diagnose(error: str):
+    return autoheal.diagnose(error)
+
+@app.get("/api/autoheal/stats")
+async def autoheal_stats():
+    return autoheal.get_stats()
+
+@app.get("/api/warehouse/analyze")
+async def warehouse_analyze(project_root: str):
+    return warehouse.analyze(project_root)
+
+@app.get("/api/git/intelligence")
+async def git_intelligence(project_root: str):
+    return git_intel.analyze(project_root)
+
+@app.get("/api/compat/detect")
+async def compat_detect(project_root: str):
+    return compat.detect(project_root)
+
+@app.get("/api/chunker/chunk")
+async def chunker_chunk(file_path: str):
+    try:
+        with open(file_path, 'r', encoding='utf-8', errors='replace') as f:
+            return chunker.chunk_file(f.read(), file_path)
+    except Exception as e:
+        return {"error": str(e)}
+
+@app.get("/api/perf/slow")
+async def perf_slow(threshold_ms: float = 1000):
+    return perf.slow_operations(threshold_ms)
+
+@app.get("/api/privacy/rules")
+async def privacy_rules():
+    return privacy.list_rules()
+
+@app.post("/api/privacy/block")
+async def privacy_block(pattern: str):
+    privacy.add_block(pattern)
+    return {"status": "blocked", "pattern": pattern}
+
+@app.get("/api/perf/stats")
+async def perf_stats(operation: str = None):
+    return perf.stats(operation)
+
+@app.post("/api/runner/run")
+async def runner_run(task: str, max_retries: int = 3):
+    return runner.run_task(task, max_retries=max_retries)
+
+@app.post("/api/runner/abort")
+async def runner_abort():
+    return runner.abort()
+
+@app.get("/api/runner/status")
+async def runner_status():
+    return runner.get_status()

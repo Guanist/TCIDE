@@ -26,13 +26,15 @@ def _run_git(args: list, timeout: int = 30) -> dict:
 
 def git_status() -> dict:
     """获取工作区状态"""
+    if not _project_root:
+        return {"success": True, "files": [], "branch": "unknown", "message": "No project open"}
     r = _run_git(["status", "--porcelain"])
     if not r["success"]:
         return r
     files = []
     for line in r["stdout"].split("\n"):
         if len(line) >= 3:
-            files.append({"status": line[:2].strip(), "path": line[3:].strip()})
+            files.append({"status": line[:2].strip(), "path": line[2:].lstrip()})
     return {"success": True, "files": files}
 
 def git_diff(path: str = None) -> dict:
@@ -125,7 +127,7 @@ def git_smart_commit(message: str = None) -> dict:
     for line in status["stdout"].split("\n"):
         if len(line) >= 3:
             s = line[:2].strip()
-            f = line[3:].strip()
+            f = line[2:].lstrip()
             if s in ("A", "??"):
                 added.append(f)
             elif s == "D":

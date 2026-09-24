@@ -1,0 +1,375 @@
+<!--
+  TCIDE · pawui 0.1.1 + rich 前端
+  原生 PySide6 窗口(pawui)做 IDE 外壳；rich 渲染终端/AI/Git 富文本；
+  TextArea 做内联文件编辑并写回；Scroll 让各面板可滚动；
+  invoke_async 把 AI/命令放到后台线程，避免卡 UI。
+  后端 = 同仓库 FastAPI 服务(main.py 启动)。
+-->
+<Window title="TCIDE · pawui + rich" theme="dark" width="1200" height="800">
+  <Row>
+    <Text color="subtext">项目: {$project}</Text>
+    <Text color="subtext">分支: {$branch}</Text>
+  </Row>
+  <Divider/>
+
+  <Row expand>
+    <!-- 左侧：文件浏览器（可滚动） -->
+    <Column>
+      <!-- 像素宠物虎猫 -->
+      <Text color="accent">🐱 虎猫宠物</Text>
+      <Web html="{$pet_frame}" height="70"/>
+      <Text color="subtext">{$pet_status_label}</Text>
+      <Divider/>
+      <Row>
+        <Input placeholder="项目路径，回车打开" on_enter="open_target_enter" bind="open_target" value="{$open_target}"/>
+        <Button on_click="open_project_btn">打开</Button>
+      </Row>
+      <Row>
+        <Text color="subtext">{$dir}</Text>
+        <Button on_click="up_dir">上级</Button>
+      </Row>
+      <Scroll expand>
+        <For each="item" in="{$items}">
+          <Input value="{$item.name}" on_enter="row_activate"/>
+        </For>
+      </Scroll>
+    </Column>
+
+    <!-- 右侧：功能面板 -->
+    <Column expand>
+      <Tabs expand>
+        <Tab label="终端">
+          <Input placeholder="命令，回车执行" on_enter="run_cmd" bind="cmd" value="{$cmd}"/>
+          <Scroll expand>
+            <Web html="{$term_html}" expand/>
+          </Scroll>
+        </Tab>
+        <Tab label="AI 助手">
+          <Input placeholder="消息，回车发送" on_enter="send_ai" bind="ai_input" value="{$ai_input}"/>
+          <Scroll expand>
+            <Web html="{$ai_html}" expand/>
+          </Scroll>
+        </Tab>
+        <Tab label="Git">
+          <Scroll expand>
+            <Web html="{$git_html}" expand/>
+          </Scroll>
+          <TextArea placeholder="提交信息（多行）" bind="commit_msg" value="{$commit_msg}" height="80"/>
+          <Row>
+            <Button on_click="git_refresh">刷新状态</Button>
+            <Button on_click="git_commit">提交</Button>
+          </Row>
+        </Tab>
+        <Tab label="编辑器">
+          <Text color="subtext">{$preview_name}</Text>
+          <TextArea bind="preview_text" value="{$preview_text}" height="2000"/>
+          <Row>
+            <Button on_click="save_file">保存</Button>
+            <Button on_click="open_external">外部编辑器打开</Button>
+          </Row>
+        </Tab>
+        <Tab label="设置">
+          <Text>AI 配置</Text>
+          <Input placeholder="Provider" bind="ai_provider" value="{$ai_provider}"/>
+          <Input placeholder="Base URL" bind="ai_baseurl" value="{$ai_baseurl}"/>
+          <Input placeholder="API Key" bind="ai_apikey" show="true" value="{$ai_apikey}"/>
+          <Input placeholder="Model" bind="ai_model" value="{$ai_model}"/>
+          <Button on_click="save_settings">保存设置</Button>
+        </Tab>
+        <Tab label="自动编程">
+          <Text color="subtext">双 Agent 自动编程：Builder 规划 → Coder 编码 → 验证 → 审查 → 提交</Text>
+          <Input placeholder="描述任务，例如：给终端加一个清空按钮" on_enter="run_auto_task_enter" bind="auto_task" value="{$auto_task}"/>
+          <Row>
+            <Button on_click="run_auto_task">运行</Button>
+            <Button on_click="auto_clear">清空日志</Button>
+          </Row>
+          <Scroll expand>
+            <Web html="{$auto_log}" expand/>
+          </Scroll>
+        </Tab>
+      </Tabs>
+    </Column>
+  </Row>
+</Window>
+
+<script>
+import sys as _sys, os as _os, os
+for _c in [_os.getcwd(), _os.path.join(_os.getcwd(), '_internal')]:
+    _sys.path.insert(0, _c)
+import html
+import time
+import tcide_client
+import richweb
+richweb.install()
+from PySide6.QtCore import QTimer
+
+URL = os.environ.get("TCIDE_URL", "http://127.0.0.1:18420")
+client = tcide_client.TCIDEClient(URL)
+
+# ── 像素宠物虎猫 ──
+PET_FRAMES = {
+    "idle":       ("  /\\_/\\  \n ( -.- )  Zzz\n  > ^ <  ", "😴 待命中"),
+    "building":   ("  /\\_/\\  \n ( o.o )  💡\n  > ^ <  ", "💡 规划中"),
+    "coding":     ("  /\\_/\\  \n ( O.O )  ⌨️\n  > ^ <  ", "⌨️ 编码中"),
+    "verifying":  ("  /\\_/\\  \n ( O.O )  🔍\n  > ^ <  ", "🔍 验证中"),
+    "reviewing":  ("  /\\_/\\  \n ( -.- )  📝\n  > ^ <  ", "📝 审查中"),
+    "committing": ("  /\\_/\\  \n ( o.o )  💾\n  > ^ <  ", "💾 提交中"),
+    "done":       ("  /\\_/\\  \n ( ^_^ )  ✨\n  > ^ <  ", "✨ 完成"),
+    "error":      ("  /\\_/\\  \n ( ;_; )  💔\n  > ^ <  ", "💔 出错"),
+}
+
+# ── 初始状态 ──
+state.project = "(未打开项目)"
+state.branch = ""
+state.dir = ""
+state.items = []
+state.open_target = ""
+state.preview_name = ""
+state.preview_path = ""
+state.preview_text = ""
+state.term_html = "<pre>TCIDE 终端就绪。输入命令后回车执行。</pre>"
+state.ai_html = "<pre>AI 助手就绪。输入消息后回车发送。</pre>"
+state.git_html = "<pre>点击「刷新状态」加载 Git 信息。</pre>"
+state.ai_messages = []
+state.ai_provider = ""
+state.ai_baseurl = ""
+state.ai_apikey = ""
+state.ai_model = ""
+state.cmd = ""
+state.ai_input = ""
+state.commit_msg = ""
+state.last_cmd = ""
+
+# 像素宠物 + 自动编程
+state.auto_task = ""
+state.auto_running = False
+state.auto_lines = []
+state.auto_log = "<pre>🐱 虎猫待命中。输入任务并点击「运行」，它会自动规划、编码、验证并提交。</pre>"
+state.pet_status = "idle"
+_pf, _pl = PET_FRAMES["idle"]
+state.pet_frame = "<pre>" + html.escape(_pf) + "</pre>"
+state.pet_status_label = html.escape(_pl)
+
+# ── 辅助 ──
+def _do_open(path):
+    r = client.open_project(path)
+    if r.get("success"):
+        state.project = r.get("name", "?")
+        state.dir = path
+        client.project_dir = path
+        _load_dir(path)
+        state.branch = client.branch()
+    else:
+        state.term_html = "<pre>打开失败: " + str(r.get("error", "")) + "</pre>"
+
+def _load_dir(path):
+    try:
+        state.items = client.list_dir(path) or []
+    except Exception as e:
+        state.items = []
+        state.term_html = "<pre>列目录失败: " + str(e) + "</pre>"
+
+def _startup():
+    proj = os.environ.get("TCIDE_PROJECT", "")
+    try:
+        if proj:
+            _do_open(proj)
+        s = client.get_settings()
+        ai = (s or {}).get("ai", {}) or {}
+        state.ai_provider = ai.get("provider", "")
+        state.ai_baseurl = ai.get("baseUrl", "")
+        state.ai_apikey = ai.get("apiKey", "")
+        state.ai_model = ai.get("model", "")
+    except Exception as e:
+        state.term_html = "<pre>连接后端失败: " + str(e) + "</pre>"
+
+# ── 事件 ──
+def open_target_enter(name):
+    name = (name or "").strip()
+    if name:
+        _do_open(name)
+
+def open_project_btn():
+    p = (state.open_target or "").strip()
+    if p:
+        _do_open(p)
+
+def up_dir():
+    if not state.dir:
+        return
+    parent = os.path.dirname(state.dir)
+    state.dir = parent
+    _load_dir(parent)
+
+def row_activate(name):
+    name = (name or "").strip()
+    if not name:
+        return
+    item = next((i for i in state.items if i.get("name") == name), None)
+    if item:
+        target = item
+    else:
+        cand = os.path.join(state.dir or "", name)
+        if os.path.isdir(cand):
+            target = {"name": name, "path": cand, "type": "directory"}
+        elif os.path.isfile(cand):
+            target = {"name": name, "path": cand, "type": "file"}
+        else:
+            return
+    if target.get("type") == "directory":
+        state.dir = target["path"]
+        _load_dir(target["path"])
+    else:
+        try:
+            content = client.read_file(target["path"]).get("content", "")
+        except Exception as e:
+            content = "读取失败: " + str(e)
+        state.preview_name = target["name"]
+        state.preview_path = target["path"]
+        state.preview_text = content
+
+def open_external():
+    p = state.preview_path
+    if p:
+        try:
+            os.startfile(p)
+        except Exception as e:
+            state.term_html = "<pre>打开失败: " + str(e) + "</pre>"
+
+def save_file():
+    p = state.preview_path
+    if not p:
+        return
+    r = client.write_file(p, state.preview_text)
+    if r.get("success"):
+        state.git_html = client.render_git(client.git_status())
+    else:
+        state.term_html = "<pre>保存失败: " + str(r.get("error", "")) + "</pre>"
+
+# 终端：后台执行，避免卡 UI
+def _exec_done(res, err):
+    cmd = state.last_cmd
+    if err is not None:
+        res = {"stdout": "", "stderr": str(err), "exitCode": -1}
+    state.term_html = client.render_terminal(cmd, res)
+    state.cmd = ""
+
+def run_cmd(cmd):
+    cmd = (cmd or "").strip()
+    if not cmd:
+        return
+    state.last_cmd = cmd
+    state.term_html = "<pre>$ " + cmd + "\n(执行中…)</pre>"
+    state.cmd = ""
+    app.invoke_async(client.exec, cmd, state.dir or ".", done=_exec_done)
+
+# AI：后台调用，避免卡 UI
+def _ai_done(reply, err):
+    msgs = list(state.ai_messages)
+    if err is not None:
+        reply = "[AI 调用失败: " + str(err) + "]"
+    msgs.append({"role": "assistant", "content": str(reply)})
+    state.ai_messages = msgs
+    state.ai_html = client.render_ai(msgs)
+    state.ai_input = ""
+
+def send_ai(text):
+    text = (text or "").strip()
+    if not text:
+        return
+    msgs = list(state.ai_messages)
+    msgs.append({"role": "user", "content": text})
+    state.ai_messages = msgs
+    state.ai_html = client.render_ai(msgs)
+    state.ai_input = ""
+    app.invoke_async(client.ai_chat, msgs, done=_ai_done)
+
+def git_refresh():
+    try:
+        state.git_html = client.render_git(client.git_status())
+    except Exception as e:
+        state.git_html = "<pre>刷新失败: " + str(e) + "</pre>"
+
+def git_commit():
+    msg = (state.commit_msg or "").strip()
+    if not msg:
+        return
+    try:
+        client.git_commit(msg)
+        state.git_html = client.render_git(client.git_status())
+    except Exception as e:
+        state.git_html = "<pre>提交失败: " + str(e) + "</pre>"
+    state.commit_msg = ""
+
+def save_settings():
+    client.save_settings(state.ai_provider, state.ai_baseurl, state.ai_apikey, state.ai_model)
+    client.ai_configure(state.ai_provider, state.ai_baseurl, state.ai_apikey, state.ai_model)
+    pet_update("idle", "⚙️ AI 配置已保存并激活")
+
+# ── 像素宠物 / 双 Agent 自动编程 ──
+_timer = [None]
+_watch = [False]
+
+def _safe_refresh():
+    return
+
+def _ensure_watch():
+    if not _watch[0]:
+        t = QTimer()
+        t.setInterval(500)
+        t.timeout.connect(lambda: _safe_refresh())
+        t.start()
+        _timer[0] = t
+        _watch[0] = True
+
+def pet_update(phase, msg):
+    frame, label = PET_FRAMES.get(phase, PET_FRAMES["idle"])
+    state.pet_status = phase
+    state.pet_frame = "<pre>" + html.escape(frame) + "</pre>"
+    state.pet_status_label = html.escape(label)
+    lines = list(state.auto_lines)
+    lines.append(msg)
+    state.auto_lines = lines
+    state.auto_log = "<pre>" + html.escape("\n".join(lines)) + "</pre>"
+
+def auto_clear():
+    state.auto_lines = []
+    state.auto_log = ""
+    pet_update("idle", "🐱 日志已清空")
+
+def _auto_done(res, err):
+    state.auto_running = False
+    if _timer[0] is not None:
+        _timer[0].stop()
+        _timer[0] = None
+    _watch[0] = False
+    if err is not None:
+        pet_update("error", "❌ 异常: " + str(err))
+    elif res and res.get("success"):
+        pet_update("done", "🎉 完成！改动已提交。")
+    else:
+        pet_update("error", "⚠️ 未完全成功: " + str((res or {}).get("error", "")))
+
+def run_auto_task():
+    t = (state.auto_task or "").strip()
+    if not t:
+        pet_update("idle", "⚠️ 先输入要让虎猫做的任务，再点运行。")
+        return
+    if state.auto_running:
+        pet_update("idle", "⏳ 上一个自动编程任务还在跑…")
+        return
+    _ensure_watch()
+    state.auto_running = True
+    state.auto_lines = []
+    state.auto_log = ""
+    pet_update("building", "🐱 虎猫开始自动编程： " + t)
+    def _worker():
+        return client.run_auto_task(t, progress=pet_update)
+    app.invoke_async(_worker, done=_auto_done)
+
+def run_auto_task_enter(name):
+    state.auto_task = (name or "").strip()
+    run_auto_task()
+
+_startup()
+</script>
