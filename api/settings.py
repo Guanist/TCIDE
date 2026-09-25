@@ -19,7 +19,7 @@ DEFAULT_SETTINGS = {
         "provider": "deepseek",
         "baseUrl": "https://api.deepseek.com/v1",
         "apiKey": "",
-        "model": "deepseek-chat",
+        "model": "deepseek-flash",
         "maxTokens": 4096,
         "temperature": 0.7,
     },
