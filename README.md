@@ -14,6 +14,7 @@
 
 - `main` 是主要开发分支，包含完整 Electron 桌面 IDE
 - `tcide-py` 是 Python 重写版，独立仓库内容，通过 `git checkout tcide-py` 切换
+- **PawUI 重写版**（独立仓库）：[Guanist/tcide-pawui](https://github.com/Guanist/tcide-pawui) — 用 [PawUI](https://github.com/LK-BLOG/PawUI) 声明式 Python UI 重写，990 条离线测试
 
 ## 核心差异
 
