@@ -65,7 +65,7 @@
 
 | 原版缺口 | 本仓库现状 |
 |---|---|
-| 0 测试 | ✅ **213 条**（本次从 62 涨到 199，再加 14 条权限测试；本地 212 passed + 1 skipped） |
+| 0 测试 | ✅ **294 条**（62 → 199 → 213 → 294；本地 293 passed + 1 skipped，106 秒） |
 | 无 CI | ✅ **已修**：新增 `.github/workflows/tests.yml`（push/PR 自动跑测试）。**已实证**：运行 [38373327750](https://github.com/Guanist/TCIDE/actions/runs/38373327750) → `success`，日志里 `212 passed, 1 skipped in 4.94s`（与本地结果一致，**不是空跑**）。刻意不装 `pywebview`（Linux 需 GTK 系统库，而测试完全不依赖 Qt） |
 | 无 LICENSE 文件 | ✅ **已修**：`LICENSE` = LGPL-3.0 标准全文；45 个源文件 SPXD 头统一 `LGPL-3.0-only`；有 6 条许可证门禁测试 |
 | `dist/` 提交占仓库 60% | ✅ 不适用/已避免：Python 版仓库树里没有 `dist/`（PawUI 版有，那是另一仓库的事） |
@@ -90,7 +90,7 @@
 |---|---|---|---|
 | ~~1~~ | ~~`permissions.py` 在本仓库未接线~~ | ✅ **已修**：钩子加在 `tcide_core/tools.py` 的 `call()`（所有工具调用的唯一咽喉），两个 `ToolRegistry` 构造点都注入 `policy=current_policy()`。因为注册表**每次请求新建**，所以档位一改**下次请求即生效**。`current_policy()` 读设置，**读不到就退回 `ask`**（保守方向：宁可多问一次，不默认放行）。新增 14 条测试，其中决定性那条断言"**只读档下写文件返回失败，且文件确实没被写出来**" | — |
 | 2 | `tcide_core/term.py` 未移植 | 它直接依赖 Qt/PawUI（移植脚本按规则跳过）。Python 版有自己的 `api/terminal.py` | 低 |
-| 3 | 3 个移植测试被移除 | `test_theme.py`（读 PawUI 的 `app.paw`）、`test_panels.py`（依赖 PawUI 夹具）、`test_gitintel.py`（同上）。**模块保留**，只是测试与 PawUI 应用层耦合 | 低：这些模块在本仓库暂无测试 |
+| ~~3~~ | ~~3 个移植测试被移除~~ | ✅ **已查清并救回 2 个**：它们的失效**不是**"测 PawUI 应用层"，而是本仓库**没有 `tests/conftest.py`**（夹具在那边）。补上 conftest（从 tcide-pawui 搬运、剔除 Qt 夹具 `qapp`/`shell`）后，`test_gitintel.py` + `test_panels.py` 直接可用 → **用例 213 → 294（+81）**。顺带引入两个踩坑得来的工具：`pytest_configure`（uuid 每次换全新临时根，治 Windows ACL 残留）与 `force_rmtree`（显式改权限再删，避免静默吞错）。剩下的 `test_theme.py` 确实依赖 PawUI 的 `app.paw`，**不移植**（模块 `theme.py` 保留） | 低 |
 | 4 | DAP 集成测试改为开关 | `TCIDE_DAP_TESTS=1` 才跑。默认跳过是因为它与临时目录清理有竞态（会偶发红）。**不是**功能缺失 —— 设开关后 2 条全过 | 低 |
 | ~~5~~ | ~~web 前端的 Diff 审核 UI~~ | ✅ **查证为已具备**：`web/assets/p2-modules.js` 引用 `window.acceptDiff` / `window.closeDiffModal` 并操作 `#diff-modal`（实现于主 bundle），前端有 `getDiff → GET /api/git/diff` | — |
 | ~~6~~ | ~~CI 是否真的在跑~~ | ✅ **已修并实证**：新增工作流，运行 38373327750 `success`，日志 `212 passed, 1 skipped in 4.94s` | — |
@@ -101,7 +101,7 @@
   `tcide_core/`（导入前缀改写、不覆盖本仓库自己的 `__init__.py`、**不带**依赖 Qt 的部分）
 - 连**配套测试**一起搬，并逐个文件验证自洽：保留 6 个（137 条），移除 3 个与 PawUI
   应用层耦合的
-- `tcide_core` 模块数 **18 → 34**；用例数 **62 → 199**
+- `tcide_core` 模块数 **18 → 34**；用例数 **62 → 199 → 294**（补 conftest 后救回 81 条）
 - `gitintel` / `completion` / `autoheal` / `perf` / `debug` / `snippets` / `tabs` /
   `panels` / `cli` / `pet` / `plans` / `trace` / `changes` / `theme` / `settings` /
   `permissions` 现在都可被 Python 版直接复用
