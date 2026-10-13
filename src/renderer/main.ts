@@ -4909,7 +4909,9 @@ function setupEventListeners(): void {
         + (info.allows_shell ? '；允许执行命令' : '；不允许执行命令');
       chip.setAttribute('aria-label', chip.textContent);
     } catch {
-      chip.textContent = '权限：未知';
+      // 拉不到就**保持中性**，不要猜一个档位 —— 猜错的可访问状态比"未知"更糟。
+      chip.textContent = '权限档';
+      chip.removeAttribute('data-level');
     }
   }
   document.getElementById('btn-permission')?.addEventListener('click', async () => {

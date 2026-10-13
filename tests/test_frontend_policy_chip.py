@@ -103,3 +103,25 @@ class TestVisualHierarchyFollowsThePrinciple:
         text = css()
         block = re.search(r'\.ai-chip\[data-level="read_only"\]\s*\{([^}]*)\}', text)
         assert block and "dashed" in block.group(1)
+
+
+class TestPlaceholderDoesNotClaimALevel:
+    """回归：静态 HTML 里不许写死某个具体档位。
+
+    教训：我一开始把初始文案写成「权限：读取」，而真实值是 ask（逐次确认）。
+    页面加载后 JS 会覆盖它，但任何在 fetch 返回前看到界面的人（包括无头截图、
+    读屏、慢网络下的用户）看到的都是一句**没根据的断言** —— 状态是用来做判断的，
+    不能先给个假值。所以静态文案必须是中性的，真实值等接口返回再写。
+    """
+
+    def test_static_text_claims_no_specific_level(self):
+        text = html()
+        for claim in ("权限：读取", "权限：逐次确认", "权限：自动", "权限：未知"):
+            assert claim not in text, f"静态文案里写死了档位：{claim}"
+
+    def test_chip_has_a_neutral_default_label(self):
+        tag = re.search(r'<button[^>]*id="btn-permission"[^>]*>([^<]*)<', html())
+        assert tag, "找不到 chip 的初始文案"
+        assert "权限" in tag.group(1)
+        assert not any(level in tag.group(1) for level in ("读取", "确认", "自动")), \
+            f"初始文案不该是具体档位：{tag.group(1)!r}"
