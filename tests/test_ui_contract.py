@@ -231,3 +231,154 @@ class TestGitContract:
             assert "error" in body
         # 还原项目根，别影响别的用例
         client.post("/api/project/open", params={"path": str(ROOT)})
+
+
+# ── 无人值守执行：必须**真的**执行（原实现是"演戏"）─────────────────────
+
+@pytest.fixture
+def temp_project(client):
+    """把项目根临时切到一个空目录，用完还原（避免测试往真实仓库里写文件）。"""
+    import tempfile
+
+    with tempfile.TemporaryDirectory() as tmp:
+        client.post("/api/project/open", params={"path": tmp})
+        client.post("/api/runner/init", params={"project": tmp})
+        yield tmp
+    client.post("/api/project/open", params={"path": str(ROOT)})
+    client.post("/api/runner/init", params={"project": str(ROOT)})
+
+
+class TestRunnerContract:
+    def test_execute_really_runs_the_command(self, client, temp_project):
+        """关键回归：``advanced.UnattendedRunner.run_task`` 只是塞几条 "running"
+        然后返回 "completed"，**什么都没执行**。这里必须看到命令的真实输出。
+        """
+        response = client.post("/api/runner/execute", json={
+            "steps": [{"name": "probe", "command": "echo batch-runner-marker-42"}]})
+        assert response.status_code == 200, response.text
+        body = response.json()
+        assert body.get("success") is True, body
+        blob = str(body.get("report")) + str(body.get("summary"))
+        assert "batch-runner-marker-42" in blob, f"没有真实输出：{body}"
+
+    def test_execute_reports_a_failing_command(self, client, temp_project):
+        """失败的命令必须让整体为失败，而不是无条件 completed。"""
+        response = client.post("/api/runner/execute", json={
+            "steps": [{"name": "bad", "command": "exit 3"}]})
+        body = response.json()
+        assert body.get("success") is False, body
+
+    def test_execute_without_task_or_steps_is_reported(self, client, temp_project):
+        assert "error" in client.post("/api/runner/execute", json={}).json()
+
+
+# ── 双 Agent 编排 ────────────────────────────────────────────────────────
+
+class TestOrchestratorContract:
+    def test_init_reports_whether_a_model_is_configured(self, client):
+        body = client.post("/api/orchestrator/init",
+                           params={"project": str(ROOT)}).json()
+        assert body["success"] is True
+        assert "model_ready" in body
+        if not body["model_ready"]:
+            assert body["hint"], "没配模型时必须给出可操作的提示"
+
+    def test_run_without_model_is_honest(self, client):
+        """没配模型时**不能**返回成功 —— 那等于假装跑过。"""
+        body = client.post("/api/orchestrator/run",
+                           json={"task": "加一个 hello 函数"}).json()
+        if body.get("status") == "unconfigured":
+            assert body["success"] is False
+            assert body["hint"]
+        else:                      # 配了模型（CI/本机有 key）时才可能真跑
+            assert "report" in body or "error" in body
+
+    def test_run_without_task_is_reported(self, client):
+        assert "error" in client.post("/api/orchestrator/run", json={}).json()
+
+
+# ── 任务会话与中止 ───────────────────────────────────────────────────────
+
+class TestAiSessionContract:
+    def test_task_session_has_the_expected_shape(self, client):
+        body = client.get("/api/ai/task-session").json()
+        for key in ("status", "task", "report", "events", "runner"):
+            assert key in body, f"缺少字段 {key}"
+
+    def test_abort_is_safe_when_nothing_is_running(self, client):
+        body = client.post("/api/ai/abort").json()
+        assert body["success"] is True
+        assert isinstance(body["aborted"], list)
+
+
+# ── 会话保存 / 恢复 ──────────────────────────────────────────────────────
+
+class TestSessionContract:
+    def test_save_then_restore_roundtrip(self, client, temp_project):
+        saved = client.post("/api/session/save", json={
+            "id": "unit-test", "active": "main.py",
+            "files": ["main.py", "server.py"]}).json()
+        assert saved["success"] is True, saved
+        restored = client.post("/api/session/restore",
+                               params={"id": "unit-test"}).json()
+        assert restored["success"] is True
+        assert restored["session"]["active"] == "main.py"
+        assert restored["session"]["files"] == ["main.py", "server.py"]
+
+    def test_restore_without_any_session_is_reported(self, client, temp_project):
+        body = client.post("/api/session/restore").json()
+        assert body["success"] is False and "error" in body
+
+    def test_empty_session_is_rejected(self, client, temp_project):
+        assert "error" in client.post("/api/session/save", json={}).json()
+
+
+# ── 批量搜索 / 记忆 / 向量 / 格式化 ──────────────────────────────────────
+
+class TestBatchSearch:
+    def test_batch_search_finds_a_known_symbol(self, client):
+        body = client.post("/api/search/batch",
+                           json={"query": "read_json"}).json()
+        if body.get("success"):
+            assert body["count"] >= 1, body
+        else:
+            assert "error" in body
+
+    def test_missing_query_is_reported(self, client):
+        assert "error" in client.post("/api/search/batch", json={}).json()
+
+
+class TestMemoryVectorAliases:
+    def test_memory_init_succeeds(self, client):
+        body = client.post("/api/memory/init", params={"project": str(ROOT)}).json()
+        assert body["success"] is True, body
+
+    def test_vector_init_succeeds(self, client):
+        body = client.post("/api/vector/init", params={"project": str(ROOT)}).json()
+        assert body["success"] is True, body
+
+
+class TestFormatContract:
+    def test_non_python_is_refused_honestly(self, client):
+        body = client.post("/api/files/format",
+                           params={"path": "web/electron-shim.js"}).json()
+        assert body["success"] is False
+        assert "Python" in body["error"]
+
+    def test_python_file_either_formats_or_explains_why_not(self, client, temp_project):
+        """装了 black 就真格式化；没装就如实说明 —— 两种都不许假装成功。"""
+        import pathlib
+
+        target = pathlib.Path(temp_project) / "ugly.py"
+        target.write_text("x=1\ndef  f( a ):\n    return  a\n", encoding="utf-8")
+        body = client.post("/api/files/format",
+                           params={"path": str(target)}).json()
+        if body.get("success"):
+            assert body["formatted"] is True
+            assert "return a" in target.read_text(encoding="utf-8")
+        else:
+            assert "black" in body["error"], body
+
+    def test_outside_project_is_refused(self, client):
+        assert client.post("/api/files/format",
+                           params={"path": "../../x.py"}).json()["success"] is False

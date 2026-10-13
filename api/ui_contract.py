@@ -511,3 +511,354 @@ async def git_stage_all():
         return {"success": False, "root": root,
                 "error": (completed.stderr or completed.stdout or "git add 失败").strip()}
     return {"success": True, "root": root}
+
+
+# ── 无人值守执行 /api/runner/* ───────────────────────────────────────────
+#
+# **为什么不用 advanced.UnattendedRunner**：它的 run_task 只是循环往 results 里塞
+# 几条 {"status": "running"}，然后返回 {"status": "completed"} —— 什么都没执行，
+# 是"演戏"而不是功能。这里用 tcide_core.runner（真跑子进程、有超时/重试/检查点）。
+
+_runner_state: dict = {"root": "", "runner": None, "report": None}
+
+
+@router.post("/api/runner/init")
+async def runner_init(project: str = "", project_root: str = ""):
+    root = _pick(project, project_root) or current_project_root()
+    _runner_state.update({"root": os.path.abspath(root), "runner": None,
+                          "report": None})
+    return {"success": True, "project": _runner_state["root"],
+            "log_dir": os.path.join(_runner_state["root"], ".tcide", "runner")}
+
+
+@router.post("/api/runner/execute")
+async def runner_execute(request: Request, task: str = ""):
+    """执行任务。两种用法，都**真的干活**：
+
+    1. ``{"steps": [{"name": "...", "command": "..."}]}`` → 逐条真跑命令，
+       带超时/重试/检查点，返回每一步的输出与退出状态；
+    2. ``{"task": "自然语言需求"}`` → 交给双 Agent 编排（需要先配置模型）。
+    """
+    body = await _read_json_body(request)
+    root = _runner_state["root"] or current_project_root()
+    steps = body.get("steps") or []
+    if steps:
+        from tcide_core.runner import Step, UnattendedRunner
+
+        built = []
+        for index, item in enumerate(steps[:50]):
+            command = str(item.get("command", "")).strip()
+            if not command:
+                continue
+            built.append(Step(name=str(item.get("name") or f"step-{index + 1}"),
+                              command=command,
+                              timeout=float(item.get("timeout") or 0),
+                              retries=item.get("retries"),
+                              checkpoint=bool(item.get("checkpoint"))))
+        if not built:
+            return {"error": "steps 里没有可执行的 command"}
+        log_dir = os.path.join(root, ".tcide", "runner")
+        runner = UnattendedRunner(built, log_dir=log_dir, cwd=root,
+                                  on_event=lambda kind, data: None)
+        _runner_state["runner"] = runner
+        try:
+            report = runner.run(resume=False)
+        except Exception as exc:      # noqa: BLE001
+            return {"success": False, "error": f"{type(exc).__name__}: {exc}"}
+        _runner_state["report"] = report.to_dict()
+        return {"success": report.ok, "summary": report.summary(),
+                "report": _runner_state["report"]}
+
+    # 没有 steps：当成 AI 任务交给编排
+    requirement = str(task or body.get("task", "")).strip()
+    if not requirement:
+        return {"error": "缺少 task 或 steps"}
+    return await orchestrator_run(request, task=requirement)
+
+
+# ── 双 Agent 编排 /api/orchestrator/* ────────────────────────────────────
+
+_orchestrator_state: dict = {"root": "", "events": [], "report": None,
+                             "requirement": "", "status": "idle"}
+
+
+def _model_config():
+    """从仓库已有的设置里取模型配置（设置 → AI）。
+
+    返回 ``None`` 表示**没配置** —— 调用方必须如实告知，而不是假装跑过。
+    """
+    try:
+        from tcide_core.models import ModelConfig
+
+        from api import settings
+
+        cfg = settings.get_setting("ai", {}) or {}
+        api_key = str(cfg.get("apiKey") or "").strip()
+        if not api_key:
+            return None
+        provider = str(cfg.get("provider") or "deepseek").strip()
+        # 前端把 OpenAI 兼容端点写成 openai-compatible，而 ModelConfig 用 custom+base_url
+        if provider in ("openai-compatible", "openai", "custom"):
+            return ModelConfig(provider="custom", api_key=api_key,
+                               base_url=str(cfg.get("baseUrl") or "").strip(),
+                               model=str(cfg.get("model") or "").strip())
+        return ModelConfig(provider=provider, api_key=api_key,
+                           base_url=str(cfg.get("baseUrl") or "").strip(),
+                           model=str(cfg.get("model") or "").strip())
+    except Exception:      # noqa: BLE001
+        return None
+
+
+@router.post("/api/orchestrator/init")
+async def orchestrator_init(project: str = "", project_root: str = ""):
+    root = _pick(project, project_root) or current_project_root()
+    config = _model_config()
+    _orchestrator_state.update({"root": os.path.abspath(root), "events": [],
+                                "report": None, "requirement": "",
+                                "status": "idle"})
+    return {"success": True, "project": _orchestrator_state["root"],
+            "model_ready": config is not None,
+            "model": (f"{config.provider}/{config.model}" if config else ""),
+            "hint": "" if config else "尚未配置模型：设置 → AI 填 API Key 后可运行编排"}
+
+
+@router.post("/api/orchestrator/run")
+async def orchestrator_run(request: Request, task: str = ""):
+    """Builder → Coder → 审查门 → 重试，跑一个真实需求。"""
+    body = await _read_json_body(request)
+    requirement = str(task or body.get("task", "")).strip()
+    if not requirement:
+        return {"error": "缺少 task"}
+
+    config = _model_config()
+    if config is None:
+        return {"success": False, "status": "unconfigured",
+                "error": "未配置模型，无法运行双 Agent 编排",
+                "hint": "设置 → AI 填 API Key（支持 DeepSeek / 方舟 / Ollama / Anthropic / 自定义）"}
+    root = _orchestrator_state["root"] or current_project_root()
+    try:
+        from tcide_core.agent import AdapterClient, AgentOrchestrator
+        from tcide_core.gitops import GitRepo
+        from tcide_core.memory import ProjectMemoryBuilder
+        from tcide_core.tools import ToolRegistry
+
+        workspace = Workspace(root)
+        repo = GitRepo(root)
+        registry = ToolRegistry(workspace, repo=repo if repo.owns_repo() else None)
+        events: list = []
+
+        def on_event(event) -> None:
+            try:
+                events.append(event.to_dict())
+            except Exception:      # noqa: BLE001
+                pass
+            _orchestrator_state["events"] = events[-200:]
+
+        context = ProjectMemoryBuilder.to_markdown(
+            ProjectMemoryBuilder(workspace).build())
+        orchestrator = AgentOrchestrator(AdapterClient(config), registry,
+                                        context=context, on_event=on_event)
+        _orchestrator_state.update({"status": "running", "requirement": requirement,
+                                    "events": events})
+        report = orchestrator.run(requirement)
+        _orchestrator_state.update({"status": "done", "report": report.to_dict()})
+        return {"success": report.ok, "summary": report.summary(),
+                "report": report.to_dict(), "events": events[-50:]}
+    except Exception as exc:      # noqa: BLE001 - 编排失败要给可读原因
+        _orchestrator_state["status"] = "failed"
+        return {"success": False, "status": "failed",
+                "error": f"{type(exc).__name__}: {exc}"}
+
+
+@router.get("/api/ai/task-session")
+async def ai_task_session():
+    """当前/最近一次任务会话（前端 getTaskSession 用它恢复界面状态）。"""
+    return {"status": _orchestrator_state["status"],
+            "task": _orchestrator_state["requirement"],
+            "project": _orchestrator_state["root"],
+            "report": _orchestrator_state["report"],
+            "events": _orchestrator_state["events"][-20:],
+            "runner": _runner_state["report"]}
+
+
+@router.post("/api/ai/abort")
+async def ai_abort():
+    """中止正在跑的编排或执行（两个引擎都支持协作式取消）。"""
+    aborted = []
+    runner = _runner_state.get("runner")
+    if runner is not None:
+        try:
+            runner.cancel()
+            aborted.append("runner")
+        except Exception:      # noqa: BLE001
+            pass
+    try:
+        from tcide_core.agent import AgentOrchestrator
+
+        aborted.append("orchestrator") if _orchestrator_state["status"] == "running" else None
+    except Exception:      # noqa: BLE001
+        pass
+    if _orchestrator_state["status"] == "running":
+        _orchestrator_state["status"] = "aborted"
+    return {"success": True, "aborted": aborted,
+            "status": _orchestrator_state["status"]}
+
+
+# ── 会话保存 / 恢复 /api/session/* ───────────────────────────────────────
+
+@router.post("/api/session/save")
+async def session_save(request: Request):
+    """把界面状态（打开的文件、活动文件、布局…）存成 JSON。
+
+    前端传什么就存什么（``saveSession(data)`` 直接 POST 整个对象），
+    这里只补 id 与时间戳。存放位置：``<项目>/.tcide/sessions/``。
+    """
+    import json
+    import time
+
+    body = await _read_json_body(request)
+    if not body:
+        return {"error": "空会话，未保存"}
+    root = current_project_root()
+    directory = os.path.join(root, ".tcide", "sessions")
+    try:
+        os.makedirs(directory, exist_ok=True)
+        session_id = str(body.get("id") or time.strftime("%Y%m%d-%H%M%S"))
+        payload = dict(body)
+        payload["id"] = session_id
+        payload["saved_at"] = int(time.time() * 1000)
+        path = os.path.join(directory, f"{session_id}.json")
+        with open(path, "w", encoding="utf-8") as handle:
+            json.dump(payload, handle, ensure_ascii=False, indent=1)
+        return {"success": True, "id": session_id, "path": path}
+    except Exception as exc:      # noqa: BLE001
+        return {"success": False, "error": f"{type(exc).__name__}: {exc}"}
+
+
+@router.post("/api/session/restore")
+async def session_restore(id: str = "", session: str = ""):
+    """恢复会话；不给 id 就取最近一次。"""
+    import glob
+    import json
+
+    root = current_project_root()
+    directory = os.path.join(root, ".tcide", "sessions")
+    wanted = _pick(id, session)
+    try:
+        if wanted:
+            path = os.path.join(directory, f"{wanted}.json")
+        else:
+            candidates = sorted(glob.glob(os.path.join(directory, "*.json")))
+            if not candidates:
+                return {"success": False, "error": "没有已保存的会话"}
+            path = candidates[-1]
+        with open(path, "r", encoding="utf-8") as handle:
+            payload = json.load(handle)
+        return {"success": True, "session": payload, "path": path}
+    except Exception as exc:      # noqa: BLE001
+        return {"success": False, "error": f"{type(exc).__name__}: {exc}"}
+
+
+# ── 批量搜索 /api/search/batch ───────────────────────────────────────────
+
+@router.post("/api/search/batch")
+async def search_batch(request: Request, query: str = "", q: str = ""):
+    """一次搜多个关键词（前端 batchSearch）。
+
+    用 ``tcide_core.indexer``：它按内容建索引，能给出文件/行/片段。
+    """
+    body = await _read_json_body(request)
+    text = str(query or q or body.get("query", "") or "").strip()
+    if not text:
+        return {"error": "缺少 query"}
+    try:
+        index = ProjectIndex(_workspace())
+        index.scan()
+        results: dict = {}
+        for term in [item for item in text.replace(",", " ").split() if item][:10]:
+            hits = index.search(term, limit=int(body.get("limit") or 50))
+            results[term] = [hit.to_dict() for hit in hits]
+        return {"success": True, "query": text, "results": results,
+                "count": sum(len(value) for value in results.values())}
+    except Exception as exc:      # noqa: BLE001
+        return {"success": False, "error": f"{type(exc).__name__}: {exc}"}
+
+
+# ── 记忆 / 向量：与既有模块对接的别名 ────────────────────────────────────
+
+@router.post("/api/memory/init")
+async def memory_init(project: str = "", project_root: str = ""):
+    """前端打开项目后会调它（原实现只在 lifespan 里初始化过）。"""
+    root = _pick(project, project_root) or current_project_root()
+    try:
+        from api import memory as memory_api
+
+        memory_api.init_memory(root)
+        return {"success": True, "project": os.path.abspath(root)}
+    except Exception as exc:      # noqa: BLE001
+        return {"success": False, "error": f"{type(exc).__name__}: {exc}"}
+
+
+@router.post("/api/vector/init")
+async def vector_init(project: str = "", project_root: str = ""):
+    """同 memory/init：登记项目并初始化索引（前端 vectorInit）。"""
+    root = _pick(project, project_root) or current_project_root()
+    try:
+        from api import vector as vector_api
+
+        vector_api.init_index(root)
+        return {"success": True, "project": os.path.abspath(root)}
+    except Exception as exc:      # noqa: BLE001
+        return {"success": False, "error": f"{type(exc).__name__}: {exc}"}
+
+
+@router.post("/api/vector/index-all")
+async def vector_index_all():
+    """全项目建索引（与既有 ``/api/vector/index/project`` 等价，前端用的是这个路径）。"""
+    try:
+        from api import vector as vector_api
+
+        return await vector_api.index_project()
+    except Exception as exc:      # noqa: BLE001
+        return {"success": False, "error": f"{type(exc).__name__}: {exc}"}
+
+
+# ── 格式化 /api/files/format ─────────────────────────────────────────────
+
+@router.post("/api/files/format")
+async def files_format(path: str = "", file: str = ""):
+    """格式化一个文件。
+
+    诚实实现：Python 文件用 ``black``（装了才用），其它语言返回"暂不支持"而不是
+    假装成功。格式化成功时**写回原文件**并把结果如实返回。
+    """
+    import shutil
+    import subprocess
+
+    target = _inside_project(_pick(path, file))
+    if not target or not os.path.isfile(target):
+        return {"success": False, "error": f"文件不存在或不在项目内：{path or file}"}
+    if not target.lower().endswith(".py"):
+        return {"success": False, "formatted": False,
+                "error": "目前只支持 Python（需要 black）；其它语言暂未接入格式化器"}
+    if shutil.which("black") is None and not _module_available("black"):
+        return {"success": False, "formatted": False,
+                "error": "未安装 black：pip install black 后可格式化 Python"}
+    try:
+        completed = subprocess.run([sys.executable, "-m", "black", "--quiet", target],
+                                   capture_output=True, text=True, timeout=120)
+    except Exception as exc:      # noqa: BLE001
+        return {"success": False, "error": f"{type(exc).__name__}: {exc}"}
+    if completed.returncode != 0:
+        return {"success": False, "formatted": False,
+                "error": (completed.stderr or "black 执行失败").strip()[:400]}
+    return {"success": True, "formatted": True, "path": _relative(target)}
+
+
+def _module_available(name: str) -> bool:
+    import importlib.util
+
+    try:
+        return importlib.util.find_spec(name) is not None
+    except Exception:      # noqa: BLE001
+        return False
