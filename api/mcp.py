@@ -1,271 +1,427 @@
 # SPDX-FileCopyrightText: 2026 Guanist, Inc.
 # SPDX-License-Identifier: LGPL-3.0-only
+"""MCP（Model Context Protocol）客户端：JSON-RPC 2.0 over **stdio**。
+
+对应 TCIDE 原版 `main/mcp-tools.ts` 那批"宣称有、实际没接线"的能力。本文件提供
+连接外部 MCP server、把它的工具并入本项目的工具表、并按名字路由调用。
+
+## 这一版修掉的真问题（都是"接了真服务器才发现"的）
+
+1. **帧协议用错了** ✗：原实现按 LSP 那样收发 ``Content-Length: N\\r\\n\\r\\n{json}``，
+   而 **MCP stdio 的约定是"一行一个 JSON 对象"**。于是任何真服务器都**永远解析不到
+   响应**，`tools/list` 只会一路超时 —— 客户端看起来"写了"，实际一次也用不了。
+2. **阻塞读** ✗：原来直接 ``proc.stdout.read(4096)``，要凑满 4096 字节才返回；
+   真服务器的响应往往只有一两百字节，于是每次都卡到超时。
+   现在用**后台读线程**按行读、按 id 派发。
+3. **命令没有解析成绝对路径** ✗：Windows 上 npm 装的服务器是 ``.CMD`` shim，
+   ``CreateProcess`` 不认 —— 和本项目 LSP 客户端踩过的是**同一个坑**。
+4. **`search_code` 绑死 `findstr`** ✗：Windows 专有，Linux/macOS 与 CI 上必坏。
+   改成纯 Python 遍历。
+
+设计取舍：传输层与工具路由都在这里，**不引入任何第三方依赖**（只用标准库），
+所以能离线严格测试；测试里有一个**说 stdio JSON-RPC 的假服务器**（见
+``tests/test_mcp.py``），另有 ``tools/verify_mcp.py`` 负责接**真**服务器出证据。
 """
-MCP 外部 Server 连接 API
-JSON-RPC 2.0 + stdio transport，连接外部 MCP server，合并内置+外部工具
-"""
+
+from __future__ import annotations
+
 import json
 import os
+import shutil
 import subprocess
 import threading
 import time
 
-# 内置工具定义（来自 ai.py 的精简版）
+#: 内置工具（与 tcide_core.tools 的注册表保持同名；这里是给 HTTP 层用的一份精简表）
 BUILTIN_TOOLS = [
-    {"name": "read_file", "description": "Read file contents", "parameters": {"type": "object", "properties": {"path": {"type": "string"}}}},
-    {"name": "write_file", "description": "Write content to file", "parameters": {"type": "object", "properties": {"path": {"type": "string"}, "content": {"type": "string"}}}},
-    {"name": "list_files", "description": "List directory contents", "parameters": {"type": "object", "properties": {"path": {"type": "string"}}}},
-    {"name": "search_code", "description": "Search code in project", "parameters": {"type": "object", "properties": {"query": {"type": "string"}}}},
-    {"name": "run_command", "description": "Run shell command", "parameters": {"type": "object", "properties": {"command": {"type": "string"}}}},
-    {"name": "git_status", "description": "Get git status", "parameters": {"type": "object", "properties": {}}},
-    {"name": "git_diff", "description": "Get git diff", "parameters": {"type": "object", "properties": {"file_path": {"type": "string"}}}},
+    {"name": "read_file", "description": "Read file contents",
+     "parameters": {"type": "object", "properties": {"path": {"type": "string"}}}},
+    {"name": "write_file", "description": "Write content to file",
+     "parameters": {"type": "object",
+                    "properties": {"path": {"type": "string"},
+                                   "content": {"type": "string"}}}},
+    {"name": "list_files", "description": "List directory contents",
+     "parameters": {"type": "object", "properties": {"path": {"type": "string"}}}},
+    {"name": "search_code", "description": "Search code in project",
+     "parameters": {"type": "object", "properties": {"query": {"type": "string"}}}},
+    {"name": "run_command", "description": "Run shell command",
+     "parameters": {"type": "object", "properties": {"command": {"type": "string"}}}},
+    {"name": "git_status", "description": "Get git status",
+     "parameters": {"type": "object", "properties": {}}},
+    {"name": "git_diff", "description": "Get git diff",
+     "parameters": {"type": "object", "properties": {"file_path": {"type": "string"}}}},
 ]
 
-# 外部 MCP 客户端状态
-_clients: dict = {}  # name -> {process, config, buffer, next_id, pending, tools}
+#: 客户端状态：name -> _ServerState
+_clients: dict = {}
 _project_root: str = ""
 
-def set_project_root(root: str):
+#: 默认协议版本（MCP 服务器会回自己支持的版本，这里只是声明我们理解的版本）
+PROTOCOL_VERSION = "2024-11-05"
+#: 单次请求默认超时（秒）
+DEFAULT_TIMEOUT = 30.0
+
+
+def set_project_root(root: str) -> None:
     global _project_root
-    _project_root = os.path.abspath(root)
+    _project_root = os.path.abspath(root or ".")
 
-def _parse_frames(buffer: bytes) -> tuple:
-    """Content-Length 帧解析"""
-    messages = []
-    while True:
-        sep = buffer.find(b"\r\n\r\n")
-        if sep == -1:
-            break
-        header = buffer[:sep].decode("utf-8", errors="replace")
-        length = 0
-        for line in header.split("\r\n"):
-            if line.lower().startswith("content-length:"):
-                length = int(line.split(":", 1)[1].strip())
-        if length == 0:
-            buffer = buffer[sep + 4:]
-            continue
-        body_start = sep + 4
-        if len(buffer) < body_start + length:
-            break
-        body = buffer[body_start:body_start + length].decode("utf-8")
-        buffer = buffer[body_start + length:]
+
+def resolve_command(command: str) -> str:
+    """把命令解析成**绝对路径**。
+
+    为什么必须这么做：Windows 上 npm/pip 装出来的 MCP 服务器是 ``.CMD`` shim，
+    而 ``CreateProcess``（也就是 ``subprocess.Popen``）**不会**按 PATHEXT 去解析它 ——
+    传裸名字会直接 ``FileNotFoundError: [WinError 2]``。本项目的 LSP 客户端踩过
+    同一个坑，这里一开始就做对。
+    """
+    if not command:
+        return command
+    if os.path.isabs(command) or os.sep in command:
+        return command
+    return shutil.which(command) or command
+
+
+class McpError(RuntimeError):
+    """MCP 调用出错（连接失败、超时、服务器返回 error）。"""
+
+
+class _ServerState:
+    """一个 MCP server 的运行时状态（进程 + 读线程 + 待回响应表）。"""
+
+    def __init__(self, name: str, command: str, args: list, cwd: str,
+                 env: dict) -> None:
+        self.name = name
+        self.command = resolve_command(command)
+        self.args = list(args or [])
+        self.cwd = cwd
+        self.env = env
+        self.process: subprocess.Popen | None = None
+        self.tools: list[dict] = []
+        self.ready = False
+        self.started_at = time.time()
+        #: 我方发出的请求 id -> {"event": Event, "result": ..., "error": ...}
+        self.pending: dict[int, dict] = {}
+        #: 服务器主动发来的通知（日志等），保留最后若干条便于排查
+        self.notifications: list[dict] = []
+        self.error = ""
+        self._next_id = 1
+        self._reader: threading.Thread | None = None
+        self._lock = threading.Lock()
+
+    # -- 生命周期 ---------------------------------------------------------
+
+    def start(self) -> None:
+        argv = [self.command, *self.args]
         try:
-            messages.append(json.loads(body))
-        except json.JSONDecodeError:
-            pass
-    return messages, buffer
+            self.process = subprocess.Popen(
+                argv, cwd=self.cwd or None, env=self.env,
+                stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE, text=True, encoding="utf-8",
+                errors="replace", bufsize=1,
+                creationflags=(subprocess.CREATE_NO_WINDOW
+                               if os.name == "nt" else 0),
+            )
+        except FileNotFoundError as exc:
+            raise McpError(f"命令不存在: {self.command}（{exc}）") from exc
+        except OSError as exc:
+            raise McpError(f"启动失败: {type(exc).__name__}: {exc}") from exc
+        self._reader = threading.Thread(target=self._read_loop, daemon=True)
+        self._reader.start()
 
-def _send_rpc(state: dict, method: str, params: dict, is_notification: bool = False):
-    """发送 JSON-RPC 消息"""
-    proc = state.get("process")
-    if not proc or proc.poll() is not None:
-        return {"error": "Server not running"}
+    def alive(self) -> bool:
+        return self.process is not None and self.process.poll() is None
 
-    msg_id = None if is_notification else state.get("next_id", 1)
-    if msg_id is not None:
-        state["next_id"] = msg_id + 1
-
-    message = {"jsonrpc": "2.0", "method": method, "params": params}
-    if msg_id is not None:
-        message["id"] = msg_id
-
-    body = json.dumps(message)
-    payload = f"Content-Length: {len(body.encode('utf-8'))}\r\n\r\n{body}"
-
-    try:
-        proc.stdin.write(payload.encode("utf-8"))
-        proc.stdin.flush()
-    except Exception as e:
-        return {"error": f"Write failed: {e}"}
-
-    if is_notification:
-        return None
-
-    # 等待响应
-    deadline = time.time() + 30
-    while time.time() < deadline:
-        if proc.poll() is not None:
-            return {"error": "Server exited"}
+    def stop(self) -> None:
+        process, self.process = self.process, None
+        if process is None:
+            return
+        for stream in (process.stdin,):
+            try:
+                if stream:
+                    stream.close()
+            except Exception:      # noqa: BLE001
+                pass
         try:
-            raw = proc.stdout.read(4096)
-            if raw:
-                msgs, state["buffer"] = _parse_frames(state.get("buffer", b"") + raw)
-                for m in msgs:
-                    if m.get("id") == msg_id:
-                        return {"error": m["error"]["message"]} if "error" in m else m.get("result")
-        except Exception:
-            time.sleep(0.01)
-    return {"error": "Request timed out"}
+            process.terminate()
+            process.wait(timeout=5)
+        except Exception:      # noqa: BLE001
+            try:
+                process.kill()
+                process.wait(timeout=5)
+            except Exception:      # noqa: BLE001
+                pass
 
-def connect_server(name: str, command: str, args: list = None, env: dict = None, project_path: str = "") -> dict:
-    """连接外部 MCP server（stdio transport）"""
+    # -- 传输（**一行一个 JSON**，不是 Content-Length）--------------------
+
+    def notify(self, method: str, params: dict | None = None) -> None:
+        self._write({"jsonrpc": "2.0", "method": method,
+                     "params": params or {}})
+
+    def request(self, method: str, params: dict | None = None,
+                *, timeout: float = DEFAULT_TIMEOUT):
+        with self._lock:
+            message_id = self._next_id
+            self._next_id += 1
+            slot = {"event": threading.Event(), "result": None, "error": None}
+            self.pending[message_id] = slot
+        self._write({"jsonrpc": "2.0", "id": message_id, "method": method,
+                     "params": params or {}})
+        if not slot["event"].wait(timeout):
+            self.pending.pop(message_id, None)
+            raise McpError(f"{method} 超时（{timeout:.0f}s）")
+        self.pending.pop(message_id, None)
+        if slot["error"] is not None:
+            raise McpError(str(slot["error"]))
+        return slot["result"]
+
+    def _write(self, message: dict) -> None:
+        process = self.process
+        if process is None or process.poll() is not None or process.stdin is None:
+            raise McpError("服务器未运行")
+        line = json.dumps(message, ensure_ascii=False)
+        try:
+            process.stdin.write(line + "\n")
+            process.stdin.flush()
+        except Exception as exc:      # noqa: BLE001
+            raise McpError(f"写入失败: {type(exc).__name__}: {exc}") from exc
+
+    def _read_loop(self) -> None:
+        """按行读 stdout；响应按 id 派发，其余当通知留档。
+
+        **按行**是关键：MCP stdio 的每一行就是一个完整 JSON 对象。
+        （原实现按 Content-Length 解析，永远拿不到东西。）
+        """
+        process = self.process
+        if process is None or process.stdout is None:
+            return
+        try:
+            for line in process.stdout:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    message = json.loads(line)
+                except json.JSONDecodeError:
+                    # 服务器往 stdout 打了非 JSON（有些实现会这样）——留档，不致命
+                    self.notifications.append({"raw": line[:500]})
+                    continue
+                if isinstance(message, dict) and "id" in message \
+                        and message["id"] in self.pending:
+                    slot = self.pending[message["id"]]
+                    if "error" in message:
+                        slot["error"] = message["error"].get("message", message["error"])
+                    else:
+                        slot["result"] = message.get("result")
+                    slot["event"].set()
+                else:
+                    self.notifications.append(message)
+                    del self.notifications[:-50]
+        except Exception as exc:      # noqa: BLE001
+            self.error = f"读线程异常: {type(exc).__name__}: {exc}"
+        finally:
+            # 进程结束 → 唤醒所有等待者，避免它们白等到超时
+            for slot in list(self.pending.values()):
+                if slot["error"] is None and slot["result"] is None:
+                    slot["error"] = self.error or "服务器已退出"
+                slot["event"].set()
+
+
+# ---------------------------------------------------------------------------
+# 公开 API（HTTP 层按这些名字调用）
+# ---------------------------------------------------------------------------
+
+
+def connect_server(name: str, command: str, args: list | None = None,
+                   env: dict | None = None, project_path: str = "") -> dict:
+    """连接一个外部 MCP server：起进程 → initialize → notifications/initialized → tools/list。"""
     if name in _clients:
         disconnect_server(name)
-
-    pp = project_path or _project_root
-    full_env = {**os.environ, **(env or {})}
-
+    target = project_path or _project_root or os.getcwd()
+    state = _ServerState(name, command, args or [], target,
+                         {**os.environ, **(env or {})})
     try:
-        proc = subprocess.Popen(
-            [command] + (args or []), cwd=pp, env=full_env,
-            stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-            creationflags=subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0,
-        )
-    except FileNotFoundError:
-        return {"error": f"Command not found: {command}"}
+        state.start()
+        state.request("initialize", {
+            "protocolVersion": PROTOCOL_VERSION,
+            "capabilities": {"tools": {}},
+            "clientInfo": {"name": "TCIDE", "version": "0.0.1.1"},
+        })
+        state.notify("notifications/initialized", {})
+        result = state.request("tools/list", {})
+    except McpError as exc:
+        state.stop()
+        return {"error": str(exc)}
 
-    state = {
-        "process": proc, "config": {"command": command, "args": args or [], "env": env or {}},
-        "project_path": pp, "buffer": b"", "next_id": 1, "pending": {},
-        "tools": [], "ready": False, "started_at": time.time(),
-    }
+    tools: list[dict] = []
+    for item in (result or {}).get("tools", []):
+        if not isinstance(item, dict) or not item.get("name"):
+            continue
+        tools.append({
+            # 前缀避免与内置工具重名；调用时再拆回来
+            "name": f"{name}__{item['name']}",
+            "description": item.get("description", ""),
+            "parameters": item.get("inputSchema") or {"type": "object"},
+            "_source": "mcp",
+            "_server": name,
+            "_remote": item["name"],
+        })
+    state.tools = tools
+    state.ready = True
     _clients[name] = state
+    return {"success": True, "name": name, "tools": len(tools),
+            "command": state.command}
 
-    # stderr 输出线程
-    def _read_stderr():
-        try:
-            while proc.poll() is None:
-                data = proc.stderr.read(4096)
-                if data:
-                    pass  # 可扩展日志
-        except Exception:
-            pass
-    threading.Thread(target=_read_stderr, daemon=True).start()
-
-    # MCP 握手
-    init_result = _send_rpc(state, "initialize", {
-        "protocolVersion": "2024-11-05",
-        "capabilities": {"tools": {}},
-        "clientInfo": {"name": "TCIDE", "version": "0.1.0"},
-    })
-    if init_result and isinstance(init_result, dict) and "error" in init_result:
-        disconnect_server(name)
-        return init_result
-
-    _send_rpc(state, "notifications/initialized", {}, is_notification=True)
-
-    # 获取工具列表
-    tools_result = _send_rpc(state, "tools/list", {})
-    external_tools = []
-    if tools_result and isinstance(tools_result, dict):
-        for t in tools_result.get("tools", []):
-            tool_def = {
-                "name": f"{name}__{t['name']}",
-                "description": t.get("description", ""),
-                "parameters": t.get("inputSchema", {}),
-                "_source": "mcp",
-                "_server": name,
-            }
-            external_tools.append(tool_def)
-    state["tools"] = external_tools
-    state["ready"] = True
-    return {"success": True, "name": name, "tools": len(external_tools)}
 
 def disconnect_server(name: str) -> dict:
-    """断开 MCP server"""
     state = _clients.pop(name, None)
-    if not state:
+    if state is None:
         return {"error": f"Server {name} not found"}
-    proc = state.get("process")
-    if proc:
-        try:
-            _send_rpc(state, "notifications/cancelled", {}, is_notification=True)
-            proc.stdin.close()
-        except Exception:
-            pass
-        try:
-            proc.terminate()
-            proc.wait(timeout=5)
-        except Exception:
-            try:
-                proc.kill()
-            except Exception:
-                pass
+    state.stop()
     return {"success": True}
 
+
+def disconnect_all() -> None:
+    for name in list(_clients):
+        disconnect_server(name)
+
+
 def list_tools() -> dict:
-    """合并内置+外部工具"""
+    """合并内置 + 外部工具（外部工具带 ``_source: mcp`` 标记，界面据此区分）。"""
     all_tools = list(BUILTIN_TOOLS)
-    for name, state in _clients.items():
-        all_tools.extend(state.get("tools", []))
+    for state in _clients.values():
+        all_tools.extend(state.tools)
     return {"tools": all_tools, "builtin": len(BUILTIN_TOOLS),
-            "external": sum(len(s.get("tools", [])) for s in _clients.values())}
+            "external": sum(len(s.tools) for s in _clients.values())}
 
-def call_tool(name: str, args: dict) -> dict:
-    """路由执行工具调用"""
-    # 内置工具
-    if name in [t["name"] for t in BUILTIN_TOOLS]:
-        return _call_builtin(name, args)
-    # 外部 MCP 工具
-    if "__" in name:
-        server_name, tool_name = name.split("__", 1)
-        state = _clients.get(server_name)
-        if not state:
-            return {"error": f"MCP server '{server_name}' not connected"}
-        result = _send_rpc(state, "tools/call", {"name": tool_name, "arguments": args})
-        if isinstance(result, dict) and "content" in result:
-            texts = [c.get("text", str(c)) for c in result.get("content", []) if isinstance(c, dict)]
-            return {"result": "\n".join(texts)}
-        return {"result": str(result)}
-    return {"error": f"Unknown tool: {name}"}
 
-def _call_builtin(name: str, args: dict) -> dict:
-    """执行内置工具"""
+def call_tool(name: str, args: dict | None = None) -> dict:
+    """按名字路由：内置工具本地执行；``server__tool`` 转发给对应 MCP server。"""
+    arguments = dict(args or {})
+    if name in {tool["name"] for tool in BUILTIN_TOOLS}:
+        return _call_builtin(name, arguments)
+    if "__" not in name:
+        return {"error": f"Unknown tool: {name}"}
+    server_name, tool_name = name.split("__", 1)
+    state = _clients.get(server_name)
+    if state is None:
+        return {"error": f"MCP server '{server_name}' not connected"}
     try:
-        if name == "read_file":
-            fp = os.path.join(_project_root, args.get("path", ""))
-            with open(fp, "r", encoding="utf-8", errors="replace") as f:
-                return {"result": f.read()[:8000]}
-        elif name == "write_file":
-            fp = os.path.join(_project_root, args.get("path", ""))
-            os.makedirs(os.path.dirname(fp), exist_ok=True)
-            with open(fp, "w", encoding="utf-8") as f:
-                f.write(args.get("content", ""))
-            return {"result": f"Written to {args.get('path')}"}
-        elif name == "list_files":
-            d = os.path.join(_project_root, args.get("path", "."))
-            skip = {".git", "node_modules", "__pycache__", ".venv", "dist"}
-            entries = [e for e in sorted(os.listdir(d)) if e not in skip and not e.startswith(".")]
-            return {"result": "\n".join(entries[:100])}
-        elif name == "search_code":
-            import subprocess as sp
-            q = args.get("query", "")
-            r = sp.run(f'findstr /s /i /n /c:"{q}" *', shell=True, cwd=_project_root,
-                       capture_output=True, text=True, timeout=10, encoding="utf-8", errors="replace")
-            return {"result": "\n".join(r.stdout.split("\n")[:30])}
-        elif name == "run_command":
-            import subprocess as sp
-            r = sp.run(args.get("command", ""), shell=True, cwd=_project_root,
-                       capture_output=True, text=True, timeout=30, encoding="utf-8", errors="replace")
-            return {"result": (r.stdout + r.stderr)[:4000]}
-        elif name == "git_status":
-            import subprocess as sp
-            r = sp.run(["git", "status", "--short"], cwd=_project_root,
-                       capture_output=True, text=True, timeout=10, encoding="utf-8", errors="replace")
-            return {"result": r.stdout.strip() or "Clean"}
-        elif name == "git_diff":
-            import subprocess as sp
-            cmd = ["git", "diff", "HEAD"]
-            fp = args.get("file_path", "")
-            if fp:
-                cmd.extend(["--", fp])
-            r = sp.run(cmd, cwd=_project_root, capture_output=True, text=True,
-                       timeout=10, encoding="utf-8", errors="replace")
-            return {"result": r.stdout.strip()[:4000] or "No changes"}
-        return {"error": f"Unknown builtin: {name}"}
-    except Exception as e:
-        return {"error": str(e)}
+        result = state.request("tools/call",
+                               {"name": tool_name, "arguments": arguments})
+    except McpError as exc:
+        return {"error": str(exc)}
+    if not isinstance(result, dict):
+        return {"result": str(result)}
+    texts = []
+    for item in result.get("content") or []:
+        if isinstance(item, dict):
+            texts.append(item.get("text") or json.dumps(item, ensure_ascii=False))
+        else:
+            texts.append(str(item))
+    payload = {"result": "\n".join(texts) or json.dumps(result, ensure_ascii=False)}
+    if result.get("isError"):
+        payload["error"] = payload["result"]
+    return payload
+
 
 def get_servers() -> dict:
-    """列出已连接的 MCP servers"""
     servers = []
     for name, state in _clients.items():
-        proc = state.get("process")
         servers.append({
             "name": name,
-            "ready": state.get("ready", False),
-            "tools": len(state.get("tools", [])),
-            "pid": proc.pid if proc else None,
-            "running": proc is not None and proc.poll() is None,
+            "ready": state.ready,
+            "command": state.command,
+            "tools": len(state.tools),
+            "pid": state.process.pid if state.process else None,
+            "running": state.alive(),
+            "error": state.error,
         })
     return {"servers": servers}
+
+
+# ---------------------------------------------------------------------------
+# 内置工具（HTTP 层用；与 tcide_core.tools 的完整实现并存，这里保持精简）
+# ---------------------------------------------------------------------------
+
+#: 搜索时跳过的目录（与 tcide_core.tools 的约定一致）
+_SKIP_DIRS = {".git", "node_modules", "__pycache__", ".venv", "venv", "dist",
+              "build", ".mypy_cache", ".pytest_cache"}
+#: 单个文件超过这个大小就不搜（避免在产物文件上卡住）
+_MAX_SEARCH_BYTES = 512 * 1024
+
+
+def _call_builtin(name: str, args: dict) -> dict:
+    try:
+        root = _project_root or os.getcwd()
+        if name == "read_file":
+            path = os.path.join(root, args.get("path", ""))
+            with open(path, "r", encoding="utf-8", errors="replace") as handle:
+                return {"result": handle.read()[:8000]}
+        if name == "write_file":
+            path = os.path.join(root, args.get("path", ""))
+            parent = os.path.dirname(path)
+            if parent:
+                os.makedirs(parent, exist_ok=True)
+            with open(path, "w", encoding="utf-8", newline="\n") as handle:
+                handle.write(args.get("content", ""))
+            return {"result": f"Written to {args.get('path')}"}
+        if name == "list_files":
+            directory = os.path.join(root, args.get("path", "."))
+            entries = [item for item in sorted(os.listdir(directory))
+                       if item not in _SKIP_DIRS and not item.startswith(".")]
+            return {"result": "\n".join(entries[:100])}
+        if name == "search_code":
+            return {"result": _search_code(root, str(args.get("query", "")))}
+        if name == "run_command":
+            completed = subprocess.run(args.get("command", ""), shell=True,
+                                       cwd=root, capture_output=True, text=True,
+                                       timeout=30, encoding="utf-8",
+                                       errors="replace")
+            return {"result": (completed.stdout + completed.stderr)[:4000]}
+        if name == "git_status":
+            completed = subprocess.run(["git", "status", "--short"], cwd=root,
+                                       capture_output=True, text=True, timeout=10,
+                                       encoding="utf-8", errors="replace")
+            return {"result": completed.stdout.strip() or "Clean"}
+        if name == "git_diff":
+            command = ["git", "diff", "HEAD"]
+            if args.get("file_path"):
+                command.extend(["--", args["file_path"]])
+            completed = subprocess.run(command, cwd=root, capture_output=True,
+                                       text=True, timeout=10, encoding="utf-8",
+                                       errors="replace")
+            return {"result": completed.stdout.strip()[:4000] or "No changes"}
+        return {"error": f"Unknown builtin: {name}"}
+    except Exception as exc:      # noqa: BLE001 - 工具失败不该把请求打挂
+        return {"error": f"{type(exc).__name__}: {exc}"}
+
+
+def _search_code(root: str, query: str, *, limit: int = 30) -> str:
+    """纯 Python 的子串搜索。
+
+    原实现调 Windows 专有的 ``findstr`` —— 在 Linux/macOS（以及 CI）上必然失败，
+    而且 ``shell=True`` 拼用户输入本身也不安全。这里改成自己遍历，跨平台且可控。
+    """
+    if not query:
+        return ""
+    hits: list[str] = []
+    for base, dirs, files in os.walk(root):
+        dirs[:] = [item for item in dirs if item not in _SKIP_DIRS]
+        for filename in files:
+            if len(hits) >= limit:
+                break
+            path = os.path.join(base, filename)
+            try:
+                if os.path.getsize(path) > _MAX_SEARCH_BYTES:
+                    continue
+                with open(path, "r", encoding="utf-8", errors="replace") as handle:
+                    for number, line in enumerate(handle, 1):
+                        if query in line:
+                            relative = os.path.relpath(path, root)
+                            hits.append(f"{relative}:{number}: {line.strip()[:160]}")
+                            if len(hits) >= limit:
+                                break
+            except (OSError, UnicodeDecodeError):
+                continue
+    return "\n".join(hits)
