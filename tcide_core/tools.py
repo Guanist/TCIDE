@@ -149,6 +149,7 @@ class ToolRegistry:
         max_output: int = DEFAULT_MAX_OUTPUT,
         command_timeout: int = DEFAULT_COMMAND_TIMEOUT,
         allow_dangerous: bool = False,
+        policy: Any = None,
     ) -> None:
         self.workspace = workspace
         self.index = index
@@ -157,6 +158,9 @@ class ToolRegistry:
         self.max_output = int(max_output)
         self.command_timeout = min(int(command_timeout), MAX_COMMAND_TIMEOUT)
         self.allow_dangerous = bool(allow_dangerous)
+        #: 权限策略。**必须在实例上赋值**：以前它只作为类属性存在、__init__ 从不设置，
+        #: 于是调用方传进来的策略会静默丢掉，只读档下的拦截形同虚设。
+        self.policy = policy
         self.tools: dict[str, ToolSpec] = {}
         self.calls: list[dict[str, Any]] = []
         self._register_defaults()

@@ -4888,6 +4888,48 @@ function setupEventListeners(): void {
   // 启动时无条件应用一次：不看按钮是否存在，也不看 localStorage。
   applyEditorTheme(themeStateIsLight());
 
+  // ── 权限档常驻 chip（原则 ③：状态是环境，不是弹窗）────────────────────
+  // 事实来源是后端的设置文件（tcide_core.settings），这里只做展示与切换，
+  // 不另存一份状态 —— 否则会出现"界面显示一套、实际执行另一套"。
+  const PERMISSION_LABELS: Record<string, string> = {
+    read_only: '权限：只读',
+    ask: '权限：逐次确认',
+    auto: '权限：自动',
+  };
+  async function refreshPermissionChip(): Promise<void> {
+    const chip = document.getElementById('btn-permission');
+    if (!chip) return;
+    try {
+      const info = await fetch('/api/policy').then(r => r.json());
+      const level = String(info.level || 'ask');
+      chip.textContent = PERMISSION_LABELS[level] || `权限：${info.label || level}`;
+      chip.setAttribute('data-level', level);
+      chip.title = `权限档：${info.label || level}（点击切换）`
+        + (info.allows_write ? '；允许写文件' : '；不允许写文件')
+        + (info.allows_shell ? '；允许执行命令' : '；不允许执行命令');
+      chip.setAttribute('aria-label', chip.textContent);
+    } catch {
+      chip.textContent = '权限：未知';
+    }
+  }
+  document.getElementById('btn-permission')?.addEventListener('click', async () => {
+    const chip = document.getElementById('btn-permission')!;
+    const order = ['read_only', 'ask', 'auto'];
+    const current = chip.getAttribute('data-level') || 'ask';
+    const next = order[(order.indexOf(current) + 1) % order.length];
+    try {
+      const info = await fetch('/api/policy', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ level: next }),
+      }).then(r => r.json());
+      chip.textContent = PERMISSION_LABELS[info.level] || `权限：${info.level}`;
+      chip.setAttribute('data-level', info.level);
+      chip.setAttribute('aria-label', chip.textContent);
+    } catch { /* 切换失败就保持原样，下次刷新会纠正 */ }
+  });
+  void refreshPermissionChip();
+
   // ═══ Git 面板 ═══
   async function refreshGitPanel() {
     const statusList = document.getElementById('git-status-list');

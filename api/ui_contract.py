@@ -170,6 +170,57 @@ def _finish_checkpoint(root: str) -> None:
         pass
 
 
+@router.get("/api/policy")
+async def get_policy():
+    """读当前权限档（三档：read_only / ask / auto）。
+
+    事实来源是**设置文件**（`load_settings().permission`）—— 与
+    `tcide_core.tools.current_policy()` 完全一致，所以这里读到什么，
+    工具调用时就是什么，不会出现"界面显示一套、实际执行另一套"。
+    """
+    from tcide_core.permissions import LEVELS, PermissionPolicy
+    from tcide_core.settings import load, summary
+
+    settings = load()
+    policy = PermissionPolicy(settings.permission)
+    return {"success": True, "level": policy.level, "label": policy.label,
+            "levels": list(LEVELS), "allows_write": policy.allows_write,
+            "allows_shell": policy.allows_shell,
+            "review_gate": policy.review_gate_enabled,
+            "summary": summary(settings)}
+
+
+@router.post("/api/policy")
+async def set_policy(request: Request):
+    """改权限档。level 非法时按 `normalize_level` 归一到安全值（不抛异常）。
+
+    写盘后立刻生效：下一次工具调用时 `current_policy()` 就会读到新档位。
+    """
+    from tcide_core.permissions import LEVELS, PermissionPolicy, normalize_level
+    from tcide_core.settings import load, normalize, save, summary
+
+    body = await _read_json_body(request)
+    requested = body.get("level")
+    level = normalize_level(requested, fallback=load().permission)
+    settings = normalize(replace_settings_permission(load(), level))
+    save(settings)
+    policy = PermissionPolicy(settings.permission)
+    return {"success": True, "level": policy.level, "label": policy.label,
+            "levels": list(LEVELS), "allows_write": policy.allows_write,
+            "allows_shell": policy.allows_shell,
+            "review_gate": policy.review_gate_enabled,
+            "requested": requested,
+            "normalized": level != requested,
+            "summary": summary(settings)}
+
+
+def replace_settings_permission(settings, level: str):
+    """返回一份把 permission 换成 level 的设置副本（dataclass replace）。"""
+    from dataclasses import replace
+
+    return replace(settings, permission=level)
+
+
 @router.get("/api/agent/checkpoints")
 async def agent_checkpoints():
     """列出检查点，并给出最新一个的**恢复判定**。
