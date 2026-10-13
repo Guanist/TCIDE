@@ -1,0 +1,29 @@
+# SPDX-FileCopyrightText: 2026 Guanist, Inc.
+# SPDX-License-Identifier: LGPL-3.0-only
+#
+# sdist 要是**完整源码包**，所以前端源码与测试、工具、文档都要包含。
+# 教训：本项目此前"源码包"里缺前端源码，别人拿到也重建不了界面。
+include LICENSE
+include README.md
+include pyproject.toml
+include requirements.txt
+include package.json
+include vite.config.ts
+include tsconfig.json
+include tsconfig.main.json
+
+recursive-include src *.ts *.tsx *.html *.css *.d.ts
+recursive-include recovered-modules *.js
+recursive-include tests *.py
+recursive-include tools *.py *.json
+recursive-include docs *.md
+recursive-include static *.css *.js
+recursive-include pet_assets *
+recursive-include web *
+
+# 明确排除：这些都是构建产物或第三方依赖，不该进源码包
+prune node_modules
+prune build
+prune dist
+prune .tcide-build
+global-exclude *.pyc __pycache__/* *.log

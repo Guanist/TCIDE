@@ -16,7 +16,18 @@
   var KEY = "tcide-theme";
   var root = document.documentElement;
 
+  // URL 参数优先（?theme=light / ?theme=dark）：一次性显式指定，不写入 localStorage。
+  // 用途：分享"浅色版"链接；以及文档/截图需要确定性地得到某个主题。
+  function fromQuery() {
+    try {
+      var match = /[?&]theme=(light|dark)\b/.exec(window.location.search);
+      return match ? match[1] : "";
+    } catch (e) { return ""; }
+  }
+
   function preferred() {
+    var asked = fromQuery();
+    if (asked) return asked;
     try {
       var saved = localStorage.getItem(KEY);
       if (saved === "dark" || saved === "light") return saved;

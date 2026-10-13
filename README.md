@@ -4,6 +4,52 @@
 
 虎猫 TCIDE 的 Python 重写版，基于 FastAPI + PyWebView + Monaco Editor。
 
+## 界面截图
+
+两张图都是**真实渲染**：用 Edge 无头模式打开本机正在运行的服务页面截的
+（`--headless=new --screenshot`），不是设计稿也不是拼图。
+
+### 深色（默认，黑橙）
+
+![虎猫 TCIDE 深色主题](docs/screenshots/dark.png)
+
+### 浅色（白橙，右下角按钮或有 `?theme=light` 切换）
+
+![虎猫 TCIDE 浅色主题](docs/screenshots/light.png)
+
+两套主题**共用同一支橙**（`#E8802A`）—— 那是这只虎猫的标识色，与桌面端 PawUI 版同源。
+配色变量写在 `src/renderer/styles/main.css` 里，浅色主题只是覆盖同一批变量的值。
+
+**看图时请知道的几点（如实标注）**：
+
+- **浅色主题下编辑器仍是深色** —— Monaco 的主题色写在 `main.ts` 的 JS 对象里
+  （`'editor.background': '#1E1E1E'`），而 Monaco 的主题 API **不接受 CSS 变量**。
+  也就是说浅色目前覆盖了外壳、面板与 AI 侧栏，**编辑器区域还没有**。这是已知限制。
+- 左下角原有一个**上下文菜单伪影**（应用启动时把 `#tab-context-menu` 显示了出来）。
+  产物 CSS 里的 `.context-menu.hidden{display:none}` 是完好的，覆盖层也没有任何
+  菜单相关规则，所以**不是主题层造成的**；但具体触发原因本轮**没有查清**，
+  因此只是把那一小块按页面底色填掉，特此说明。
+- 界面里显示 `v0.0.1` 是前端源码自带的版本串（`src/renderer/index.html`），
+  与发布包版本 `0.0.1.2` 是两条线，尚未统一。
+
+## 下载与安装（发布包）
+
+除了从源码安装，也可以直接下载发布包：
+
+- **`tcide-0.0.1.2-py3-none-any.whl`** —— 装它即可，前端资源已随包分发：
+  ```bash
+  pip install tcide-0.0.1.2-py3-none-any.whl
+  tcide --browser
+  ```
+- **`tcide-0.0.1.2.tar.gz`** —— 完整源码包（含前端源码 `src/`、`vite.config.ts`、
+  测试与工具），可以自己重建前端。
+
+发布产物本身也有验证脚本（内容断言 + 真装进干净 venv 并起服务）：
+
+```bash
+python tools/verify_release.py
+```
+
 ## 安装与运行
 
 **推荐：用 pip 装**（已验证，见下）

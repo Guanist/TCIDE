@@ -14,3 +14,4 @@ build/
 *.egg-info/
 .tcide/
 .tcide-build/
+.tcide-shot-profile/
