@@ -65,12 +65,30 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="同步前端产物到 web/")
     parser.add_argument("--from", dest="source", required=True, help="产物目录")
     parser.add_argument("--dry-run", action="store_true")
+    parser.add_argument("--force", action="store_true",
+                        help="即使产物提交与 HEAD 不一致也同步")
     args = parser.parse_args()
 
     source = pathlib.Path(args.source)
     if not (source / "index.html").is_file():
         print(f"★ {source} 里没有 index.html（不是渲染层产物？）")
         return 1
+
+    # 防呆：产物里的 COMMIT 必须与本地 HEAD 一致。
+    # 起因是我用"最近一次成功的构建"下载到了**更早提交**的产物，把旧代码同步回了
+    # web/（旧 bundle 里还有已经撤掉的界面内宠物）。这种事不该靠记性避免。
+    stamp = source / "COMMIT"
+    if stamp.is_file() and not args.force:
+        built = stamp.read_text(encoding="utf-8").strip()
+        head = subprocess.run(["git", "rev-parse", "HEAD"], cwd=str(ROOT),
+                              capture_output=True, text=True).stdout.strip()
+        if built and head and built != head:
+            print(f"★ 拒绝同步：产物来自提交 {built[:7]}，而本地 HEAD 是 {head[:7]}")
+            print("  （对不上说明下错了产物。确认要同步就加 --force。）")
+            return 1
+        print(f"  ✓ 产物提交与 HEAD 一致（{built[:7]}）")
+    elif not stamp.is_file():
+        print("  · 产物里没有 COMMIT 文件（旧构建），无法核对提交号")
 
     # 1) 以**新产物**的首页为准，算出被引用的资源
     new_index = (source / "index.html").read_text(encoding="utf-8")

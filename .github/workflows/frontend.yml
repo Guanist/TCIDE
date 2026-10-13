@@ -83,6 +83,11 @@ jobs:
           fi
           grep -q '/static/tcide-theme.js' dist/renderer/index.html
           echo "OK: 主题变量、浅色主题、切换脚本都已在产物中"
+      - name: 在产物里写下提交号（供同步工具比对，防止同步到旧的构建）
+        run: |
+          echo "${GITHUB_SHA}" > dist/renderer/COMMIT
+          cat dist/renderer/COMMIT
+
       - name: 上传产物（便于人工核对）
         uses: actions/upload-artifact@v4
         with:
