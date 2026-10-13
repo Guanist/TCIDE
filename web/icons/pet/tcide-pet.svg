@@ -47,6 +47,11 @@
       .eyes-shut { display: none; }
       .zzz, .tear { display: none; }
 
+      /* ── idle 是基础态：不覆盖任何元素，只把节奏放慢一档 ──
+         显式写出来，是为了让四个状态在样式里自证（也避免读者以为待机是什么都没有）*/
+      .state-idle .body-group  { animation-duration: 3.6s; }
+      .state-idle .tail        { animation-duration: 3s; }
+
       .state-work .laptop      { display: block; }
       .state-work .body-group  { animation: pet-type .5s ease-in-out infinite; }
       .state-work .tail        { animation-duration: 1.4s; }

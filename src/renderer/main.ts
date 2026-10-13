@@ -9,6 +9,7 @@ import 'xterm/css/xterm.css';
 import { getLspClient, lspDidOpen, lspDidChange, lspDidClose, stopAllLspClients, getAllDiagnostics } from './lsp-client';
 import { initSnippets, registerSnippets, listSnippets } from './snippet-service';
 import { initPixelPet, petToolCallStart, petToolCallEnd } from './pet';
+import { initSvgPet } from './svg-pet';
 import { DebugPanel } from './debug-panel';
 
 // ── 轻量 Emmet 解析器 (内联, 避免外部依赖) ──
@@ -5361,6 +5362,8 @@ function setupEventListeners(): void {
 
   // ── 像素宠物 ──
   initPixelPet();
+  // 界面里的矢量宠物（Web/PyWebView 版原先没有宠物：只有样式没有 DOM）
+  initSvgPet();
 
 }
 
