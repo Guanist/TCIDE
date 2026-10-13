@@ -89,6 +89,34 @@ def main() -> int:
 
         print(f"\n=== 5) 服务器状态 ===")
         print(f"  {mcp.get_servers()}")
+
+        # 6) 最关键的一步：**通过工具注册表**调用外部工具。
+        #    这一步证明"AI 能用上它"，而不只是"客户端能连上" ——
+        #    注册表是 agent 唯一的工具入口，也是权限策略生效的地方。
+        print("\n=== 6) 注册进工具表并按注册表调用 ===")
+        from tcide_core.tools import ToolRegistry
+        from tcide_core.workspace import Workspace
+
+        registry = ToolRegistry(Workspace(workdir))
+        registered = mcp.register_into(registry, project_path=str(workdir))
+        print(f"  注册进工具表的外部工具：{registered} 个")
+        names = [name for name in registry.names() if "__" in name]
+        if not names:
+            problems.append("外部工具没进工具表（模型看不到它）")
+        else:
+            target = next((name for name in names
+                           if "list_directory" in name or "read_file" in name), names[0])
+            arguments = ({"path": str(workdir)} if "list" in target
+                         else {"path": str(workdir / "hello.txt")})
+            outcome = registry.call(target, arguments)
+            print(f"  经注册表调用 {target} → ok={outcome.ok} "
+                  f"输出={outcome.output[:120]!r}")
+            if not outcome.ok:
+                problems.append(f"经注册表调用失败：{outcome.error}")
+            elif "hello" not in outcome.output and "code.py" not in outcome.output:
+                problems.append(f"经注册表调用返回内容不符预期：{outcome.output[:120]}")
+            else:
+                print("  ✓ 外部工具经注册表调用成功 —— AI 现在能用上它了")
     finally:
         mcp.disconnect_all()
         shutil.rmtree(workdir, ignore_errors=True)

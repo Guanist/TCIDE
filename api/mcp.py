@@ -425,3 +425,107 @@ def _search_code(root: str, query: str, *, limit: int = 30) -> str:
             except (OSError, UnicodeDecodeError):
                 continue
     return "\n".join(hits)
+
+
+# ---------------------------------------------------------------------------
+# 配置与"把外部工具交给 AI"
+# ---------------------------------------------------------------------------
+#
+# 背景：MCP 客户端能连上真服务器之后，**AI 仍然用不到它** —— agent 走的是
+# tcide_core.tools.ToolRegistry，而外部工具从来没注册进去。也就是
+# "能力在、接线没接"。下面这几个函数就是那根线。
+
+#: 配置文件：``<配置目录>/mcp.json``（配置目录遵循 TCIDE_CONFIG_DIR，便于测试隔离）
+CONFIG_NAME = "mcp.json"
+
+
+def config_path() -> str:
+    from tcide_core.settings import config_dir
+
+    return str(config_dir() / CONFIG_NAME)
+
+
+def load_config() -> dict:
+    """读 MCP 配置。缺文件/坏文件都返回空配置（**不抛异常**）。
+
+    格式照抄主流客户端（Claude Desktop / Codex 那一类），便于用户直接搬过来::
+
+        {"servers": {"fs": {"command": "npx",
+                            "args": ["-y", "@modelcontextprotocol/server-filesystem", "/path"],
+                            "env": {}}}}
+    """
+    path = config_path()
+    if not os.path.isfile(path):
+        return {"servers": {}}
+    try:
+        with open(path, "r", encoding="utf-8") as handle:
+            data = json.load(handle)
+    except (OSError, json.JSONDecodeError):
+        return {"servers": {}}
+    servers = data.get("servers") if isinstance(data, dict) else None
+    return {"servers": servers if isinstance(servers, dict) else {}}
+
+
+def connect_configured(*, project_path: str = "") -> dict:
+    """按配置连接所有 MCP server（已连的复用）。返回逐个结果。"""
+    results: dict = {}
+    for name, spec in load_config().get("servers", {}).items():
+        if name in _clients:
+            results[name] = {"success": True, "name": name,
+                             "tools": len(_clients[name].tools), "cached": True}
+            continue
+        if not isinstance(spec, dict) or not spec.get("command"):
+            results[name] = {"error": "配置缺少 command"}
+            continue
+        results[name] = connect_server(
+            name, str(spec["command"]), list(spec.get("args") or []),
+            dict(spec.get("env") or {}), project_path=project_path)
+    return results
+
+
+def tool_specs() -> list:
+    """把已连接的外部工具转成 ``tcide_core.tools.ToolSpec``。
+
+    两个关键决定：
+
+    1. **handler 走 :func:`call_tool`** —— 于是权限策略、调用记录、错误包装都用
+       注册表那一套，不另开旁路；
+    2. **``dangerous=True``** —— 外部工具对我们来说是黑盒（可能写文件、执行命令、
+       联网）。不标危险的话，只读档下它会被**直接放行**：权限策略按工具名判断，
+       而外部工具名是 ``server__tool``，策略原本认不出来。这是一个真实的安全洞。
+    """
+    from tcide_core.tools import ToolResult, ToolSpec
+
+    specs = []
+    for state in _clients.values():
+        for item in state.tools:
+            remote_name = item["name"]
+
+            def handler(_name=remote_name, **arguments):
+                outcome = call_tool(_name, arguments)
+                if outcome.get("error"):
+                    return ToolResult(ok=False, error=str(outcome["error"]))
+                return ToolResult(ok=True, output=str(outcome.get("result", "")))
+
+            specs.append(ToolSpec(
+                name=remote_name,
+                description=item.get("description", ""),
+                parameters=item.get("parameters") or {"type": "object"},
+                handler=handler,
+                dangerous=True,
+            ))
+    return specs
+
+
+def register_into(registry, *, project_path: str = "") -> int:
+    """把已配置的外部工具注册进工具表；返回注册数量。
+
+    幂等；连不上服务器时**不抛异常**（一个 MCP server 挂掉不该让 IDE 起不来），
+    失败原因留在 :func:`connect_configured` 的返回值里。
+    """
+    connect_configured(project_path=project_path)
+    count = 0
+    for spec in tool_specs():
+        registry.register(spec)
+        count += 1
+    return count

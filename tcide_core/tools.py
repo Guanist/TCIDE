@@ -188,7 +188,8 @@ class ToolRegistry:
             return ToolResult(ok=False, error=f"未知工具: {name}（可用: {self.names()}）")
         # 权限兜底：拦在所有工具调用的唯一咽喉上（agent 有多条路径，散着判迟早漏一条）。
         # 只读档下写文件/执行命令在这里被直接拒绝 —— fail closed。
-        decision = self.policy.decide(name) if self.policy else None
+        decision = (self.policy.decide(name, dangerous=bool(getattr(spec, "dangerous", False)))
+                    if self.policy else None)
         if decision is not None and decision.denied:
             record["ok"] = False
             record["denied"] = True

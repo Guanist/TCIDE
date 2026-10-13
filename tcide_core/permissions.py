@@ -105,15 +105,22 @@ class PermissionPolicy:
 
     # -- 决策 -------------------------------------------------------------
 
-    def decide(self, tool: str) -> Decision:
-        """给一个工具名，返回处置决定。"""
+    def decide(self, tool: str, *, dangerous: bool = False) -> Decision:
+        """给一个工具名（或一个"危险"标志），返回处置决定。
+
+        ``dangerous`` 是给**外部工具**用的：MCP 等外部 server 的工具名形如
+        ``fs__write_file``，按名字根本认不出它会不会写盘/执行命令，所以由注册表把
+        ``ToolSpec.dangerous`` 传进来。**没有这个参数就是一个真实的安全洞**：
+        只读档下外部写工具会被当成"只读类工具"直接放行。
+        """
         name = str(tool or "")
-        if name not in GATED_TOOLS:
+        if name not in GATED_TOOLS and not dangerous:
             return Decision("allow", "只读类工具，任何档位都放行")
         if self.level == "auto":
             return Decision("allow", "自动档：直接执行")
         if self.level == "read_only":
-            kind = "写文件" if name in WRITE_TOOLS else "执行命令"
+            kind = ("外部工具" if dangerous and name not in GATED_TOOLS
+                    else ("写文件" if name in WRITE_TOOLS else "执行命令"))
             return Decision(
                 "deny",
                 f"当前权限为「只读」，{kind}（{name}）已被拒绝。"
