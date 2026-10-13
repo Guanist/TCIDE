@@ -51,6 +51,20 @@ jobs:
           ls dist/renderer/assets | grep -q 'index-.*\.js'
           ls dist/renderer/assets | grep -q 'index-.*\.css'
 
+      - name: 校验主题真的进了产物（源码 → 构建 → 产物 这条链）
+        run: |
+          set -e
+          css=$(ls dist/renderer/assets/index-*.css | head -1)
+          echo "检查 $css"
+          grep -q -- '--bg-primary' "$css"
+          grep -q 'data-tcide-theme="light"' "$css"
+          if grep -qiE '#1e1e1e' "$css"; then
+            echo "::error::产物里仍有裸写的 #1e1e1e —— 主题变量没被用上"
+            exit 1
+          fi
+          grep -q '/static/tcide-theme.js' dist/renderer/index.html
+          echo "OK: 主题变量、浅色主题、切换脚本都已在产物中"
+
       - name: 上传产物（便于人工核对）
         uses: actions/upload-artifact@v4
         with:

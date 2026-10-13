@@ -30,6 +30,11 @@
 
   function apply(name) {
     root.setAttribute("data-tcide-theme", name);
+    // 同步应用自带的类名机制（main.ts 用 classList.toggle('theme-light')）：
+    // 两套触发指向同一份变量，才不会互相打架。
+    try {
+      root.classList.toggle("theme-light", name === "light");
+    } catch (e) { /* 老浏览器没有 classList.toggle 的第二参数 */ }
     var button = document.getElementById("tcide-theme-toggle");
     if (button) {
       button.textContent = name === "dark" ? "☀" : "☾"; // 显示"点了会变成什么"
@@ -56,7 +61,8 @@
   }
 
   // 尽早把属性写上（避免"先白闪一下再变黑"）
-  apply(preferred());
+  var bootstrapped = root.classList.contains("theme-light") ? "light" : preferred();
+  apply(bootstrapped);
   if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", mount);
   } else {

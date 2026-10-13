@@ -78,47 +78,88 @@
   --font-size-xl: 20px;
   --font-size-2xl: 24px;
   --font-size-3xl: 32px;
-}
-
-/* ═══ 白虎主题（亮色） ═══ */
-.theme-light {
-  --tc-orange: #E67E00;
-  --tc-orange-light: #FF9500;
-  --tc-orange-dark: #B86E00;
-  --tc-stripe: #F5F5F5;
-  --tc-glow: rgba(230, 126, 0, 0.15);
-  --tc-gradient: linear-gradient(135deg, #E67E00, #CC6E00);
+}:root {
+  /* ═══ 虎猫主题色 ═══ */
+  --tc-orange: var(--tc-orange);
+  --tc-orange-light: var(--tc-orange-light);
+  --tc-orange-dark: var(--tc-orange-dark);
+  --tc-stripe: var(--tc-stripe);
+  --tc-glow: rgba(255, 140, 0, 0.25);
+  --tc-gradient: linear-gradient(135deg, var(--tc-orange), #E67E00);
   
-  --bg-primary: #FFFFFF;
-  --bg-secondary: #F5F5F5;
-  --bg-tertiary: #E8E8E8;
-  --bg-hover: #ECECEC;
-  --bg-active: #DBE4F0;
-  --bg-glass: rgba(0, 0, 0, 0.03);
-  --bg-glass-hover: rgba(0, 0, 0, 0.06);
+  /* ═══ 背景色系 ═══ */
+  --bg-primary: var(--bg-primary);
+  --bg-secondary: var(--bg-secondary);
+  --bg-tertiary: var(--bg-tertiary);
+  --bg-hover: var(--bg-hover);
+  --bg-active: var(--bg-active);
+  --bg-glass: rgba(255, 255, 255, 0.04);
+  --bg-glass-hover: rgba(255, 255, 255, 0.06);
   
-  --text-primary: #1E1E1E;
-  --text-secondary: #6E6E6E;
-  --text-accent: #E67E00;
-  --text-link: #0078D4;
-  --text-dim: #A0A0A0;
+  /* ═══ 文字色系 ═══ */
+  --text-primary: var(--text-primary);
+  --text-secondary: var(--text-secondary);
+  --text-accent: var(--tc-orange);
+  --text-link: var(--text-link);
+  --text-dim: var(--text-dim);
   
-  --border-subtle: #E0E0E0;
-  --border-normal: #D0D0D0;
-  --border-bright: #B0B0B0;
+  /* ═══ 边框 ═══ */
+  --border-subtle: var(--border-subtle);
+  --border-normal: var(--border-normal);
+  --border-bright: var(--border-bright);
   
-  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.08);
-  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.1);
-  --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.12);
-  --shadow-xl: 0 16px 48px rgba(0, 0, 0, 0.15);
+  /* ═══ 功能色 ═══ */
+  --success: var(--success);
+  --warning: var(--warning);
+  --error: var(--error);
+  --info: var(--info);
+  
+  /* ═══ 间距比例 ═══ */
+  --space-xs: 4px;
+  --space-sm: 6px;
+  --space-md: 8px;
+  --space-lg: 12px;
+  --space-xl: 16px;
+  --space-2xl: 24px;
+  
+  /* ═══ 圆角 ═══ */
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+  --radius-xl: 12px;
+  --radius-full: 999px;
+  
+  /* ═══ 阴影 ═══ */
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.3);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.4);
+  --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.5);
+  --shadow-xl: 0 16px 48px rgba(0, 0, 0, 0.6);
   --shadow-glow: 0 0 16px var(--tc-glow);
-
-  /* ═══ 亮色特别覆盖 ═══ */
+  
+  /* ═══ 缓动函数 ═══ */
+  --ease-fast: 0.12s cubic-bezier(0.4, 0, 0.2, 1);
+  --ease-normal: 0.18s cubic-bezier(0.4, 0, 0.2, 1);
+  --ease-smooth: 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  --ease-bounce: 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+  
+  /* ═══ 字体 ═══ */
+  --font-sans: 'Segoe UI', 'Microsoft YaHei', system-ui, sans-serif;
+  --font-mono: 'Cascadia Code', 'Fira Code', 'JetBrains Mono', 'Consolas', monospace;
+  --font-size-xs: 11px;
+  --font-size-sm: 12px;
+  --font-size-base: 13px;
+  --font-size-md: 14px;
+  --font-size-lg: 16px;
+  --font-size-xl: 20px;
+  --font-size-2xl: 24px;
+  --font-size-3xl: 32px;
 }
+
+
 .theme-light .ai-panel { border-left-color: var(--border-normal); }
 .theme-light .settings-panel { background: var(--bg-primary); }
 .theme-light .welcome-page { background: linear-gradient(135deg, #FFF 0%, #FFF8F0 100%); }
-.theme-light .welcome-title { color: #1E1E1E; }
+.theme-light .welcome-title { color: var(--text-primary); }
 
 /* ────────────────────────────────────────
    全局基础
@@ -759,12 +800,12 @@ html, body {
 
 /* ── 终端面板 ── */
 #panel-terminal {
-  background: #1E1E1E;
+  background: var(--bg-primary);
 }
 
 #terminal-container {
   flex: 1;
-  background: #1E1E1E;
+  background: var(--bg-primary);
   padding: 2px 0;
 }
 
@@ -2230,7 +2271,7 @@ body.zen-mode #editor-area {
 }
 .diff-backdrop { position: absolute; inset: 0; background: rgba(0,0,0,0.6); }
 .diff-panel {
-  position: relative; background: #1e1e1e; border: 1px solid #3a3a3a;
+  position: relative; background: var(--bg-primary); border: 1px solid #3a3a3a;
   border-radius: 12px; width: 90vw; max-width: 1100px; max-height: 85vh;
   display: flex; flex-direction: column; box-shadow: 0 8px 40px rgba(0,0,0,0.5);
 }
@@ -4571,3 +4612,47 @@ input:focus, button:focus-visible, select:focus, textarea:focus {
 }
 .avatar-picker .avatar-emoji-grid button:hover { background:var(--bg-active); }
 
+
+/* ═══════════════════════════════════════════════════════════════════
+   浅色主题（白橙）—— 由 html[data-tcide-theme="light"] 触发
+
+   为什么放在源码里而不是运行时覆盖：变量本来就在这个文件里定义，
+   在源码里"换值"是最干净的做法 —— 构建时就会进产物，不依赖任何运行时补丁。
+   与 tcide-pawui 的 theme.py、以及 static/tcide-theme.css 同一套配色。
+   ═══════════════════════════════════════════════════════════════════ */
+/* 两种触发都支持：data 属性（本项目的切换脚本）与 .theme-light 类
+   （应用自带按钮用的就是它，见 main.ts 的 classList.toggle） */
+html[data-tcide-theme="light"],
+html.theme-light {
+  --tc-orange: #E8802A;
+  --tc-orange-light: #F59B4B;
+  --tc-orange-dark: #C2651A;
+  --tc-stripe: #F0E6D8;
+  --tc-glow: rgba(232, 128, 42, 0.18);
+
+  --bg-primary: #FDFAF5;
+  --bg-secondary: #FFFFFF;
+  --bg-tertiary: #F6F1E8;
+  --bg-hover: #F1E9DC;
+  --bg-active: #FBE3C9;
+  --bg-glass: rgba(90, 70, 40, 0.04);
+  --bg-glass-hover: rgba(90, 70, 40, 0.07);
+
+  --text-primary: #1A1512;
+  --text-secondary: #6F6154;
+  --text-accent: #C2651A;
+  --text-link: #1F6FB2;
+  --text-dim: #9C8F80;
+
+  --border-subtle: #E6DCCD;
+  --border-normal: #D8CBB8;
+  --border-bright: #BCA98F;
+
+  /* 从被删掉的遗留块并入：浅色也需要层次 */
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.08);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.1);
+  --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.12);
+  --shadow-xl: 0 16px 48px rgba(0, 0, 0, 0.15);
+  --shadow-glow: 0 0 16px var(--tc-glow);
+  --tc-gradient: linear-gradient(135deg, #E67E00, #CC6E00);
+}
