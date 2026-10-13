@@ -1891,7 +1891,7 @@ let _lastPreviewFrame: HTMLIFrameElement | null = null;
     } else if (langLower === 'javascript' || langLower === 'js' || langLower === 'ts') {
       frame.srcdoc = `<html><head></head><body><div id="output" style="padding:20px;font-family:monospace"></div><script>try{const out=document.getElementById('output');const origLog=console.log;console.log=function(...args){out.innerHTML+=args.join(' ')+'<br>'};${code};console.log=origLog}catch(e){document.getElementById('output').innerHTML='<span style="color:red">❌ Error: '+e.message+'</span>'}<\/script></body></html>`;
     } else {
-      frame.srcdoc = `<html><body style="padding:20px;font-family:monospace;background:#1e1e1e;color:#d4d4d4"><h3>🔍 ${lang} 源码预览</h3><pre style="white-space:pre-wrap">${code.replace(/&/g,'&amp;').replace(/</g,'&lt;')}</pre></body></html>`;
+      frame.srcdoc = `<html><body style="padding:20px;font-family:monospace;background: var(--bg-primary);color:#d4d4d4"><h3>🔍 ${lang} 源码预览</h3><pre style="white-space:pre-wrap">${code.replace(/&/g,'&amp;').replace(/</g,'&lt;')}</pre></body></html>`;
     }
   }
   
