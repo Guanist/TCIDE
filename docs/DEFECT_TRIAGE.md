@@ -74,8 +74,8 @@
 | 2 | `tcide_core/term.py` 未移植 | 它直接依赖 Qt/PawUI（移植脚本按规则跳过）。Python 版有自己的 `api/terminal.py` | 低 |
 | 3 | 3 个移植测试被移除 | `test_theme.py`（读 PawUI 的 `app.paw`）、`test_panels.py`（依赖 PawUI 夹具）、`test_gitintel.py`（同上）。**模块保留**，只是测试与 PawUI 应用层耦合 | 低：这些模块在本仓库暂无测试 |
 | 4 | DAP 集成测试改为开关 | `TCIDE_DAP_TESTS=1` 才跑。默认跳过是因为它与临时目录清理有竞态（会偶发红）。**不是**功能缺失 —— 设开关后 2 条全过 | 低 |
-| 5 | web 前端的 Diff 审核 UI | 见 B 表"待核" | 待评估 |
-| 6 | CI 是否真的在跑 | 见 C 表"待核" | 待评估 |
+| ~~5~~ | ~~web 前端的 Diff 审核 UI~~ | ✅ **查证为已具备**：`web/assets/p2-modules.js` 引用 `window.acceptDiff` / `window.closeDiffModal` 并操作 `#diff-modal`（实现于主 bundle），前端有 `getDiff → GET /api/git/diff` | — |
+| ~~6~~ | ~~CI 是否真的在跑~~ | ✅ **已修并实证**：新增工作流，运行 38373327750 `success`，日志 `212 passed, 1 skipped in 4.94s` | — |
 
 ## 本次为这份对照表做了什么
 
