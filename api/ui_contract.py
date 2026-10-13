@@ -613,13 +613,18 @@ def runner_abort() -> dict:
 
 
 def runner_status() -> dict:
-    """当前执行状态（老接口 ``/api/runner/status``）。"""
+    """当前执行状态（老接口 ``/api/runner/status``）。
+
+    注意 ``tcide_core.runner.UnattendedRunner.cancelled`` 是 **property**（不是方法）——
+    我第一版当函数调用了，得到 ``TypeError: 'bool' object is not callable``。
+    """
     runner = _runner_state.get("runner")
+    report = _runner_state.get("report")
+    cancelled = bool(runner is not None and runner.cancelled)
     return {"root": _runner_state.get("root", ""),
-            "running": bool(runner is not None and not runner.cancelled()
-                            and _runner_state.get("report") is None),
-            "cancelled": bool(runner is not None and runner.cancelled()),
-            "report": _runner_state.get("report")}
+            "running": bool(runner is not None and not cancelled and report is None),
+            "cancelled": cancelled,
+            "report": report}
 
 
 # ── 双 Agent 编排 /api/orchestrator/* ────────────────────────────────────
