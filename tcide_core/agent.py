@@ -324,6 +324,7 @@ class CoderAgent:
         if self.on_event is not None:
             self.on_event(AgentEvent(kind=kind, message=message, data=data))
 
+
     def execute(self, task: Task, *, context: str = "") -> TaskOutcome:
         messages = [ChatMessage.system(CODER_SYSTEM)]
         if context:
@@ -472,6 +473,7 @@ class AgentOrchestrator:
         review_gate_enabled: bool = True,
         reviewer: ReviewerAgent | None = None,
         on_event: Callable[[AgentEvent], None] | None = None,
+        on_checkpoint: Callable[[dict], None] | None = None,
     ) -> None:
         self.model = model
         self.tools = tools
@@ -481,7 +483,29 @@ class AgentOrchestrator:
         self.review_gate_enabled = bool(review_gate_enabled)
         self.reviewer = reviewer or ReviewerAgent(tools=tools)
         self.on_event = on_event
+        #: 任务边界回调（长任务恢复用）：收一个 dict，由调用方决定怎么落盘 ——
+        #: 编排器不认识文件系统，保持它可测、可复用。
+        self.on_checkpoint = on_checkpoint
         self._cancel = threading.Event()
+    def _checkpoint(self, report: "RunReport", *, stage: str,
+                    task: "Task | None" = None,
+                    in_flight: list[str] | None = None) -> None:
+        """在**任务边界**通知调用方落盘（任务内部不存 —— 那是结果未知的危险区）。"""
+        if self.on_checkpoint is None:
+            return
+        try:
+            self.on_checkpoint({
+                "stage": stage,
+                "task_id": task.id if task is not None else "",
+                "tasks": [item.to_dict() for item in report.tasks],
+                "done_count": report.done,
+                "tool_calls": report.tool_calls,
+                "cancelled": self.cancelled,
+                "in_flight": list(in_flight or []),
+            })
+        except Exception:      # noqa: BLE001 - 落盘失败不该打断编排
+            pass
+
 
     # -- 事件与取消 -------------------------------------------------------
 
@@ -548,6 +572,8 @@ class AgentOrchestrator:
             return
         task.status = "running"
         self._emit("task_start", task.title, task_id=task.id)
+        # 任务**开始**处也存一次：这样"哪些任务已经做完"永远是准确的
+        self._checkpoint(report, stage="task_start", task=task)
         coder = CoderAgent(self.model, self.tools, on_event=self.on_event)
         final_reason = "coder"
 
@@ -596,6 +622,7 @@ class AgentOrchestrator:
         task.status = "rejected" if final_reason == "review" else "failed"
         with lock:
             report.failed += 1
+        self._checkpoint(report, stage="task_failed", task=task)
         self._emit("task_failed", task.error or "失败", task_id=task.id,
                    status=task.status)
 

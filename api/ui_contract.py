@@ -120,6 +120,83 @@ def _engine(name: str):
 
 # ── 代码熵 /api/entropy/* ────────────────────────────────────────────────
 
+def _checkpoint_recorder(root: str, *, run_id: str = ""):
+    """返回一个"在任务边界落盘检查点"的回调（长任务恢复用）。
+
+    为什么放在 HTTP 层而不是编排器里：编排器不认识文件系统（那样它就没法离线测了）。
+    所以由这里提供落盘，编排器只负责在正确的位置喊一声。
+    """
+    from tcide_core.checkpoints import Checkpoint, CheckpointStore
+
+    store = CheckpointStore(root)
+    identity = run_id or f"run-{int(__import__('time').time())}"
+
+    def record(payload: dict) -> None:
+        checkpoint = Checkpoint(
+            run_id=identity,
+            requirement=str(payload.get("goal", "")),
+            tasks=list(payload.get("tasks") or []),
+            done_count=int(payload.get("done_count") or 0),
+            tool_calls=int(payload.get("tool_calls") or 0),
+            in_flight=list(payload.get("in_flight") or []),
+            finished=False,
+            cancelled=bool(payload.get("cancelled")),
+        )
+        try:
+            store.save(checkpoint)
+            store.prune(keep=10)
+        except OSError:
+            pass          # 落盘失败不该打断编排
+
+    return record
+
+
+def _finish_checkpoint(root: str) -> None:
+    """把最新检查点标记为"已结束"。
+
+    不做这一步的话，一次**正常跑完**的编排在恢复判定里仍然像"可以接着跑" —— 那是
+    误导：用户会以为自己中断过。标记 finished 之后，判定会明确说"无需恢复"。
+    """
+    from tcide_core.checkpoints import CheckpointStore
+
+    store = CheckpointStore(root)
+    latest = store.latest()
+    if latest is None or latest.finished:
+        return
+    latest.finished = True
+    try:
+        store.save(latest)
+    except OSError:
+        pass
+
+
+@router.get("/api/agent/checkpoints")
+async def agent_checkpoints():
+    """列出检查点，并给出最新一个的**恢复判定**。
+
+    判定里最重要的一条：如果上次中断时**有工具已发起但结果未知**，恢复前必须先核验
+    它的副作用（文件是否已改、命令是否已执行）—— 盲目重跑比中断本身更危险。
+    """
+    from tcide_core.checkpoints import CheckpointStore, plan_resume
+
+    store = CheckpointStore(current_project_root())
+    items = []
+    for run_id in store.list()[-20:]:
+        checkpoint = store.load(run_id)
+        if checkpoint is not None:
+            items.append(checkpoint.to_dict())
+    latest = store.latest()
+    decision = plan_resume(latest)
+    return {"success": True, "count": len(items), "checkpoints": items,
+            "resume": {"can_resume": decision.can_resume,
+                       "run_id": decision.run_id,
+                       "from_round": decision.from_round,
+                       "pending": decision.pending,
+                       "unknown_tools": decision.unknown_tools,
+                       "notes": decision.notes,
+                       "summary": decision.summary()}}
+
+
 @router.post("/api/agent/best-of-n")
 async def agent_best_of_n(request: Request):
     """同一需求跑多个**隔离**尝试，按可验证的分数选优。
@@ -158,7 +235,9 @@ async def agent_best_of_n(request: Request):
             policy=current_policy())
         _register_mcp_tools(registry, str(workdir))
         memory = ProjectMemoryBuilder(Workspace(str(workdir))).build()
-        agent = AgentOrchestrator(AdapterClient(config), registry, memory=memory)
+        agent = AgentOrchestrator(AdapterClient(config), registry,
+                                  memory=memory,
+                                  on_checkpoint=_checkpoint_recorder(str(workdir)))
         return agent.run(requirement)
 
     def verify(workdir, report):
@@ -806,11 +885,14 @@ async def orchestrator_run(request: Request, task: str = ""):
         context = ProjectMemoryBuilder.to_markdown(
             ProjectMemoryBuilder(workspace).build())
         orchestrator = AgentOrchestrator(AdapterClient(config), registry,
-                                        context=context, on_event=on_event)
+                                        context=context, on_event=on_event,
+                                        on_checkpoint=_checkpoint_recorder(root))
         _orchestrator_state.update({"status": "running", "requirement": requirement,
                                     "events": events})
         report = orchestrator.run(requirement)
         _orchestrator_state.update({"status": "done", "report": report.to_dict()})
+        # 正常结束 → 把检查点标记为 finished，恢复判定就不会再让人"接着跑"
+        _finish_checkpoint(root)
         return {"success": report.ok, "summary": report.summary(),
                 "report": report.to_dict(), "events": events[-50:]}
     except Exception as exc:      # noqa: BLE001 - 编排失败要给可读原因

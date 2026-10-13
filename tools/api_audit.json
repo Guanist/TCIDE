@@ -3,6 +3,7 @@
  "unused": [
   "/",
   "/api/agent/best-of-n",
+  "/api/agent/checkpoints",
   "/api/ai/configure",
   "/api/ai/orchestrate",
   "/api/ai/review",
@@ -386,6 +387,9 @@
    "POST"
   ],
   "/api/runner/status": [
+   "GET"
+  ],
+  "/api/agent/checkpoints": [
    "GET"
   ],
   "/api/agent/best-of-n": [
