@@ -470,7 +470,10 @@ class TestDebugContract:
                 assert item.get("install"), f"{item['id']} 不可用时必须给出安装方式"
 
     def test_start_then_step_then_stop(self, client, temp_project):
-        """真起一个 pdb 进程，真的单步，然后停掉。"""
+        """真起一个调试会话，真的单步，然后停掉。
+
+        装了 debugpy 时走 DAP、否则走 pdb —— 两种都必须能单步。
+        """
         import pathlib
 
         script = pathlib.Path(temp_project) / "debugme.py"
@@ -480,16 +483,46 @@ class TestDebugContract:
                               json={"adapter": "pdb", "file": str(script)}).json()
         assert started.get("success") is True, started
         session = started["session"]
-        assert started["adapter"] == "pdb"
+        assert started["adapter"] in ("pdb", "debugpy")
 
         stepped = client.post("/api/debug/next", params={"session": session}).json()
-        assert stepped["success"] is True, stepped
-        assert "n" == stepped["command"]
-        # pdb 停在断点/首行时会打印 "> /path(x)<module>()"
-        assert stepped["output"] or stepped["location"], stepped
+        assert stepped.get("success") is not False, stepped
+        if started["adapter"] == "pdb":
+            assert stepped["command"] == "n"
+            assert stepped["output"] or stepped["location"], stepped
+        else:
+            # DAP 会话即使程序已结束也必须给出明确结论，而不是假装停住了
+            assert "terminated" in stepped or "state" in stepped, stepped
 
         stopped = client.post("/api/debug/stop", params={"session": session}).json()
         assert stopped["stopped"] is True
+
+    def test_dap_session_reads_real_variables(self, client, temp_project):
+        """**真调试验证**：命中断点后必须能读到被调试进程的真实局部变量。
+
+        DAP（debugpy）相对 pdb 的核心价值就在这里 —— pdb 只有文本输出。
+        没装 debugpy 时接口必须如实说明，而不是假装成功。
+        """
+        import pathlib
+
+        script = pathlib.Path(temp_project) / "target.py"
+        script.write_text('def add(a, b):\n    total = a + b\n    return total\n\n\n'
+                          'print("result =", add(2, 3))\n', encoding="utf-8")
+        started = client.post("/api/debug/start", json={
+            "adapter": "debugpy", "file": str(script), "line": 3}).json()
+        if "error" in started:
+            assert "debugpy" in started["error"], started
+            return
+        assert started["adapter"] == "debugpy", started
+        state = started.get("state") or {}
+        assert state.get("line") == 3, f"没停在断点行：{state}"
+        values = {item["name"]: item["value"] for item in state.get("locals", [])}
+        assert values.get("a") == "2" and values.get("b") == "3", state
+
+        stepped = client.post("/api/debug/next",
+                              params={"session": started["session"]}).json()
+        assert stepped.get("success") is not False, stepped
+        client.post("/api/debug/stop", params={"session": started["session"]})
 
     def test_step_without_session_is_reported(self, client):
         body = client.post("/api/debug/next", params={"session": "nope"}).json()

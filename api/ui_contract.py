@@ -1057,14 +1057,38 @@ async def debug_start(request: Request, adapter: str = "", file: str = "",
     if not absolute or not os.path.isfile(absolute):
         return {"error": f"文件不存在或不在项目内：{target}"}
     if not absolute.lower().endswith(".py"):
-        return {"error": "pdb 会话目前只支持 Python 文件"}
+        return {"error": "目前只支持 Python 文件（pdb / debugpy）"}
+
+    # 优先走 DAP（debugpy）：能拿到栈帧/作用域/变量，界面才能做真正的调试面板。
+    # 没装 debugpy 时退回 pdb 会话（可单步，但只有文本输出）。
+    line = int(line or body.get("line") or 0)
+    if adapter != "pdb" and _module_available("debugpy"):
+        from tcide_core.dap import DapError, DapSession
+
+        session_id = f"dap-{len(_debug_sessions) + 1}"
+        try:
+            dap = DapSession(absolute, cwd=current_project_root())
+            if not dap.start():
+                raise DapError("initialize 失败")
+            verified = dap.set_breakpoints(absolute, [line]) if line > 0 else []
+            dap.configuration_done()
+            if line > 0:
+                dap.wait_stopped(timeout=20)
+        except Exception as exc:      # noqa: BLE001
+            return {"error": f"{type(exc).__name__}: {exc}", "fallback": "pdb"}
+        _debug_sessions[session_id] = dap
+        return {"success": True, "session": session_id, "adapter": "debugpy",
+                "file": target, "pid": dap.process.pid if dap.process else 0,
+                "port": dap.port, "breakpoint_verified": verified,
+                "state": dap.state(),
+                "note": "DAP 会话（debugpy）：可读变量、可求值"}
+
     session = _PdbSession(absolute, current_project_root())
     session_id = f"pdb-{len(_debug_sessions) + 1}"
     _debug_sessions[session_id] = session
     output = session.read(wait=1.0)              # pdb 的启动横幅（含当前位置）
-    if int(line or body.get("line") or 0) > 0:
-        output += "\n" + session.send(
-            f"b {os.path.basename(absolute)}:{int(line or body.get('line'))}")
+    if line > 0:
+        output += "\n" + session.send(f"b {os.path.basename(absolute)}:{line}")
     return {"success": True, "session": session_id, "adapter": "pdb", "file": target,
             "pid": session.process.pid, "output": output,
             "location": session.location(),
@@ -1102,7 +1126,7 @@ async def debug_step_out(session: str = "", session_id: str = ""):
 
 @router.post("/api/debug/pause")
 async def debug_pause(session: str = "", session_id: str = ""):
-    """pdb 里没有"暂停"，但 ``where`` 会给出当前栈帧 —— 语义上等价于"现在停在哪"。"""
+    """pdb 里没有"暂停"，用 ``where`` 给出当前栈帧；DAP 里有真正的 ``pause``。"""
     return _debug_step(_pick(session, session_id), "where", "pause")
 
 
@@ -1117,9 +1141,24 @@ async def debug_stop(session: str = "", session_id: str = ""):
 
 
 def _debug_step(session_id: str, command: str, action: str) -> dict:
+    """步进一次。
+
+    - DAP 会话（debugpy）：走协议的 ``continue/next/stepIn/stepOut/pause``，
+      停下后回传**栈帧与局部变量**（这是 DAP 相对 pdb 的价值所在）。
+    - pdb 会话：发一条 pdb 命令，返回文本输出与当前位置。
+    """
     session, error = _debug_session(session_id)
     if error is not None:
         return error
+    from tcide_core.dap import DapSession
+
+    if isinstance(session, DapSession):
+        try:
+            result = session.step(action)
+        except Exception as exc:      # noqa: BLE001
+            return {"success": False, "session": session_id,
+                    "error": f"{type(exc).__name__}: {exc}"}
+        return {"session": session_id, "adapter": "debugpy", **result}
     output = session.send(command)
     return {"success": True, "session": session_id, "action": action,
             "command": command, "output": output, "location": session.location(),
