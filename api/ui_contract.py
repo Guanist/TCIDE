@@ -332,36 +332,42 @@ async def lint_file(path: str = "", file_path: str = "", file: str = ""):
 # （only completion/definition/references/format 等）。这里用 tcide_core 里那个
 # 真正的 JSON-RPC 客户端补上通用入口，并给出"装哪个服务器"的提示。
 
-#: 语言 → 会话中的 LSP 客户端
+#: 语言 → 会话（**不再自己持有客户端**，一律走 api/lsp.py —— 合并后它是唯一实现）
 _lsp_clients: dict = {}
 
 
-def _lsp_client(language: str):
-    client = _lsp_clients.get(language)
-    if client is None:
-        from tcide_core.lsp import LspClient
+def _lsp_ready(language: str) -> dict | None:
+    """确保该语言有可用的服务器；不可用时返回"可直接回给前端的错误体"。"""
+    from api import lsp as lsp_api
 
-        client = LspClient(language=language, root=current_project_root())
-        _lsp_clients[language] = client
-    return client
+    status = lsp_api.get_status(language, current_project_root())
+    if status.get("running"):
+        return None
+    started = lsp_api.start_server(language, current_project_root())
+    if "error" in started:
+        return {"error": started["error"], "hint": started.get("hint", "")}
+    return None
 
 
 @router.post("/api/lsp/request")
 async def lsp_request(request: Request, language: str = ""):
-    """通用请求：``{language, method, params}`` → JSON-RPC 返回原样透传。"""
+    """通用请求：``{language, method, params}`` → JSON-RPC 返回原样透传。
+
+    （合并后这里只做参数解析，真正的实现在 ``api/lsp.py`` → ``tcide_core.lsp``。）
+    """
     body = await _read_json_body(request)
     language = language or body.get("language", "")
     method = body.get("method", "")
     if not language or not method:
         return {"error": "缺少 language 或 method"}
-    client = _lsp_client(language)
-    if not client.running() and not client.start():
-        return {"error": f"{language} 的语言服务器未安装或无法启动",
-                "install_guide": _install_guide(language)}
-    try:
-        return {"result": client.request(method, body.get("params") or {})}
-    except Exception as exc:      # noqa: BLE001
-        return {"error": f"{type(exc).__name__}: {exc}"}
+    blocked = _lsp_ready(language)
+    if blocked is not None:
+        blocked["install_guide"] = _install_guide(language)
+        return blocked
+    from api import lsp as lsp_api
+
+    return lsp_api.send_request(language, method, body.get("params") or {},
+                                current_project_root())
 
 
 @router.post("/api/lsp/notify")
@@ -372,10 +378,14 @@ async def lsp_notify(request: Request, language: str = ""):
     method = body.get("method", "")
     if not language or not method:
         return {"error": "缺少 language 或 method"}
-    client = _lsp_client(language)
-    if not client.running() and not client.start():
-        return {"error": f"{language} 的语言服务器未安装或无法启动", "sent": False}
-    return {"sent": bool(client.notify(method, body.get("params") or {}))}
+    blocked = _lsp_ready(language)
+    if blocked is not None:
+        blocked["sent"] = False
+        return blocked
+    from api import lsp as lsp_api
+
+    return lsp_api.send_notify(language, method, body.get("params") or {},
+                               current_project_root())
 
 
 @router.get("/api/lsp/install-guide")

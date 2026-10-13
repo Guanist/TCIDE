@@ -182,6 +182,60 @@ class TestLspContract:
         assert "error" in body
 
 
+class TestLspMerge:
+    """合并后 ``api/lsp.py`` 必须提供 ``server.py`` 调用的**全部**函数。
+
+    合并前它只有 9 个函数，而路由在调 ``did_open`` / ``get_diagnostics`` /
+    ``goto_definition`` 等 —— 那些**根本不存在**，一调就是 ``AttributeError``。
+    """
+
+    REQUIRED = ("start_server", "stop_server", "get_status", "did_open", "did_change",
+                "get_diagnostics", "format_document", "goto_definition",
+                "find_references", "send_request", "send_notify", "completion",
+                "shutdown_all", "LSP_CONFIGS")
+
+    def test_module_exposes_every_name_the_routes_call(self):
+        from api import lsp
+
+        missing = [name for name in self.REQUIRED if not hasattr(lsp, name)]
+        assert not missing, f"api/lsp.py 缺少路由要用的名字：{missing}"
+
+    def test_status_overview_shape(self):
+        from api import lsp
+
+        status = lsp.get_status("")
+        assert "servers" in status and "available" in status and "configs" in status
+        for item in status["servers"]:
+            if not item["available"]:
+                assert item["hint"], f"{item['language']} 不可用时必须给出安装提示"
+
+    def test_start_reports_install_hint_instead_of_crashing(self):
+        """没装 pyright 时要**如实说明**，不能像原来那样让 subprocess 抛异常。"""
+        from api import lsp
+
+        result = lsp.start_server("python", str(ROOT))
+        if "error" in result:
+            assert result.get("hint"), result
+        else:
+            lsp.stop_server("python", str(ROOT))
+
+    def test_previously_broken_routes_answer(self, client):
+        """这几条路由以前会因为函数不存在而 500；现在必须给出可读回应。"""
+        payload = {"language": "python", "uri": (ROOT / "server.py").as_uri(),
+                   "text": "x = 1\n", "line": 0, "character": 0}
+        for path in ("/api/lsp/didOpen", "/api/lsp/didChange", "/api/lsp/format",
+                     "/api/lsp/definition", "/api/lsp/references", "/api/lsp/completion"):
+            response = client.post(path, json=payload)
+            assert response.status_code == 200, f"{path} → {response.status_code}"
+            assert isinstance(response.json(), dict), path
+
+    def test_diagnostics_route_answers(self, client):
+        response = client.get("/api/lsp/diagnostics",
+                              params={"uri": (ROOT / "server.py").as_uri()})
+        assert response.status_code == 200
+        assert isinstance(response.json().get("diagnostics"), list)
+
+
 # ── 文件：十六进制与系统打开 ─────────────────────────────────────────────
 
 class TestFilesContract:
