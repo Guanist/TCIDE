@@ -5,7 +5,18 @@
 (function() {
   'use strict';
 
-  const API_BASE = 'http://127.0.0.1:18420';
+  // ── 后端地址 ──
+  // 跟随页面自身的来源：这个页面本来就是后端发出来的，用 location.origin 一定对。
+  // 原来硬编码 'http://127.0.0.1:18420' —— 一旦用 `main.py --port 18421` 或
+  // `--host 0.0.0.0` 启动，前端所有请求都会打到空端口上（界面整体失效）。
+  const API_BASE = (function() {
+    if (typeof location === 'undefined') return 'http://127.0.0.1:18420';
+    if (location.protocol === 'file:' || !location.origin
+        || location.origin === 'null') {
+      return 'http://127.0.0.1:18420';   // 直接从文件系统打开页面时的回退
+    }
+    return location.origin;
+  })();
 
   // ── Provider → Base URL map (matches Electron bundle) ──
   const PROVIDER_URLS = {

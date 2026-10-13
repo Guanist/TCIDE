@@ -16,7 +16,8 @@ from fastapi.staticfiles import StaticFiles
 # 确保模块路径
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from api import files, git_ops, terminal, ai, settings, lsp, mcp, memory, vector, snapshot, usage, debug
+from api import (files, git_ops, terminal, ai, settings, lsp, mcp, memory,
+                 vector, snapshot, usage, debug, ui_contract)
 
 # ── Advanced Features ──
 from advanced import (
@@ -94,6 +95,38 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="TCIDE", version="1.0.0", lifespan=lifespan)
 
+
+async def read_json(request: Request) -> dict:
+    """宽容地读取 JSON body：没有 body / 空 body / 坏 JSON 一律返回 ``{}``，不抛异常。
+
+    为什么必须有这个助手：前端（``web/electron-shim.js``）对不少接口是**只带 query
+    参数、不带 body** 调用的，例如
+
+        POST /api/project/open?path=…      （openProject）
+        POST /api/files/mkdir?path=…       （createDir）
+
+    而处理函数如果直接 ``body = await request.json()``，在空 body 上会抛
+    ``json.JSONDecodeError: Expecting value: line 1 column 1`` —— 界面上表现为
+    "打开项目"这类功能直接失败，而日志里看起来只是解析错误。
+    """
+    try:
+        raw = await request.body()
+    except Exception:      # noqa: BLE001 - 读不到就当作没有
+        return {}
+    if not raw or not raw.strip():
+        return {}
+    try:
+        data = json.loads(raw)
+    except Exception:      # noqa: BLE001 - 坏 JSON 也当作没有，交给调用方用默认值
+        return {}
+    return data if isinstance(data, dict) else {}
+
+
+
+# 前端契约路由：web/ 前端调用、但此前"URL 对不上 / 参数名对不上 / 根本没加"的接口。
+# 缺口清单可用 tools/api_audit.py 重新生成。
+app.include_router(ui_contract.router)
+
 # 静态文件 — 从 web/ 目录提供 Electron UI
 web_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "web")
 if os.path.isdir(web_dir):
@@ -119,9 +152,11 @@ async def index():
 # ── 项目 ──
 
 @app.post("/api/project/open")
-async def open_project(request: Request):
-    body = await request.json()
-    path = body.get("path", "")
+async def open_project(request: Request, path: str = ""):
+    # 前端是 POST /api/project/open?path=…（**不带 body**），所以 path 既可能来自
+    # query，也可能来自 body（旧客户端），两个都接受。
+    body = await read_json(request)
+    path = path or body.get("path", "")
     if not os.path.isdir(path):
         return {"error": f"Not a directory: {path}"}
     files.set_project_root(path)
@@ -927,7 +962,10 @@ async def terminal_ws(websocket: WebSocket, terminal_id: str):
 # ═══════════════════════════════════════════
 
 @app.get("/api/entropy/evaluate")
-async def entropy_evaluate(file_path: str):
+async def entropy_evaluate(file_path: str = "", path: str = ""):
+    # 前端（electron-shim.js 的 entropyEvaluate）用的是 ?path=…，而这里原来只声明
+    # file_path → FastAPI 直接 422，界面上"代码熵评估"必坏。两个名字都接受。
+    file_path = file_path or path
     try:
         with open(file_path, 'r', encoding='utf-8', errors='replace') as f:
             return entropy_eval.evaluate(file_path, f.read())
