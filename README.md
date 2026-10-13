@@ -1,70 +1,87 @@
-# 虎猫 TCIDE — 个人专属 AI 编程 IDE
+# TCIDE-Py — 虎猫 AI 编程 IDE（Python 版）
 
-> Builder → Coder → Compile → Deploy
-
-[![Release](https://img.shields.io/github/v/release/Guanist/TCIDE?color=ff8c00)](https://github.com/Guanist/TCIDE/releases)
 [![License](https://img.shields.io/badge/license-GPLv3-blue.svg)](LICENSE)
 
-## 分支说明
+虎猫 TCIDE 的 Python 重写版，基于 FastAPI + PyWebView + Monaco Editor。
 
-| 分支 | 说明 | 技术栈 |
-|------|------|--------|
-| **main** | TypeScript Electron 桌面版 | Electron 33 + TypeScript + Monaco + xterm.js + Vite + SQLite |
-| **tcide-py** | Python 重写版 | Python 3.11 + FastAPI + PyWebView + Monaco (CDN) |
+## 技术栈
 
-- `main` 是主要开发分支，包含完整 Electron 桌面 IDE
-- `tcide-py` 是 Python 重写版，独立仓库内容，通过 `git checkout tcide-py` 切换
-- **PawUI 重写版**（独立仓库）：[Guanist/tcide-pawui](https://github.com/Guanist/tcide-pawui) — 用 [PawUI](https://github.com/LK-BLOG/PawUI) 声明式 Python UI 重写，990 条离线测试
-
-## 核心差异
-
-虎猫 TCIDE 内置 **Builder + Coder 双 Agent 协作引擎**：
-
-> Builder 读需求 → 拆解任务 → Coder 写代码 → 编译验证 → 自动提交
-
-你只需要说「帮我做一个 xxx」，剩下的设计、编码、编译、提交全由虎猫完成。
-
-## AI 双 Agent
-
-| Agent | 职责 |
-|-------|------|
-| **Builder** | 需求分析、架构设计、任务拆解 |
-| **Coder** | 代码生成、编译验证、错误修复 |
-
-- 自动读取项目上下文，编译失败自动修复重试
-- 多模型：DeepSeek / 火山方舟 / Ollama / Anthropic / OpenAI
-
-## 特色
-
-- **像素宠物** — 桌面虎猫精灵，实时显示 AI 状态
-- **自动编程循环** — /task 命令一键全自动开发
-- **多模型支持** — DeepSeek / 火山方舟 / Ollama / Anthropic / OpenAI
-
-## 基础能力
-
-Monaco Editor + LSP、文件树、搜索、Git、xterm.js 终端、文件预览、Emmet、Snippets、暗色主题、Zen Mode
+| 层级 | 技术 |
+|------|------|
+| 桌面窗口 | PyWebView |
+| 后端 | FastAPI + uvicorn |
+| 前端 | Monaco Editor + xterm.js（CDN 加载） |
+| AI | OpenAI 兼容 API / Anthropic / Ollama |
+| Git | GitPython |
+| 终端 | subprocess 多实例 |
+| LSP | pyright/gopls/rust-analyzer/clangd |
+| MCP | JSON-RPC 2.0 stdio transport |
 
 ## 快速开始
 
-### TS 版（main 分支）
-
 ```bash
-git clone https://github.com/Guanist/TCIDE.git
-cd TCIDE
-npm install
-npm run build
-npm run dist:portable
-```
-
-### Python 版（tcide-py 分支）
-
-```bash
-git clone -b tcide-py https://github.com/Guanist/TCIDE.git
-cd TCIDE
 pip install -r requirements.txt
 python main.py
 ```
 
+## 目录结构
+
+```
+├── main.py              # 入口：PyWebView 窗口 + FastAPI 后台线程
+├── server.py            # FastAPI 路由注册（13个API模块）
+├── requirements.txt     # Python 依赖
+├── api/
+│   ├── files.py         # 文件操作（树/读写/搜索/统计）
+│   ├── git_ops.py       # Git 操作（status/diff/commit/push/pull/log/branches）
+│   ├── terminal.py      # 终端管理（subprocess 多实例）
+│   ├── ai.py            # AI 对话 + Agent 调用（流式/工具调用）
+│   ├── settings.py      # 设置管理（JSON 持久化）
+│   ├── lsp.py           # LSP 客户端（诊断/补全/跳转/格式化）
+│   ├── mcp.py           # MCP 外部工具连接（JSON-RPC 2.0）
+│   ├── memory.py        # 上下文记忆（技术栈/风格自动检测）
+│   ├── vector.py        # 向量索引（TF-IDF + BM25 语义搜索）
+│   ├── snapshot.py      # 文件快照（保存/恢复/对比）
+│   ├── usage.py         # 用量统计（token/成本/历史）
+│   └── debug.py         # 调试工具（断点/表达式求值）
+├── agents/
+│   ├── builder.py       # Builder Agent：需求分析 → 任务拆解
+│   ├── coder.py         # Coder Agent：代码生成 + 自动重试修复
+│   ├── reviewer.py      # Reviewer Agent：代码审查
+│   └── orchestrator.py  # Orchestrator：Builder→Coder→Reviewer 流水线
+├── adapters/
+│   └── llm.py           # 多提供商 LLM 适配器（OpenAI/Anthropic/Ollama）
+├── core/                # 核心模块（架构/压缩/批处理等）
+└── static/
+    └── index.html       # IDE 前端（Monaco + xterm + AI 聊天）
+```
+
+## 功能
+
+### 核心功能
+- 📂 文件树浏览 + 多标签编辑
+- 🖥️ xterm.js 终端（WebSocket 交互）
+- 💬 AI 对话（流式输出 + 工具调用循环）
+- 🤖 Builder + Coder + Reviewer 三 Agent 协作
+- 🔀 Git 全操作（status/diff/commit/push/pull/branches）
+- ⚙️ 设置管理（AI/编辑器/主题配置）
+- 🎨 暗色主题（VS Code 风格）
+
+### 扩展功能
+- 🔗 MCP 工具连接（内置 + 外部服务器）
+- 📝 LSP 语言服务（诊断/补全/跳转/格式化）
+- 🧠 上下文记忆（技术栈/编码风格自动检测）
+- 🔍 语义搜索（TF-IDF + BM25 向量索引）
+- 📸 文件快照（保存/恢复/版本对比）
+- 📊 用量统计（token/成本/历史记录）
+- 🐛 调试工具（断点管理/表达式求值）
+
 ## 许可证
 
 [GNU General Public License v3.0](LICENSE)
+
+## 关联分支
+
+| 分支 | 说明 |
+|------|------|
+| **main** | TypeScript Electron 桌面版（稳定基线） |
+| **tcide-py** | 本分支 — Python 重写版 |
