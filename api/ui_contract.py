@@ -35,6 +35,28 @@ from tcide_core.indexer import ProjectIndex        # noqa: E402
 from tcide_core.lint import Linter                 # noqa: E402
 from tcide_core.workspace import Workspace         # noqa: E402
 
+async def _read_json_body(request) -> dict:
+    """宽容读取 JSON body（与 ``server.read_json`` 同逻辑，但**本地实现**）。
+
+    为什么不直接 ``from server import read_json``：``server.py`` 会 import 本模块
+    （为了 ``include_router``），模块级反向导入会形成循环导入 ✗。这点重复很小，
+    换来的是清晰的依赖方向：``server → api.ui_contract``。
+    """
+    import json
+
+    try:
+        raw = await request.body()
+    except Exception:      # noqa: BLE001
+        return {}
+    if not raw or not raw.strip():
+        return {}
+    try:
+        data = json.loads(raw)
+    except Exception:      # noqa: BLE001
+        return {}
+    return data if isinstance(data, dict) else {}
+
+
 router = APIRouter(tags=["ui-contract"])
 
 #: 代码熵控制器的会话状态（前端会 init → 反复 tick → 读 recommendation）
@@ -301,3 +323,191 @@ async def lint_file(path: str = "", file_path: str = "", file: str = ""):
     except Exception as exc:      # noqa: BLE001
         return {"file": relative, "success": False,
                 "error": f"{type(exc).__name__}: {exc}"}
+
+
+# ── LSP 透传 /api/lsp/* ──────────────────────────────────────────────────
+#
+# 前端要的是**通用 JSON-RPC 透传**（lspRequest(lang, method, params) /
+# lspNotify(...)），而仓库里的 /api/lsp/* 是一堆写死的方法包装
+# （only completion/definition/references/format 等）。这里用 tcide_core 里那个
+# 真正的 JSON-RPC 客户端补上通用入口，并给出"装哪个服务器"的提示。
+
+#: 语言 → 会话中的 LSP 客户端
+_lsp_clients: dict = {}
+
+
+def _lsp_client(language: str):
+    client = _lsp_clients.get(language)
+    if client is None:
+        from tcide_core.lsp import LspClient
+
+        client = LspClient(language=language, root=current_project_root())
+        _lsp_clients[language] = client
+    return client
+
+
+@router.post("/api/lsp/request")
+async def lsp_request(request: Request, language: str = ""):
+    """通用请求：``{language, method, params}`` → JSON-RPC 返回原样透传。"""
+    body = await _read_json_body(request)
+    language = language or body.get("language", "")
+    method = body.get("method", "")
+    if not language or not method:
+        return {"error": "缺少 language 或 method"}
+    client = _lsp_client(language)
+    if not client.running() and not client.start():
+        return {"error": f"{language} 的语言服务器未安装或无法启动",
+                "install_guide": _install_guide(language)}
+    try:
+        return {"result": client.request(method, body.get("params") or {})}
+    except Exception as exc:      # noqa: BLE001
+        return {"error": f"{type(exc).__name__}: {exc}"}
+
+
+@router.post("/api/lsp/notify")
+async def lsp_notify(request: Request, language: str = ""):
+    """通用通知：``{language, method, params}`` → 不回结果，只报是否送达。"""
+    body = await _read_json_body(request)
+    language = language or body.get("language", "")
+    method = body.get("method", "")
+    if not language or not method:
+        return {"error": "缺少 language 或 method"}
+    client = _lsp_client(language)
+    if not client.running() and not client.start():
+        return {"error": f"{language} 的语言服务器未安装或无法启动", "sent": False}
+    return {"sent": bool(client.notify(method, body.get("params") or {}))}
+
+
+@router.get("/api/lsp/install-guide")
+async def lsp_install_guide(language: str = ""):
+    """某个语言该装什么服务器、装完怎么验证。"""
+    return _install_guide(language)
+
+
+def _install_guide(language: str) -> dict:
+    """用 tcide_core.lsp 的探测结果生成安装指引（缺失时如实说明）。"""
+    from tcide_core.lsp import NO_SERVER_HINTS, detect_servers
+
+    statuses = detect_servers([language] if language else None)
+    selected = [item for item in statuses if item.language == language] or statuses
+    return {
+        "language": language,
+        "servers": [item.to_dict() for item in selected],
+        "available": [item.language for item in selected if item.available],
+        "hint": NO_SERVER_HINTS.get(language, "安装对应语言的 LSP 服务器后重启语言服务"),
+    }
+
+
+# ── 文件：十六进制视图与"在系统里打开" ──────────────────────────────────
+#
+# 安全说明：后端默认只监听 127.0.0.1（见 main.py 的 --host 默认值），下面这几个
+# 接口会触发**系统级动作**，所以都限制在项目目录内（open/show），打开 URL 只允许
+# http/https —— 不允许任意路径/协议被一个网页请求拉起。
+
+@router.get("/api/files/hex")
+async def files_hex(path: str = "", file_path: str = "", file: str = "",
+                    offset: int = 0, rows: int = 16, length: int = 0):
+    """十六进制视图（前端 readHex(path, offset, length)）。"""
+    name = _pick(path, file_path, file)
+    if not name:
+        return {"error": "缺少 path 参数"}
+    relative = _relative(name)
+    try:
+        from tcide_core.hexview import HexViewer
+
+        # HexViewer **必须带 workspace**（它用 workspace.read_bytes 读文件）；
+        # 空构造会抛"没有 workspace，无法读取文件"（我第一版就是这么错的）。
+        viewer = HexViewer(_workspace())
+        if length and length > 0:
+            rows = max(1, min(4096, (length + 15) // 16))
+        lines = viewer.page(relative, offset=max(0, offset), rows=min(rows, 256))
+        return {"file": relative, "offset": max(0, offset),
+                "lines": [line.to_dict() for line in lines],
+                "info": viewer.info(relative)}
+    except Exception as exc:      # noqa: BLE001
+        return {"error": f"{type(exc).__name__}: {exc}", "file": relative}
+
+
+def _inside_project(path: str) -> str:
+    """把路径规整到项目内；越界返回空串。"""
+    relative = _relative(path)
+    root = os.path.abspath(current_project_root())
+    absolute = os.path.abspath(os.path.join(root, relative))
+    try:
+        return absolute if os.path.commonpath([absolute, root]) == root else ""
+    except ValueError:
+        return ""
+
+
+@router.post("/api/files/open")
+async def files_open(path: str = "", file: str = ""):
+    """用系统默认程序打开项目内的文件（前端 openSystemFile）。"""
+    target = _inside_project(_pick(path, file))
+    if not target or not os.path.exists(target):
+        return {"success": False, "error": f"文件不存在或不在项目内：{path or file}"}
+    try:
+        if os.name == "nt":
+            os.startfile(target)          # type: ignore[attr-defined]
+        else:
+            import subprocess
+
+            subprocess.Popen(["xdg-open", target])
+        return {"success": True, "path": target}
+    except Exception as exc:      # noqa: BLE001
+        return {"success": False, "error": f"{type(exc).__name__}: {exc}"}
+
+
+@router.post("/api/files/show")
+async def files_show(path: str = "", file: str = ""):
+    """在文件管理器里定位该文件（前端 showItemInFolder）。"""
+    target = _inside_project(_pick(path, file))
+    if not target or not os.path.exists(target):
+        return {"success": False, "error": f"文件不存在或不在项目内：{path or file}"}
+    try:
+        import subprocess
+
+        if os.name == "nt":
+            subprocess.Popen(["explorer", "/select,", os.path.normpath(target)])
+        elif sys.platform == "darwin":
+            subprocess.Popen(["open", "-R", target])
+        else:
+            subprocess.Popen(["xdg-open", os.path.dirname(target)])
+        return {"success": True, "path": target}
+    except Exception as exc:      # noqa: BLE001
+        return {"success": False, "error": f"{type(exc).__name__}: {exc}"}
+
+
+@router.post("/api/files/open-url")
+async def files_open_url(url: str = ""):
+    """用系统浏览器打开 http/https 链接（前端 openExternal）。"""
+    if not url.lower().startswith(("http://", "https://")):
+        return {"success": False, "error": "只允许打开 http/https 链接"}
+    try:
+        import webbrowser
+
+        return {"success": bool(webbrowser.open(url)), "url": url}
+    except Exception as exc:      # noqa: BLE001
+        return {"success": False, "error": f"{type(exc).__name__}: {exc}"}
+
+
+# ── Git：全部暂存（前端 stageAll）────────────────────────────────────────
+
+@router.post("/api/git/stage-all")
+async def git_stage_all():
+    """``git add -A``：前端「暂存全部」按钮。
+
+    直接调 git 而不是复用 ``GitRepo`` 的包装：前端只关心成败，而且这里需要
+    "不是仓库"时给出可读原因（而不是抛异常）。
+    """
+    import subprocess
+
+    root = current_project_root()
+    try:
+        completed = subprocess.run(["git", "add", "-A"], cwd=root, capture_output=True,
+                                   text=True, timeout=60)
+    except Exception as exc:      # noqa: BLE001
+        return {"success": False, "error": f"{type(exc).__name__}: {exc}"}
+    if completed.returncode != 0:
+        return {"success": False, "root": root,
+                "error": (completed.stderr or completed.stdout or "git add 失败").strip()}
+    return {"success": True, "root": root}

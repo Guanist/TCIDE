@@ -546,15 +546,43 @@ async def mcp_call_tool(request: Request):
 # ── LSP ──
 
 @app.post("/api/lsp/start")
-async def lsp_start(request: Request):
-    body = await request.json()
-    return lsp.start_server(body["language"], body.get("project_path", ""))
+async def lsp_start(request: Request, language: str = "", project_path: str = ""):
+    # 前端（electron-shim.js 的 lspStart）是 POST /api/lsp/start?language=…（**不带 body**），
+    # 原来直接 request.json() → 空 body 上抛 JSONDecodeError，LSP 在界面上起不来。
+    body = await read_json(request)
+    language = language or body.get("language", "")
+    project_path = project_path or body.get("project_path", "")
+    if not language:
+        return {"error": "缺少 language 参数"}
+    # 先探测可用性再启动：原来直接 spawn config["command"]，服务器没装时
+    # subprocess 抛 OSError（WinError 123）→ 界面拿到 500 而不知道原因。
+    # 现在先查 PATH，没装就返回"装什么 + 怎么装"。
+    try:
+        from tcide_core.lsp import NO_SERVER_HINTS, detect_servers
+
+        statuses = detect_servers([language])
+        target = next((item for item in statuses if item.language == language), None)
+        if target is not None and not target.available:
+            return {"error": f"{language} 的语言服务器不可用：{target.command or '未找到'}",
+                    "hint": NO_SERVER_HINTS.get(language, "安装对应语言的 LSP 服务器后重试"),
+                    "servers": [item.to_dict() for item in statuses]}
+    except Exception:      # noqa: BLE001 - 探测失败不该挡住启动
+        pass
+    try:
+        return lsp.start_server(language, project_path)
+    except Exception as exc:      # noqa: BLE001 - 起不来也要给可读原因
+        return {"error": f"{type(exc).__name__}: {exc}", "language": language}
 
 
 @app.post("/api/lsp/stop")
-async def lsp_stop(request: Request):
-    body = await request.json()
-    return lsp.stop_server(body["language"], body.get("project_path", ""))
+async def lsp_stop(request: Request, language: str = "", project_path: str = ""):
+    # 同 /api/lsp/start：前端只带 query 参数，不带 body。
+    body = await read_json(request)
+    language = language or body.get("language", "")
+    project_path = project_path or body.get("project_path", "")
+    if not language:
+        return {"error": "缺少 language 参数"}
+    return lsp.stop_server(language, project_path)
 
 
 @app.get("/api/lsp/servers")

@@ -151,3 +151,83 @@ class TestLintAndChunker:
         response = client.get("/api/chunker/needs-chunking")
         assert response.status_code == 200
         assert "error" in response.json()
+
+
+# ── LSP 透传 ─────────────────────────────────────────────────────────────
+
+class TestLspContract:
+    def test_install_guide_lists_servers_and_hint(self, client):
+        body = client.get("/api/lsp/install-guide",
+                          params={"language": "python"}).json()
+        assert body["language"] == "python"
+        assert isinstance(body["servers"], list)
+        assert body["hint"]
+
+    def test_start_accepts_query_params(self, client):
+        """回归：前端 ``POST /api/lsp/start?language=…`` **不带 body**。
+
+        原来那个处理函数直接 ``await request.json()`` → 空 body 抛
+        ``JSONDecodeError`` → 界面上 LSP 永远起不来。
+        """
+        response = client.post("/api/lsp/start", params={"language": "python"})
+        assert response.status_code == 200, response.text
+        assert isinstance(response.json(), dict)
+
+    def test_request_without_language_is_reported(self, client):
+        body = client.post("/api/lsp/request", json={}).json()
+        assert "error" in body
+
+    def test_notify_without_language_is_reported(self, client):
+        body = client.post("/api/lsp/notify", json={}).json()
+        assert "error" in body
+
+
+# ── 文件：十六进制与系统打开 ─────────────────────────────────────────────
+
+class TestFilesContract:
+    def test_hex_view_returns_lines_and_info(self, client):
+        body = client.get("/api/files/hex",
+                          params={"path": "server.py", "rows": 4}).json()
+        assert body["file"] == "server.py"
+        assert 0 < len(body["lines"]) <= 4
+        assert "info" in body
+
+    def test_hex_view_without_param_is_reported(self, client):
+        assert "error" in client.get("/api/files/hex").json()
+
+    def test_open_url_refuses_non_http(self, client):
+        """安全边界：只允许 http/https，别让一个网页请求拉起任意协议。"""
+        body = client.post("/api/files/open-url",
+                           params={"url": "file:///C:/Windows/System32/calc.exe"}).json()
+        assert body["success"] is False
+        assert "http" in body["error"]
+
+    def test_open_refuses_paths_outside_the_project(self, client):
+        body = client.post("/api/files/open",
+                           params={"path": "../../Windows/System32/calc.exe"}).json()
+        assert body["success"] is False
+
+    def test_show_refuses_missing_file(self, client):
+        body = client.post("/api/files/show",
+                           params={"path": "no-such-file-xyz.txt"}).json()
+        assert body["success"] is False
+
+
+# ── Git：暂存全部（**不碰真实仓库**）─────────────────────────────────────
+
+class TestGitContract:
+    def test_stage_all_reports_a_readable_reason_outside_a_repo(self, client):
+        """在**非 git 仓库**的临时目录里调用，应当如实报错而不是抛异常。
+
+        刻意不在这里提交/暂存真实项目：测试改动真实仓库是绝对要避免的事
+        （tcide-pawui 那边就因为测试夹具提交进过真实仓库）。
+        """
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as tmp:
+            client.post("/api/project/open", params={"path": tmp})
+            body = client.post("/api/git/stage-all").json()
+            assert body["success"] is False, body
+            assert "error" in body
+        # 还原项目根，别影响别的用例
+        client.post("/api/project/open", params={"path": str(ROOT)})
