@@ -1,0 +1,96 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "tcide"
+# 与 GitHub release 的 tag 保持一致（v0.0.1.1）
+version = "0.0.1.1"
+description = "虎猫 TCIDE —— 本地优先的 AI 编程 IDE（FastAPI + PyWebView + 可离线前端）"
+readme = "README.md"
+requires-python = ">=3.10"
+license = "LGPL-3.0-only"
+license-files = ["LICENSE"]
+authors = [{ name = "Guanist, Inc." }]
+keywords = ["ide", "ai", "coding-agent", "offline", "fastapi", "pywebview"]
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "Intended Audience :: Developers",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Topic :: Software Development :: Integrated Development Environments (IDE)",
+]
+# 注意：这里**不写** `License ::` 分类器 —— setuptools ≥ 77 起，PEP 639 的
+# `license = "LGPL-3.0-only"` 表达式与 License 分类器**互斥**，同时写会直接报
+# `InvalidConfigError: License classifiers have been superseded by license expressions`。
+# （本机 setuptools 82.0.1 实测如此。）也不写 `Environment :: ... :: Qt` ——
+# Python 版后端**不依赖 Qt**，写了是不实描述。
+
+# 运行依赖：与 requirements.txt 保持一致（那份文件仍然是"源码运行"的入口）
+dependencies = [
+  "fastapi>=0.115.0",
+  "uvicorn>=0.32.0",
+  "httpx>=0.28.0",
+  "pydantic>=2.10.0",
+  "openai>=1.60.0",
+  "pywebview>=5.3",
+  "python-multipart>=0.0.18",
+  "gitpython>=3.1.44",
+  "ptyprocess>=0.7.0; sys_platform != 'win32'",
+  "pywinpty>=2.0.14; sys_platform == 'win32'",
+  "rich>=13.0.0",
+]
+
+[project.optional-dependencies]
+# 只要后端（不需要原生窗口）—— 服务器/CI 用这个就够
+server = ["fastapi>=0.115.0", "uvicorn>=0.32.0", "httpx>=0.28.0", "pydantic>=2.10.0"]
+dev = ["pytest>=8.0"]
+# 调试用的真 DAP 适配器（默认不装：它体积不小，且只有调试时才需要）
+debug = ["debugpy>=1.8.0"]
+
+[project.urls]
+Homepage = "https://github.com/Guanist/TCIDE"
+Source = "https://github.com/Guanist/TCIDE"
+Issues = "https://github.com/Guanist/TCIDE/issues"
+
+[project.scripts]
+# 装完就有 `tcide` 命令（等价于 python main.py）
+tcide = "main:main"
+
+[tool.setuptools]
+# 顶层模块（平铺布局，与源码运行时的结构一致 —— 这样 server.py 用
+# os.path.dirname(__file__)/web 找资源，在安装后依然成立）
+py-modules = [
+  "main",
+  "server",
+  "advanced",
+  "tcide_client",
+  "tcide_pet",
+]
+
+[tool.setuptools.packages.find]
+where = ["."]
+# web/ static/ pet_assets/ 也作为"资源包"安装（它们各自带 __init__.py），
+# 于是 server.py 里的 os.path.join(dirname(__file__), "web") 在 site-packages 下同样成立。
+include = [
+  "api*",
+  "tcide_core*",
+  "adapters*",
+  "agents*",
+  "core*",
+  "web*",
+  "static*",
+  "pet_assets*",
+]
+exclude = ["tests*", "tools*", "dist*", "build*"]
+
+[tool.setuptools.package-data]
+# 前端与资源都要带上：这是一个**离线优先**的 IDE，少了 web/ 就打不开界面。
+# 注意 web/vendor/monaco 有 24 MB 左右，所以 wheel 会比较大 —— 这是"离线可用"的代价，
+# 想瘦身可以用 tools/vendor_monaco.py 的开关减掉 Monaco。
+"*" = ["**/*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q -p no:cacheprovider"

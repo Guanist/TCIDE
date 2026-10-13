@@ -4,6 +4,39 @@
 
 虎猫 TCIDE 的 Python 重写版，基于 FastAPI + PyWebView + Monaco Editor。
 
+## 安装与运行
+
+**推荐：用 pip 装**（已验证，见下）
+
+```bash
+pip install .          # 从源码目录安装
+# 或者隔离安装（推荐，不污染全局环境）
+pipx install .
+```
+
+装完会得到 `tcide` 命令：
+
+```bash
+tcide                  # 打开原生窗口（PyWebView）
+tcide --browser        # 用系统浏览器打开
+tcide --no-window      # 只跑后端服务（无界面，适合服务器/CI）
+tcide /path/to/project # 指定要打开的项目目录
+```
+
+**开发时（不安装）**：装好 `requirements.txt` 后直接 `python main.py`。
+
+### 为什么推荐的安装方式是 pip 而不是"冻结打包"
+
+- 本项目的**冻结打包产物在本机无法验证**：冻结后的 PySide6 在 `QApplication()` 处崩溃
+  （`0xC0000005`），且已用 5 行最小探针证明**与本项目、spec、QtWebEngine 无关**
+  （去掉 WebEngine 的轻量构建同样崩）。
+- **pip 安装这条路是本机实测通过的**：
+  ```bash
+  python tools/verify_install.py
+  ```
+  它会在一个干净 venv 里真装真跑，并断言：`pip install` 成功、`tcide` 命令生成、
+  `web/` 前端资源随包分发到 site-packages、服务能起、首页与 `/assets/...` 都返回 200。
+
 ## 技术栈
 
 | 层级 | 技术 |
