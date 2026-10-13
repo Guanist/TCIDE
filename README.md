@@ -22,15 +22,19 @@
 
 **看图时请知道的几点（如实标注）**：
 
-- **浅色主题下编辑器仍是深色** —— Monaco 的主题色写在 `main.ts` 的 JS 对象里
-  （`'editor.background': '#1E1E1E'`），而 Monaco 的主题 API **不接受 CSS 变量**。
-  也就是说浅色目前覆盖了外壳、面板与 AI 侧栏，**编辑器区域还没有**。这是已知限制。
+- **浅色主题覆盖外壳、面板、AI 侧栏与编辑器** —— 编辑器（Monaco）跟随 `?theme=`、
+  `.theme-light` 类与 `data-tcide-theme` 属性三者中的任意一个变化（`isLightThemeActive()`
+  是唯一判断依据）。之所以 Monaco 需要**单独一套主题定义**而不是靠 CSS 变量：
+  它的主题 API 只接受具体色值，不接受 `var()` —— 所以 `trae-light` 里的颜色是与
+  `main.css` 的浅色变量**逐条对齐**的（暖白底 `#FDFAF5`、橙色光标 `#C2651A`）。
 - 左下角原有一个**上下文菜单伪影**（应用启动时把 `#tab-context-menu` 显示了出来）。
   产物 CSS 里的 `.context-menu.hidden{display:none}` 是完好的，覆盖层也没有任何
   菜单相关规则，所以**不是主题层造成的**；但具体触发原因本轮**没有查清**，
   因此只是把那一小块按页面底色填掉，特此说明。
-- 界面里显示 `v0.0.1` 是前端源码自带的版本串（`src/renderer/index.html`），
-  与发布包版本 `0.0.1.2` 是两条线，尚未统一。
+- **版本串已统一**：界面（`main.ts` 的 `FIRST_LAUNCH_README`，也就是首启的
+  `Welcome.md`）与 `package.json` 的 `versionName` 都显示 `v0.0.1.2`，与发布版本一致。
+  `package.json.version` 保持合法 semver（`0.0.1`）—— 四段的 `0.0.1.2` 会被 npm 拒绝，
+  真正对外的是 `versionName`。一致性由 `tests/test_frontend_version.py` 钉住。
 
 ## 下载与安装（发布包）
 
