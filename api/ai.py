@@ -1,5 +1,5 @@
-# SPDX-FileCopyrightText: 2025 TCIDE contributors
-# SPDX-License-Identifier: LGPL-3.0-or-later
+# SPDX-FileCopyrightText: 2026 Guanist, Inc.
+# SPDX-License-Identifier: LGPL-3.0-only
 """
 AI 对话 + Agent 编排 API
 增强: chat_stream_with_tools / agent_orchestrate_stream

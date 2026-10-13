@@ -1,5 +1,5 @@
-# SPDX-FileCopyrightText: 2025 tcide-pawui contributors
-# SPDX-License-Identifier: LGPL-3.0-or-later
+# SPDX-FileCopyrightText: 2026 Guanist, Inc.
+# SPDX-License-Identifier: LGPL-3.0-only
 """项目索引：符号表、调用图、依赖图、关键词检索、语义切块。
 
 对应 TCIDE 原版的 `indexer/project-indexer.ts`、`indexer/vector-indexer.ts`、

@@ -1,5 +1,5 @@
-# SPDX-FileCopyrightText: 2025 tcide-pawui contributors
-# SPDX-License-Identifier: LGPL-3.0-or-later
+# SPDX-FileCopyrightText: 2026 Guanist, Inc.
+# SPDX-License-Identifier: LGPL-3.0-only
 """Token 估算与文本工具。
 
 TCIDE 原版按「中文字符数 + 英文字符数/4」粗估（`contextManager.ts` 里的

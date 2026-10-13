@@ -1,5 +1,5 @@
-# SPDX-FileCopyrightText: 2025 tcide-pawui contributors
-# SPDX-License-Identifier: LGPL-3.0-or-later
+# SPDX-FileCopyrightText: 2026 Guanist, Inc.
+# SPDX-License-Identifier: LGPL-3.0-only
 """AI 双 Agent 引擎：Builder 拆解 → Coder 执行 → Reviewer 审查门。
 
 对应 TCIDE 原版的 `core/agent/`（`agent-orchestrator.ts` 399 行 +

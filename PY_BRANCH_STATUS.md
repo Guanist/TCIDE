@@ -51,7 +51,7 @@ python main.py --no-window --port 18430   # 真启动，再用 HTTP 打接口
    **从未被任何路由使用**）：代码熵 `/api/entropy/*`、仓库分析 `/api/warehouse/*`、
    分块 `/api/chunker/needs-chunking`、向量 `/api/vector/{init,index-all}`、
    记忆 `/api/memory/init`。
-2. **复用 `tcide_core/`**（从 `tcide-pawui` 搬运的纯标准库后端，LGPL-3.0-or-later，
+2. **复用 `tcide_core/`**（从 `tcide-pawui` 搬运的纯标准库后端，LGPL-3.0-only，
    不含 PawUI/Qt）：静态检查 `/api/lint`、调用链与影响面 `/api/warehouse/{call-chain,impact}`、
    十六进制 `/api/files/hex`、LSP 透传 `/api/lsp/{request,notify,install-guide}`、
    真执行 `/api/runner/*`、双 Agent `/api/orchestrator/{init,run}`、

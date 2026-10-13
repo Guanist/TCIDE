@@ -1,5 +1,5 @@
-# SPDX-FileCopyrightText: 2025 TCIDE contributors
-# SPDX-License-Identifier: LGPL-3.0-or-later
+# SPDX-FileCopyrightText: 2026 Guanist, Inc.
+# SPDX-License-Identifier: LGPL-3.0-only
 """
 TCIDE - 纯 Python 版桌面 IDE
 入口文件：启动 FastAPI 服务 + PyWebView 窗口

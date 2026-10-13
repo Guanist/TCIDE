@@ -1,5 +1,5 @@
-# SPDX-FileCopyrightText: 2025 TCIDE contributors
-# SPDX-License-Identifier: LGPL-3.0-or-later
+# SPDX-FileCopyrightText: 2026 Guanist, Inc.
+# SPDX-License-Identifier: LGPL-3.0-only
 """前端契约路由：让 ``web/`` 前端调用的接口**真的存在且能对上**。
 
 背景（这是本仓库"功能不完善"的主要形态）：``web/`` 是原 Electron 渲染层用 Vite
@@ -17,7 +17,7 @@
 本模块只做**接线、改名、参数兼容**，不重复实现引擎：
 - 能委托给 ``advanced.py`` 里已有对象（服务启动时就已实例化）的一律委托；
 - 仓库里确实没有的能力（如静态检查）用 ``tcide_core``（从 tcide-pawui 搬运的纯
-  标准库实现，LGPL-3.0-or-later，见 ``tcide_core/__init__.py``）。
+  标准库实现，LGPL-3.0-only，见 ``tcide_core/__init__.py``）。
 
 约定：与前缀路由保持一致 —— 出错也返回 200 + ``{"error": ...}``，不抛 5xx，
 这样界面能显示原因而不是白屏。

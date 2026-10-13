@@ -1,5 +1,5 @@
-# SPDX-FileCopyrightText: 2025 tcide-pawui contributors
-# SPDX-License-Identifier: LGPL-3.0-or-later
+# SPDX-FileCopyrightText: 2026 Guanist, Inc.
+# SPDX-License-Identifier: LGPL-3.0-only
 """工作区：文件树、读写、搜索、语言识别。
 
 对应 TCIDE 原版的 `file-service.ts` + 文件树/项目搜索。纯标准库，不依赖 Qt，

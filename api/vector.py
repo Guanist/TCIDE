@@ -1,5 +1,5 @@
-# SPDX-FileCopyrightText: 2025 TCIDE contributors
-# SPDX-License-Identifier: LGPL-3.0-or-later
+# SPDX-FileCopyrightText: 2026 Guanist, Inc.
+# SPDX-License-Identifier: LGPL-3.0-only
 """
 向量搜索 API
 TF-IDF + BM25 语义搜索，零外部依赖

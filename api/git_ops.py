@@ -1,5 +1,5 @@
-# SPDX-FileCopyrightText: 2025 TCIDE contributors
-# SPDX-License-Identifier: LGPL-3.0-or-later
+# SPDX-FileCopyrightText: 2026 Guanist, Inc.
+# SPDX-License-Identifier: LGPL-3.0-only
 """
 Git 操作 API
 增强: git_smart_commit / git_list_branches / git_get_user / git_diff_detailed

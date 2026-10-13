@@ -1,5 +1,5 @@
-# SPDX-FileCopyrightText: 2025 tcide-pawui contributors
-# SPDX-License-Identifier: LGPL-3.0-or-later
+# SPDX-FileCopyrightText: 2026 Guanist, Inc.
+# SPDX-License-Identifier: LGPL-3.0-only
 """Git 操作封装。
 
 对应 TCIDE 原版的 `git-intelligence.ts` 与 Git 面板（状态/一键 stage-commit-push/分支切换）。

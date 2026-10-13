@@ -77,10 +77,17 @@ python main.py
 
 ## 许可证
 
-[GNU Lesser General Public License v3.0](LICENSE)（SPDX：`LGPL-3.0-or-later`）
+[GNU Lesser General Public License v3.0](LICENSE) —— **仅第 3 版**
+（SPDX：`LGPL-3.0-only`，**不含** "or any later version"）
 
-`LICENSE` 是 **LGPL-3.0 全文**，各源文件头部带 `SPDX-License-Identifier: LGPL-3.0-or-later`。
-`tcide_core/` 从 `tcide-pawui` 搬运而来，同样是 LGPL-3.0-or-later。
+本仓库是自由软件：你可以按自由软件基金会发布的 GNU 宽通用公共许可证**第 3 版**
+（且**不包括**"或任何更新版本"这一选项）的条款重新发布和/或修改它。
+
+- 各源文件头部带 `SPDX-License-Identifier: LGPL-3.0-only`
+- `LICENSE` 是 LGPL-3.0 标准全文；其中附录里的 "or later" 示例声明属于 FSF 文本本身，
+  **未作改动** —— 表达"仅第 3 版"靠的是上面这句我们自己的声明
+- `web/assets/vendor-xterm-*` 是第三方（xterm.js），**保持它自己的 MIT 授权**
+- `tcide_core/` 从 `tcide-pawui` 搬运而来，同样是 `LGPL-3.0-only`
 
 ## 分支
 

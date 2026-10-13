@@ -1,5 +1,5 @@
-# SPDX-FileCopyrightText: 2025 TCIDE contributors
-# SPDX-License-Identifier: LGPL-3.0-or-later
+# SPDX-FileCopyrightText: 2026 Guanist, Inc.
+# SPDX-License-Identifier: LGPL-3.0-only
 """DAP（Debug Adapter Protocol）客户端 —— 接 debugpy，做**真的**调试会话。
 
 ## 为什么有了 pdb 还要这个
@@ -141,6 +141,17 @@ class DapSession:
         return bool(self.process is not None and self.process.poll() is None)
 
     def stop(self) -> None:
+        """停止会话：**必须等进程真的退出**再返回。
+
+        为什么强调这点（实测）：只 kill 不 wait 的话，被调试进程可能还握着工作目录
+        里的文件句柄 —— 在 Windows 上表现为随后 `shutil.rmtree` / `TemporaryDirectory`
+        清理时报 ``PermissionError: [WinError 32] 另一个程序正在使用此文件``。
+        这个竞态让测试**间歇性**报错（单独跑能过、全量跑偶发失败），所以这里：
+
+        1. 先发 disconnect（让它自己收尾）；
+        2. 再 terminate → wait → 必要时 kill → **再 wait**；
+        3. 最后关 socket 并等读线程退出。
+        """
         try:
             self.request("disconnect", terminateDebuggee=True, timeout=3)
         except Exception:      # noqa: BLE001
@@ -151,9 +162,27 @@ class DapSession:
             except Exception:      # noqa: BLE001
                 pass
             self.sock = None
-        if self.process is not None and self.process.poll() is None:
+        process = self.process
+        if process is not None and process.poll() is None:
             try:
-                self.process.kill()
+                process.terminate()
+                process.wait(timeout=3)
+            except Exception:      # noqa: BLE001 - 不退出就强杀
+                try:
+                    process.kill()
+                except Exception:      # noqa: BLE001
+                    pass
+            try:
+                process.wait(timeout=5)      # ★ 关键：等到确实回收，句柄才释放
+            except Exception:      # noqa: BLE001
+                pass
+        if self._reader is not None and self._reader.is_alive():
+            self._reader.join(timeout=2)
+        # 进程的管道也要关掉，否则 Python 侧仍持有句柄
+        stream = getattr(process, "stdout", None)
+        if stream is not None:
+            try:
+                stream.close()
             except Exception:      # noqa: BLE001
                 pass
 

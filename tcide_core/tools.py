@@ -1,5 +1,5 @@
-# SPDX-FileCopyrightText: 2025 tcide-pawui contributors
-# SPDX-License-Identifier: LGPL-3.0-or-later
+# SPDX-FileCopyrightText: 2026 Guanist, Inc.
+# SPDX-License-Identifier: LGPL-3.0-only
 """工具集：给 Agent 用的、可直接操作项目的函数。
 
 对应 TCIDE 原版 `main/mcp-tools.ts` 宣称的 10 个工具

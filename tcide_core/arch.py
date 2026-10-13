@@ -1,5 +1,5 @@
-# SPDX-FileCopyrightText: 2025 tcide-pawui contributors
-# SPDX-License-Identifier: LGPL-3.0-or-later
+# SPDX-FileCopyrightText: 2026 Guanist, Inc.
+# SPDX-License-Identifier: LGPL-3.0-only
 """架构分析：循环依赖、分层、扇入扇出、代码异味。
 
 对应 TCIDE 原版的 `core/arch/arch-analyzer.ts` 与 `indexer/warehouse-analyzer.ts`。

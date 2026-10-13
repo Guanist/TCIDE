@@ -1,5 +1,5 @@
-# SPDX-FileCopyrightText: 2025 tcide-pawui contributors
-# SPDX-License-Identifier: LGPL-3.0-or-later
+# SPDX-FileCopyrightText: 2026 Guanist, Inc.
+# SPDX-License-Identifier: LGPL-3.0-only
 """多模型适配层：OpenAI 兼容 / Anthropic / Ollama。
 
 对应 TCIDE 原版的 `core/model/adapter.ts`（564 行）与 README 宣称的五家服务商

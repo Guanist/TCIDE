@@ -1,5 +1,5 @@
-# SPDX-FileCopyrightText: 2025 tcide-pawui contributors
-# SPDX-License-Identifier: LGPL-3.0-or-later
+# SPDX-FileCopyrightText: 2026 Guanist, Inc.
+# SPDX-License-Identifier: LGPL-3.0-only
 """LSP 客户端（语言服务器协议）。
 
 TCIDE 原版宣称「LSP 支持 TS/Python、自动识别」。这里实现**真的 LSP**：

@@ -1,5 +1,5 @@
-# SPDX-FileCopyrightText: 2025 TCIDE contributors
-# SPDX-License-Identifier: LGPL-3.0-or-later
+# SPDX-FileCopyrightText: 2026 Guanist, Inc.
+# SPDX-License-Identifier: LGPL-3.0-only
 """接口对账：前端真正请求的 `/api/...` vs 后端真的实现了的路由。
 
 为什么用这个方法找"功能不完善"：这个仓库的前端是原 Electron 渲染层用 Vite

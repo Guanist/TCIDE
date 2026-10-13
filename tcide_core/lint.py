@@ -1,5 +1,5 @@
-# SPDX-FileCopyrightText: 2025 tcide-pawui contributors
-# SPDX-License-Identifier: LGPL-3.0-or-later
+# SPDX-FileCopyrightText: 2026 Guanist, Inc.
+# SPDX-License-Identifier: LGPL-3.0-only
 """静态检查（lint）。
 
 对应 TCIDE 原版的 `core/lint/lint-manager.ts` —— 该模块在原版**从未接线，功能静默失效**
