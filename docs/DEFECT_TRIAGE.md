@@ -42,7 +42,7 @@
 
 | 丢失内容 | 本仓库状态 |
 |---|---|
-| `acceptDiff` / `closeDiffModal`（Diff 审核弹窗） | ⚠️ **待核**：Python 版有 `/api/git/*` 与 diff 能力（`tcide_core/diff.py`），但 web 前端是否提供"逐文件/逐块接受"的弹窗，我**没有逐一验证**，不写成"已修" |
+| `acceptDiff` / `closeDiffModal`（Diff 审核弹窗） | ✅ **已具备**（本次查证）：`web/assets/p2-modules.js` 明确引用 `window.acceptDiff` / `window.closeDiffModal` 并操作 `#diff-modal` 元素，实现在主 bundle 内；`p2-modules.js` 还提供"未初始化时只警告不崩"的兜底。前端还有 `getDiff → GET /api/git/diff`（后端 147 条路由中含 `/api/git/diff`） |
 | `__tcide_listSnippets` → 实际返回空数组（50+ snippets 为空） | ✅ **本次移植** `tcide_core/snippets.py`（235 行，含 PawUI 专属条目） |
 | `__tcide_originalSendToAI` 桥接 | 不适用（Python 版没有这个补丁层） |
 
@@ -50,8 +50,8 @@
 
 | 原版缺口 | 本仓库现状 |
 |---|---|
-| 0 测试 | ✅ **199 条**（本次从 62 涨到 199，其中 137 条来自移植模块的自洽测试） |
-| 无 CI | ⚠️ **待核**：本仓库有 `.github/`，但我没验证工作流是否真的在跑 |
+| 0 测试 | ✅ **213 条**（本次从 62 涨到 199，再加 14 条权限测试；本地 212 passed + 1 skipped） |
+| 无 CI | ✅ **已修**：新增 `.github/workflows/tests.yml`（push/PR 自动跑测试）。**已实证**：运行 [38373327750](https://github.com/Guanist/TCIDE/actions/runs/38373327750) → `success`，日志里 `212 passed, 1 skipped in 4.94s`（与本地结果一致，**不是空跑**）。刻意不装 `pywebview`（Linux 需 GTK 系统库，而测试完全不依赖 Qt） |
 | 无 LICENSE 文件 | ✅ **已修**：`LICENSE` = LGPL-3.0 标准全文；45 个源文件 SPXD 头统一 `LGPL-3.0-only`；有 6 条许可证门禁测试 |
 | `dist/` 提交占仓库 60% | ✅ 不适用/已避免：Python 版仓库树里没有 `dist/`（PawUI 版有，那是另一仓库的事） |
 | 165 份重复图片 | ✅ 不适用：Python 版没有那批资源 |
