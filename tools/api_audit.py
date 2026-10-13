@@ -19,8 +19,9 @@ import sys
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 
-#: 后端路由声明（server.py 里 @app.get("/api/...")）
-ROUTE_RE = re.compile(r"""@app\.(get|post|put|delete|patch)\(\s*["']([^"']+)["']""")
+#: 后端路由声明：既可能在 server.py（``@app.get(...)``），
+#: 也可能在 api/*.py（``@router.get(...)``，由 include_router 注册）
+ROUTE_RE = re.compile(r"""@(?:app|router)\.(get|post|put|delete|patch)\(\s*["']([^"']+)["']""")
 
 #: 前端里出现的接口字面量："/api/xxx" 或 `/api/xxx?y=${...}`
 CALL_RE = re.compile(r"""["'`](/api/[A-Za-z0-9_\-/{}$.]*)""")
@@ -35,10 +36,19 @@ def normalize(path: str) -> str:
 
 
 def backend_routes() -> dict[str, set[str]]:
+    """后端所有已注册的路由。
+
+    **必须扫全部 Python 文件**：只扫 ``server.py`` 会漏掉通过 ``include_router``
+    注册的路由（第一版就是这样，于是"缺失接口"数一直停在 42，看不到修复进展）。
+    """
     routes: dict[str, set[str]] = {}
-    text = (ROOT / "server.py").read_text(encoding="utf-8", errors="replace")
-    for method, path in ROUTE_RE.findall(text):
-        routes.setdefault(normalize(path), set()).add(method.upper())
+    sources = [ROOT / "server.py", *sorted((ROOT / "api").glob("*.py"))]
+    for source in sources:
+        if not source.is_file():
+            continue
+        text = source.read_text(encoding="utf-8", errors="replace")
+        for method, path in ROUTE_RE.findall(text):
+            routes.setdefault(normalize(path), set()).add(method.upper())
     return routes
 
 
