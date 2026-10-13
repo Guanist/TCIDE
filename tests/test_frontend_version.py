@@ -116,3 +116,44 @@ class TestEditorFollowsTheme:
         block = text[light_start:light_start + 1200]
         assert "'editor.background': '#FDFAF5'" in block, \
             "浅色编辑器底色没有跟随应用调色板（应为 #FDFAF5 暖白）"
+
+
+class TestCreateTimeThemeUsesTheSameJudge:
+    """回归：创建编辑器时的主题判断必须与观察者**共用同一个实现**。
+
+    曾经的 bug：`monaco.editor.create({ theme: localStorage... === 'light' ? ... })`
+    只看 localStorage，而皮肤层脚本用 `?theme=light` 时**刻意不写** localStorage。
+    结果是编辑器以深色创建 —— 更糟的是，这个显式选项会**覆盖**全局 `setTheme`，
+    所以"提前设全局主题"也救不回来（我上一轮就是这么白改的）。
+    """
+
+    def test_there_is_a_single_judge_function(self):
+        text = MAIN_TS.read_text(encoding="utf-8")
+        assert "function isLightThemeActive(): boolean" in text, \
+            "缺少统一的「当前是否浅色」判断函数"
+
+    def test_judge_considers_all_three_sources(self):
+        text = MAIN_TS.read_text(encoding="utf-8")
+        start = text.find("function isLightThemeActive")
+        block = text[start:start + 700]
+        assert "localStorage" in block, "没考虑 localStorage（应用按钮会写它）"
+        assert "classList.contains('theme-light')" in block, "没考虑 .theme-light 类"
+        assert "data-tcide-theme" in block, \
+            "没考虑 data-tcide-theme 属性 —— 皮肤层脚本用的就是它"
+
+    def test_editor_creation_uses_the_shared_judge(self):
+        text = MAIN_TS.read_text(encoding="utf-8")
+        create_at = text.find("monaco.editor.create(container")
+        assert create_at != -1, "找不到编辑器创建处"
+        nearby = text[create_at:create_at + 900]
+        assert "isLightThemeActive()" in nearby, \
+            "创建编辑器时没有用统一判断 —— ?theme=light 下编辑器会是深色"
+        assert "localStorage.getItem('tcide-theme') === 'light' ? 'trae-light'" \
+            not in nearby, "创建时又只看 localStorage 了（这是原 bug 的写法）"
+
+    def test_observer_reuses_the_shared_judge(self):
+        text = MAIN_TS.read_text(encoding="utf-8")
+        start = text.find("function themeStateIsLight")
+        block = text[start:start + 400]
+        assert "isLightThemeActive()" in block, \
+            "观察者没有复用统一判断 —— 两处逻辑又会漂移"

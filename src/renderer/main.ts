@@ -306,10 +306,27 @@ function initMonaco(): void {
 
   const container = document.getElementById('monaco-container')!;
 
+  // 「当前是不是浅色」的**唯一**判断依据。三处来源都要认：
+  //   - localStorage：应用自己的按钮会写（也兼容旧数据）
+  //   - .theme-light 类：应用按钮切换的类
+  //   - data-tcide-theme：皮肤层脚本（/static/tcide-theme.js）设置的属性，
+  //     包括 ?theme=light 这种一次性指定（它刻意不写 localStorage）
+  // 之前创建编辑器时只看了 localStorage，于是用 ?theme=light 时编辑器仍以深色创建，
+  // 而且这个显式 theme 选项会覆盖全局 setTheme。
+  function isLightThemeActive(): boolean {
+    try {
+      if (localStorage.getItem('tcide-theme') === 'light') return true;
+    } catch { /* 隐私模式 */ }
+    const root = document.documentElement;
+    return root.classList.contains('theme-light')
+      || root.getAttribute('data-tcide-theme') === 'light';
+  }
+
   editor = monaco.editor.create(container, {
     value: '',
     language: 'kotlin',
-    theme: (() => { try { return localStorage.getItem('tcide-theme') === 'light' ? 'trae-light' : 'trae-dark'; } catch { return 'trae-dark'; } })(),
+    // 用统一判断：否则 ?theme=light 时编辑器会以深色创建，并覆盖全局 setTheme
+    theme: (() => { try { return isLightThemeActive() ? 'trae-light' : 'trae-dark'; } catch { return 'trae-dark'; } })(),
     fontSize: 14,
     fontFamily: "'JetBrains Mono', 'Cascadia Code', 'Consolas', monospace",
     fontLigatures: true,
@@ -4858,9 +4875,9 @@ function setupEventListeners(): void {
   // data-tcide-theme 与 .theme-light 类，不经过上面按钮的 click 处理函数 ——
   // 结果是外壳换成浅色、编辑器还留在深色。用观察者把状态当唯一依据即可。
   function themeStateIsLight(): boolean {
-    const root = document.documentElement;
-    return root.classList.contains('theme-light')
-      || root.getAttribute('data-tcide-theme') === 'light';
+    // 与编辑器创建时**共用同一个实现**，避免两处判断漂移
+    // （这次的 bug 正是漂移造成的：创建时只看 localStorage，观察者看 class/属性）。
+    return isLightThemeActive();
   }
   try {
     new MutationObserver(() => applyEditorTheme(themeStateIsLight()))
