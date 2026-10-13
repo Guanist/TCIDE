@@ -703,11 +703,13 @@ async def orchestrator_run(request: Request, task: str = ""):
         from tcide_core.agent import AdapterClient, AgentOrchestrator
         from tcide_core.gitops import GitRepo
         from tcide_core.memory import ProjectMemoryBuilder
-        from tcide_core.tools import ToolRegistry
+        from tcide_core.tools import ToolRegistry, current_policy
 
         workspace = Workspace(root)
         repo = GitRepo(root)
-        registry = ToolRegistry(workspace, repo=repo if repo.owns_repo() else None)
+        registry = ToolRegistry(workspace,
+                                repo=repo if repo.owns_repo() else None,
+                                policy=current_policy())
         events: list = []
 
         def on_event(event) -> None:
@@ -1263,11 +1265,12 @@ async def ai_chat_tools(request: Request):
         from tcide_core.agent import AdapterClient
         from tcide_core.gitops import GitRepo
         from tcide_core.models import ChatMessage
-        from tcide_core.tools import ToolRegistry
+        from tcide_core.tools import ToolRegistry, current_policy
 
         root = current_project_root()
         registry = ToolRegistry(Workspace(root),
-                                repo=GitRepo(root) if GitRepo(root).owns_repo() else None)
+                                repo=GitRepo(root) if GitRepo(root).owns_repo() else None,
+                                policy=current_policy())
         client = AdapterClient(config)
 
         history = [ChatMessage(role=str(item.get("role", "user")),

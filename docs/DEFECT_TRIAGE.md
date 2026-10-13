@@ -70,7 +70,7 @@
 
 | # | 项 | 说明 | 影响 |
 |---|---|---|---|
-| 1 | `permissions.py` 在本仓库**未接线** | 模块已移植（可单独测试），但本仓库的 `tools.py` 还没有那个"唯一咽喉"策略钩子（PawUI 版有）。所以权限三档**只在 PawUI 版生效** | 中：Python 版的 API 侧暂时没有权限闸门 |
+| ~~1~~ | ~~`permissions.py` 在本仓库未接线~~ | ✅ **已修**：钩子加在 `tcide_core/tools.py` 的 `call()`（所有工具调用的唯一咽喉），两个 `ToolRegistry` 构造点都注入 `policy=current_policy()`。因为注册表**每次请求新建**，所以档位一改**下次请求即生效**。`current_policy()` 读设置，**读不到就退回 `ask`**（保守方向：宁可多问一次，不默认放行）。新增 14 条测试，其中决定性那条断言"**只读档下写文件返回失败，且文件确实没被写出来**" | — |
 | 2 | `tcide_core/term.py` 未移植 | 它直接依赖 Qt/PawUI（移植脚本按规则跳过）。Python 版有自己的 `api/terminal.py` | 低 |
 | 3 | 3 个移植测试被移除 | `test_theme.py`（读 PawUI 的 `app.paw`）、`test_panels.py`（依赖 PawUI 夹具）、`test_gitintel.py`（同上）。**模块保留**，只是测试与 PawUI 应用层耦合 | 低：这些模块在本仓库暂无测试 |
 | 4 | DAP 集成测试改为开关 | `TCIDE_DAP_TESTS=1` 才跑。默认跳过是因为它与临时目录清理有竞态（会偶发红）。**不是**功能缺失 —— 设开关后 2 条全过 | 低 |

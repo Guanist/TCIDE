@@ -111,7 +111,32 @@ def truncate_output(text: str, limit: int) -> tuple[str, bool]:
             + text[-tail:]), True
 
 
+def current_policy():
+    """读取当前权限档位（在工具调用处兜底用）。
+
+    **保守优先**：读不到设置就退回 ``ask``（宁可多要一次确认，也不默认放行）。
+    注册表是每次请求新建的，所以这里读到的值天然就是"下次请求生效"。
+    """
+    try:
+        from tcide_core.permissions import PermissionPolicy
+        from tcide_core.settings import load as load_settings
+
+        return PermissionPolicy(load_settings().permission)
+    except Exception:      # noqa: BLE001 - 读设置失败也不该让工具不可用
+        from tcide_core.permissions import PermissionPolicy
+
+        return PermissionPolicy("ask")
+
+
 class ToolRegistry:
+    """工具注册表。
+
+    ``policy`` 为 ``None`` 时不做权限拦截（库本身不假设一定要有权限模型）；
+    应用层注入 :func:`current_policy` 后，只读档下的写/执行会被**真的拦下**。
+    """
+
+    policy: Any = None
+
     """注册/发现/调用工具。"""
 
     def __init__(
@@ -161,6 +186,15 @@ class ToolRegistry:
             record["ok"] = False
             self.calls.append(record)
             return ToolResult(ok=False, error=f"未知工具: {name}（可用: {self.names()}）")
+        # 权限兜底：拦在所有工具调用的唯一咽喉上（agent 有多条路径，散着判迟早漏一条）。
+        # 只读档下写文件/执行命令在这里被直接拒绝 —— fail closed。
+        decision = self.policy.decide(name) if self.policy else None
+        if decision is not None and decision.denied:
+            record["ok"] = False
+            record["denied"] = True
+            record["reason"] = decision.reason
+            self.calls.append(record)
+            return ToolResult(ok=False, error=decision.reason)
         try:
             result = spec.handler(**arguments)
         except TypeError as exc:
