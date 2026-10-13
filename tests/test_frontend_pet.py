@@ -125,3 +125,22 @@ class TestSvgArtwork:
         text = SVG.read_text(encoding="utf-8")
         for color in ("#F2A03D", "#FDF3E3", "#F7A8B8", "#3B2B20"):
             assert color in text, f"缺少品牌配色 {color}"
+
+
+class TestStatusBarLookup:
+    """回归：状态栏要用 id **或** class 查找。
+
+    实测：这份遗产代码里 #status-bar 与 .status-bar 两套命名并存，真实元素用的是
+    类名 —— 只用 getElementById 会拿到 null，宠物在初始化第一行就悄悄返回，
+    而且没有任何报错（我为此用 --dump-dom 才查出来）。
+    """
+
+    def test_accepts_both_id_and_class(self):
+        text = PET_TS.read_text(encoding="utf-8")
+        assert "getElementById('status-bar')" in text
+        assert ".status-bar" in text, "只认 id —— 真实元素用类名时会静默失败"
+
+    def test_quietly_gives_up_when_missing(self):
+        text = PET_TS.read_text(encoding="utf-8")
+        assert "if (container || !statusBar()) return;" in text, \
+            "找不到状态栏时要安静退出，不能抛错"

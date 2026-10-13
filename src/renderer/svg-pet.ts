@@ -61,8 +61,34 @@ let labelEl: HTMLElement | null = null;
 let speechEl: HTMLElement | null = null;
 let speechTimer: number | undefined;
 
+/**
+ * 找状态栏。
+ *
+ * 注意：这份遗产代码里 `#status-bar` 与 `.status-bar` **两套命名并存**
+ * （注入样式里两者都有）。实测用 `getElementById('status-bar')` 拿到的是 null ——
+ * 真实元素用的是类名 —— 于是宠物在初始化第一行就悄悄返回了。所以两种都认。
+ */
 function statusBar(): HTMLElement | null {
-  return document.getElementById('status-bar');
+  return document.getElementById('status-bar')
+    || document.querySelector<HTMLElement>('.status-bar')
+    || document.querySelector<HTMLElement>('#statusbar, .statusbar');
+}
+
+/**
+ * 盯着状态栏：应用的 `updateEditorStatusBar()` 会重写 `#status-bar` 的内容，
+ * 把宠物一起冲掉（这是实测到的现象 —— 插进去了，一更新就没了）。
+ * 所以不能"插一次就完"，要跟着重挂。
+ */
+function watchStatusBar(): void {
+  const bar = statusBar();
+  if (!bar) return;
+  const ensure = (): void => {
+    if (!container || !bar.contains(container)) bar.insertBefore(container, bar.firstChild);
+  };
+  try {
+    new MutationObserver(ensure).observe(bar, { childList: true });
+  } catch { /* 老浏览器没有 MutationObserver：退化为只在初始化时插入 */ }
+  ensure();
 }
 
 /** 创建宠物容器（幂等）。找不到状态栏就安静退出 —— 宠物是可选装饰，不该影响主流程。 */
@@ -94,6 +120,7 @@ export function initSvgPet(): void {
   // 放在状态栏最前面（左侧），和原来的设计一致。
   const bar = statusBar()!;
   bar.insertBefore(container, bar.firstChild);
+  watchStatusBar();
 
   fetch('/icons/pet/tcide-pet.svg')
     .then((response) => (response.ok ? response.text() : Promise.reject(new Error('svg'))))
