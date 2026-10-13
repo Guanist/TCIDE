@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2025 TCIDE contributors
+# SPDX-License-Identifier: LGPL-3.0-or-later
 """
 TCIDE Advanced Features Module
 LSP, MCP, Semantic, Entropy, Auto-heal, Warehouse, Git Intelligence,

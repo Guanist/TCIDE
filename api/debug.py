@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2025 TCIDE contributors
+# SPDX-License-Identifier: LGPL-3.0-or-later
 """
 调试管理 API
 断点管理（设置/移除/列出），调试状态跟踪

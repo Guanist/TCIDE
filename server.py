@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2025 TCIDE contributors
+# SPDX-License-Identifier: LGPL-3.0-or-later
 """
 TCIDE Python - FastAPI 后端服务
 """

@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2025 TCIDE contributors
+# SPDX-License-Identifier: LGPL-3.0-or-later
 """
 文件快照 API
 保存/恢复文件快照，用于任务回滚

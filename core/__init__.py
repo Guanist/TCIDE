@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2025 TCIDE contributors
+# SPDX-License-Identifier: LGPL-3.0-or-later
 """核心模块 __init__"""
 from core.entropy.evaluator import EntropyEvaluator
 from core.memory.project_memory import ProjectMemory

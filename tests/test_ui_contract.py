@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2025 TCIDE contributors
+# SPDX-License-Identifier: LGPL-3.0-or-later
 """前端契约路由的回归测试（本仓库的第一批测试）。
 
 为什么先测这些：``web/`` 前端调用了一批接口，其中有些**后端根本没有**、有些

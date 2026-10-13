@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2025 TCIDE contributors
+# SPDX-License-Identifier: LGPL-3.0-or-later
 """
 项目记忆 API
 自动检测技术栈/编码风格/目录规范，记录重构/模式/决策，注入 system prompt

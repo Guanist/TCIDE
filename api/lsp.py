@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2025 TCIDE contributors
+# SPDX-License-Identifier: LGPL-3.0-or-later
 """LSP 适配层：以 ``tcide_core.lsp`` 为**唯一实现**，保留本模块原有的函数名。
 
 ## 为什么合并

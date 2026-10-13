@@ -1,6 +1,6 @@
 # TCIDE-Py — 虎猫 AI 编程 IDE（Python 版）
 
-[![License](https://img.shields.io/badge/license-GPLv3-blue.svg)](LICENSE)
+[![License](https://img.shields.io/badge/license-LGPL--3.0-blue.svg)](LICENSE)
 
 虎猫 TCIDE 的 Python 重写版，基于 FastAPI + PyWebView + Monaco Editor。
 
@@ -77,11 +77,15 @@ python main.py
 
 ## 许可证
 
-[GNU General Public License v3.0](LICENSE)
+[GNU Lesser General Public License v3.0](LICENSE)（SPDX：`LGPL-3.0-or-later`）
 
-## 关联分支
+`LICENSE` 是 **LGPL-3.0 全文**，各源文件头部带 `SPDX-License-Identifier: LGPL-3.0-or-later`。
+`tcide_core/` 从 `tcide-pawui` 搬运而来，同样是 LGPL-3.0-or-later。
+
+## 分支
 
 | 分支 | 说明 |
 |------|------|
-| **main** | TypeScript Electron 桌面版（稳定基线） |
-| **tcide-py** | 本分支 — Python 重写版 |
+| **main** | Python 版（FastAPI + PyWebView + `web/`）—— 当前主线 |
+| **tcide-py** | 同一内容的开发分支（与 main 同步） |
+| **tag `archive/electron-v0.0.9`** | 旧的 TypeScript Electron 版（已归档保留，可 `git checkout` 找回） |

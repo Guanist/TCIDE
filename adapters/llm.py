@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2025 TCIDE contributors
+# SPDX-License-Identifier: LGPL-3.0-or-later
 """
 多提供商 LLM 适配器
 支持 OpenAI 兼容 / Anthropic / Ollama，统一 streaming 接口

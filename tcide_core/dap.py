@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2025 TCIDE contributors
+# SPDX-License-Identifier: LGPL-3.0-or-later
 """DAP（Debug Adapter Protocol）客户端 —— 接 debugpy，做**真的**调试会话。
 
 ## 为什么有了 pdb 还要这个

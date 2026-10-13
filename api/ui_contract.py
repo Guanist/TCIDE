@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2025 TCIDE contributors
+# SPDX-License-Identifier: LGPL-3.0-or-later
 """前端契约路由：让 ``web/`` 前端调用的接口**真的存在且能对上**。
 
 背景（这是本仓库"功能不完善"的主要形态）：``web/`` 是原 Electron 渲染层用 Vite
