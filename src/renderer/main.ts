@@ -5360,10 +5360,11 @@ function setupEventListeners(): void {
     document.getElementById('output-content')!.textContent = '';
   });
 
-  // ── 像素宠物 ──
-  initPixelPet();
-  // 界面里的矢量宠物（Web/PyWebView 版原先没有宠物：只有样式没有 DOM）
+  // ── 宠物 ──
+  // 先挂界面里的矢量宠物：它只依赖 DOM 与一张本地图，不该被下面那个
+  // "向 Electron 独立宠物窗口发消息"的桥接拖累（上游抛错会带走同一块里后续代码）。
   initSvgPet();
+  initPixelPet();
 
 }
 

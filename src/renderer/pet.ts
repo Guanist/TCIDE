@@ -9,10 +9,16 @@ let toolCount = 0;
  *  放在一个地方，是为了不漏状态 —— 原先 6 处直接调 IPC，加钩子很容易只改一半。 */
 function emit(state: string, label: string): void {
   setSvgPetState(state, label);
-  window.api?.petSetState?.(state, label);
+  try {
+    window.api?.petSetState?.(state, label);
+  } catch { /* 桥接不可用不影响界面里的宠物 */ }
 }
 
 export function initPixelPet(): void {
+  // 防御：Web 版（electron-shim）不一定提供事件订阅。没有就安静返回 ——
+  // 原先这里会抛 TypeError，把同一初始化块里**后面的所有代码**一起带走
+  // （实测代价：界面里的宠物因此从未被创建）。
+  if (!window.api?.on) return;
   // Pet window is created by main process automatically
   // This just listens for AI events and relays them
   window.api?.on('ai-stream-chunk', () => {
