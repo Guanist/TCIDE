@@ -1,0 +1,244 @@
+/* SPDX-FileCopyrightText: 2026 Guanist, Inc.
+   SPDX-License-Identifier: LGPL-3.0-only
+
+   虎猫 TCIDE · Web 前端皮肤层（不依赖前端构建）
+
+   ## 为什么是"覆盖层"而不是改前端源码
+
+   `web/` 里是 **Vite 构建产物**：`index-*.js` / `index-*.css` 都是压缩过的，
+   而本仓库**没有前端源码**（没有 `web/src`、`package.json`、`vite.config.ts`，
+   也没有 `node_modules`）—— 所以**重建不了**。这是硬限制，不是偷懒。
+
+   但有一件事不需要构建：**在 bundle 之后追加一层 CSS**。样式级联在同等特异性下
+   "后者胜"，所以这份文件排在 `index-*.css` 之后就能覆盖观感层（字体、圆角、间距、
+   滚动条、选中态、聚焦环、主题色）。
+
+   `!important` 用得比较多 —— 因为要压过压缩产物里的行内样式与高特异性选择器。
+   在这个"皮肤层"的定位下这是合理的，不是随手加。
+
+   ## 主题与 PawUI 版一致
+
+   深色 = 黑橙（底 #0d0b09 / 强调 #e8802a），浅色 = 白橙（底 #fdfaf5 / 同色强调）。
+   两套共用同一支橙 —— 那是这只虎猫的标识色（与 `tcide-pawui` 的 `tcide/theme.py` 同源）。
+*/
+
+:root,
+html[data-tcide-theme="dark"] {
+  --tc-bg: #0d0b09;
+  --tc-surface: #17130f;
+  --tc-surface-2: #1f1a14;
+  --tc-text: #f6efe3;
+  --tc-subtext: #b8a48c;
+  --tc-accent: #e8802a;
+  --tc-accent-soft: rgba(232, 128, 42, 0.16);
+  --tc-border: #33261a;
+  --tc-danger: #d2503f;
+  --tc-code-bg: #100c09;
+  --tc-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+  --tc-radius: 10px;
+  --tc-radius-sm: 7px;
+}
+
+html[data-tcide-theme="light"] {
+  --tc-bg: #fdfaf5;
+  --tc-surface: #ffffff;
+  --tc-surface-2: #f6f1e8;
+  --tc-text: #1a1512;
+  --tc-subtext: #6f6154;
+  --tc-accent: #e8802a;
+  --tc-accent-soft: rgba(232, 128, 42, 0.14);
+  --tc-border: #e6dccd;
+  --tc-danger: #c0392b;
+  --tc-code-bg: #fbf7f1;
+  --tc-shadow: 0 8px 24px rgba(90, 70, 40, 0.14);
+}
+
+/* ── 基调：字体、底色、文字 ─────────────────────────────────────────── */
+html,
+body {
+  background: var(--tc-bg) !important;
+  color: var(--tc-text) !important;
+  font-family: "Microsoft YaHei UI", "Segoe UI", "PingFang SC", system-ui, sans-serif !important;
+  font-size: 13.5px !important;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* 侧栏 / 面板 / 卡片：统一成"暖黑面 + 细边" */
+.panel,
+.sidebar,
+.activitybar,
+.editor-group,
+.tab,
+.statusbar,
+.terminal,
+.modal-content,
+.welcome,
+.explorer,
+.tree,
+.list,
+.card {
+  background: var(--tc-surface) !important;
+  border-color: var(--tc-border) !important;
+  color: var(--tc-text) !important;
+}
+
+/* ── 滚动条：细，悬停变橙（默认那根又宽又灰）──────────────────────── */
+::-webkit-scrollbar { width: 10px !important; height: 10px !important; }
+::-webkit-scrollbar-track { background: transparent !important; }
+::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--tc-border) 80%, #000 20%) !important;
+  border-radius: 6px !important;
+  border: 2px solid transparent !important;
+  background-clip: content-box !important;
+}
+::-webkit-scrollbar-thumb:hover { background: var(--tc-accent) !important; }
+* { scrollbar-width: thin; scrollbar-color: var(--tc-border) transparent; }
+
+/* ── 按钮：圆角 + 悬停 + 主操作实心橙 ───────────────────────────────── */
+button,
+.btn,
+.button,
+[role="button"] {
+  border-radius: var(--tc-radius-sm) !important;
+  border: 1px solid var(--tc-border) !important;
+  background: var(--tc-surface-2) !important;
+  color: var(--tc-text) !important;
+  padding: 5px 11px !important;
+  transition: background 0.15s ease, border-color 0.15s ease, transform 0.05s ease !important;
+}
+button:hover,
+.btn:hover,
+.button:hover,
+[role="button"]:hover {
+  border-color: var(--tc-accent) !important;
+  background: var(--tc-accent-soft) !important;
+}
+button:active,
+.btn:active { transform: translateY(1px) !important; }
+button.primary,
+.btn-primary,
+.btn.primary {
+  background: var(--tc-accent) !important;
+  border-color: var(--tc-accent) !important;
+  color: #fff6e8 !important;
+  font-weight: 600 !important;
+}
+
+/* ── 输入框：聚焦时给橙色环（默认几乎看不出焦点在哪）───────────────── */
+input,
+textarea,
+select,
+[contenteditable="true"] {
+  background: var(--tc-code-bg) !important;
+  color: var(--tc-text) !important;
+  border: 1px solid var(--tc-border) !important;
+  border-radius: var(--tc-radius-sm) !important;
+  padding: 5px 8px !important;
+}
+input:focus,
+textarea:focus,
+select:focus,
+[contenteditable="true"]:focus {
+  outline: none !important;
+  border-color: var(--tc-accent) !important;
+  box-shadow: 0 0 0 3px var(--tc-accent-soft) !important;
+}
+
+/* ── 列表 / 树：选中项带左侧橙条（"虎纹"），悬停可见 ───────────────── */
+.tree-item:hover,
+.list-item:hover,
+li:hover,
+tr:hover {
+  background: var(--tc-accent-soft) !important;
+}
+.tree-item.selected,
+.list-item.selected,
+li.selected,
+tr.selected,
+.tree-item[aria-selected="true"],
+.list-item[aria-selected="true"] {
+  background: var(--tc-accent-soft) !important;
+  border-left: 3px solid var(--tc-accent) !important;
+  color: #fff6e8 !important;
+}
+html[data-tcide-theme="light"] .tree-item.selected,
+html[data-tcide-theme="light"] .list-item.selected,
+html[data-tcide-theme="light"] li.selected {
+  color: var(--tc-text) !important;
+}
+
+/* ── 页签：下划线式（默认的"文件夹标签"是最显旧的地方之一）────────── */
+.tab,
+.tab-item,
+[role="tab"] {
+  border-radius: 0 !important;
+  border: none !important;
+  border-bottom: 2px solid transparent !important;
+  background: transparent !important;
+  color: var(--tc-subtext) !important;
+  padding: 7px 13px !important;
+}
+.tab:hover,
+[role="tab"]:hover { color: var(--tc-text) !important; background: var(--tc-surface-2) !important; }
+.tab.active,
+.tab.selected,
+[role="tab"][aria-selected="true"] {
+  color: var(--tc-text) !important;
+  border-bottom: 2px solid var(--tc-accent) !important;
+  font-weight: 600 !important;
+  background: transparent !important;
+}
+
+/* ── 代码与终端：暖黑底 + 等宽字体 ────────────────────────────────── */
+pre, code, .monaco-editor, .xterm, .terminal, .code-block {
+  background: var(--tc-code-bg) !important;
+  font-family: "Cascadia Mono", "Consolas", "JetBrains Mono", monospace !important;
+}
+
+/* ── 弹窗 / 提示：统一的圆角与阴影（默认是直角 + 无层次）───────────── */
+.modal-overlay,
+.overlay { background: rgba(0, 0, 0, 0.45) !important; backdrop-filter: blur(2px) !important; }
+.modal-content,
+.dialog,
+.popup,
+.dropdown,
+.context-menu {
+  border-radius: var(--tc-radius) !important;
+  border: 1px solid var(--tc-border) !important;
+  box-shadow: var(--tc-shadow) !important;
+  background: var(--tc-surface) !important;
+}
+
+/* ── 状态栏：低调，不抢主区 ──────────────────────────────────────── */
+.statusbar,
+.status-bar {
+  background: var(--tc-surface) !important;
+  border-top: 1px solid var(--tc-border) !important;
+  color: var(--tc-subtext) !important;
+}
+
+/* ── 主题切换按钮（由 tcide-theme.js 注入到右下角）────────────────── */
+#tcide-theme-toggle {
+  position: fixed;
+  right: 14px;
+  bottom: 34px;
+  z-index: 2147483000;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  border: 1px solid var(--tc-border) !important;
+  background: var(--tc-surface) !important;
+  color: var(--tc-text) !important;
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+  box-shadow: var(--tc-shadow);
+  opacity: 0.75;
+  transition: opacity 0.15s ease, transform 0.15s ease;
+}
+#tcide-theme-toggle:hover { opacity: 1; transform: scale(1.06); }
+
+/* 尊重"减少动效"偏好 —— 别为了好看让人晕 */
+@media (prefers-reduced-motion: reduce) {
+  * { transition: none !important; animation: none !important; }
+}
