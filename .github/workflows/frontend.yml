@@ -54,17 +54,32 @@ jobs:
       - name: 校验主题真的进了产物（源码 → 构建 → 产物 这条链）
         run: |
           set -e
-          css=$(ls dist/renderer/assets/index-*.css | head -1)
-          echo "检查 $css"
-          grep -q -- '--bg-primary' "$css"
-          grep -q 'data-tcide-theme="light"' "$css"
-          if grep -qiE '#1e1e1e' "$css"; then
+          echo "=== 产物 CSS 分块 ==="
+          ls -la dist/renderer/assets/*.css
+          echo "=== 诊断：变量与主题块分布 ==="
+          for f in dist/renderer/assets/*.css; do
+            printf '%s: --bg-primary=%s light-theme=%s\n' "$f" \
+              "$(grep -c -- '--bg-primary' "$f" || true)" \
+              "$(grep -ciE 'data-tcide-theme|theme-light' "$f" || true)"
+          done
+
+          # 变量定义要在**任意**一个分块里（vite 会分块，不能只看第一个）
+          if ! grep -lq -- '--bg-primary' dist/renderer/assets/*.css; then
+            echo "::error::所有产物 CSS 里都没有 --bg-primary —— 主题变量没进产物"
+            exit 1
+          fi
+          # 浅色主题块要在；压缩后引号可能被去掉，两种写法都接受
+          if ! grep -lEqi 'data-tcide-theme="?light"?|theme-light' dist/renderer/assets/*.css; then
+            echo "::error::产物 CSS 里没有浅色主题块"
+            exit 1
+          fi
+          # 那批"决定观感"的裸色值不该再出现
+          if grep -liqE '#1e1e1e' dist/renderer/assets/*.css; then
             echo "::error::产物里仍有裸写的 #1e1e1e —— 主题变量没被用上"
             exit 1
           fi
           grep -q '/static/tcide-theme.js' dist/renderer/index.html
           echo "OK: 主题变量、浅色主题、切换脚本都已在产物中"
-
       - name: 上传产物（便于人工核对）
         uses: actions/upload-artifact@v4
         with:
