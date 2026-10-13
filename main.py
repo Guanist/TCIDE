@@ -45,6 +45,62 @@ def wait_for_server(url: str, timeout: int = 10) -> bool:
     return False
 
 
+
+# ── 宠物窗口位置（记住用户拖到哪儿）─────────────────────────────────────────
+# PyWebView 没有 moved 事件，但 Window.x / Window.y 可读；位置存 settings.extra。
+PET_POSITION_KEY = "pet_position"
+
+
+def read_pet_position() -> tuple[int | None, int | None]:
+    """读上次的位置；没有或不可信就返回 (None, None)，交给系统决定。"""
+    from tcide_core.settings import load
+
+    value = (load().extra or {}).get(PET_POSITION_KEY)
+    try:
+        x, y = int(value[0]), int(value[1])
+    except (TypeError, ValueError, IndexError):
+        return None, None
+    # 明显跑到屏幕外的坐标不要用（换显示器/分辨率变了会变成"看不见的宠物"）
+    if x < -2000 or y < -2000 or x > 20000 or y > 20000:
+        return None, None
+    return x, y
+
+
+def save_pet_position(x: int, y: int) -> None:
+    from tcide_core.settings import load, save
+
+    settings = load()
+    extra = dict(settings.extra or {})
+    if extra.get(PET_POSITION_KEY) == [int(x), int(y)]:
+        return
+    extra[PET_POSITION_KEY] = [int(x), int(y)]
+    settings.extra = extra
+    save(settings)
+
+
+def watch_pet_position(window, interval: float = 2.0) -> None:
+    """在 webview.start() 的后台线程里盯住窗口位置，变了就存。
+
+    为什么轮询而不是事件：PyWebView 没有 moved 事件（实测 Window.events 不存在）。
+    两秒一次足够 —— 拖动过程中不必每次都写盘。
+    """
+    import time
+
+    last: tuple[int, int] | None = None
+    while True:
+        time.sleep(interval)
+        try:
+            x, y = int(window.x), int(window.y)
+        except Exception:      # noqa: BLE001 - 窗口已关闭等情况
+            return
+        if last != (x, y):
+            last = (x, y)
+            try:
+                save_pet_position(x, y)
+            except Exception:      # noqa: BLE001 - 存不下不该影响宠物
+                pass
+
+
 def open_pet_window(url: str, *, x: int | None = None, y: int | None = None) -> None:
     """开一个独立悬浮的桌面宠物窗口。
 
@@ -64,7 +120,7 @@ def open_pet_window(url: str, *, x: int | None = None, y: int | None = None) -> 
         # 和主窗口一致：没有 pywebview 就安静不开宠物窗口，不能影响主流程。
         print("[TCIDE] 未安装 pywebview，跳过桌面宠物窗口")
         return
-    webview.create_window(
+    return webview.create_window(
         "虎猫", f"{url}/pet",
         width=140, height=170,
         x=x, y=y,
@@ -88,9 +144,16 @@ def open_window(url: str, title: str = "虎猫 TCIDE", *, no_pet: bool = False) 
         return False
     webview.create_window(title, url, width=1440, height=900)
     # 桌面宠物：独立、透明、置顶、可拖动的小窗口（`--no-pet` 可关）
+    pet = None
     if not no_pet:
-        open_pet_window(url)
-    webview.start()
+        pet_x, pet_y = read_pet_position()
+        pet = open_pet_window(url, x=pet_x, y=pet_y)
+    # 把"盯住宠物位置"放到 start() 的后台槽位里（PyWebView 支持这样跑一个循环）。
+    # 没有宠物窗口时就照常启动。
+    if pet is not None:
+        webview.start(watch_pet_position, [pet])
+    else:
+        webview.start()
     return True
 
 

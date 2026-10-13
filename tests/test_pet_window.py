@@ -23,6 +23,8 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
+import sys
+
 import pytest
 from fastapi.testclient import TestClient
 
@@ -206,3 +208,114 @@ class TestSvgArtwork:
         text = SVG.read_text(encoding="utf-8")
         assert "background" not in text.split("<style>")[1].split("</style>")[0], \
             "SVG 里画了背景，会挡住透明窗口"
+
+
+class TestPetPositionIsRemembered:
+    """用户把宠物拖到哪儿，下次打开就该在哪儿。
+
+    PyWebView 没有 moved 事件（实测 Window.events 不存在），所以实现是：
+    `webview.start(func, args)` 的后台槽位里轮询 Window.x/y，变化就写进
+    settings.extra。这一组把"存 → 读 → 恢复 → 越界保护"整条链路钉住。
+    """
+
+    @pytest.fixture(autouse=True)
+    def isolated(self, tmp_path, monkeypatch):
+        monkeypatch.setenv("TCIDE_CONFIG_DIR", str(tmp_path))
+
+    def test_unset_returns_none(self):
+        assert main_module.read_pet_position() == (None, None)
+
+    def test_round_trips(self):
+        main_module.save_pet_position(320, 240)
+        assert main_module.read_pet_position() == (320, 240)
+
+    def test_out_of_range_is_rejected(self):
+        """换显示器/改分辨率后，旧坐标可能落在屏幕外 —— 那会变成"看不见的宠物"。"""
+        main_module.save_pet_position(0, 0)
+        main_module._forced_out_of_range = True  # 说明用：下面直接写非法值
+        from tcide_core.settings import load, save
+
+        settings = load()
+        extra = dict(settings.extra or {})
+        extra[main_module.PET_POSITION_KEY] = [-99999, 5]
+        settings.extra = extra
+        save(settings)
+        assert main_module.read_pet_position() == (None, None)
+
+    def test_watcher_saves_where_the_window_actually_is(self):
+        """盯守循环必须真的把窗口当前位置存下来。"""
+        calls = {"n": 0}
+
+        class FakeWindow:
+            @property
+            def x(self):
+                calls["n"] += 1
+                if calls["n"] > 2:
+                    raise RuntimeError("窗口已关闭")   # 让循环自己退出
+                return 111
+
+            @property
+            def y(self):
+                return 222
+
+        main_module.watch_pet_position(FakeWindow(), interval=0.01)
+        assert main_module.read_pet_position() == (111, 222)
+
+    def test_window_opens_at_the_saved_position(self, monkeypatch):
+        captured = self._capture(monkeypatch)
+        main_module.save_pet_position(410, 260)
+        x, y = main_module.read_pet_position()
+        main_module.open_pet_window("http://127.0.0.1:18420", x=x, y=y)
+        assert captured[0]["kwargs"]["x"] == 410
+        assert captured[0]["kwargs"]["y"] == 260
+
+    def test_open_window_wires_the_watcher_only_when_pet_exists(self, monkeypatch):
+        """没有宠物窗口时不能传一个空对象给 start()。"""
+        started: list = []
+
+        class FakeWindow:
+            pass
+
+        class FakeWebview:
+            @staticmethod
+            def create_window(*args, **kwargs):
+                return FakeWindow()
+
+            @staticmethod
+            def start(func=None, args=None, **kwargs):
+                started.append((func, args))
+
+        monkeypatch.setitem(sys.modules, "webview", FakeWebview)
+        main_module.open_window("http://127.0.0.1:18420", no_pet=True)
+        assert started and started[0][0] is None, \
+            "没开宠物窗口时不该传盯守函数"
+
+    def _capture(self, monkeypatch) -> list:
+        captured: list = []
+
+        class FakeWebview:
+            @staticmethod
+            def create_window(*args, **kwargs):
+                captured.append({"args": args, "kwargs": kwargs})
+                return object()
+
+            @staticmethod
+            def start(*args, **kwargs):
+                return None
+
+        monkeypatch.setitem(sys.modules, "webview", FakeWebview)
+        return captured
+
+
+class TestPetFallsAsleep:
+    """`sleep` 这个状态此前**永远触发不到** —— 图画好了却没有代码会切过去。"""
+
+    def test_page_sleeps_after_a_long_idle(self):
+        text = PET_HTML.read_text(encoding="utf-8")
+        assert "SLEEP_AFTER_MS" in text, "页面没有空闲入睡的逻辑"
+        assert "pet-sleep.gif" in text, "入睡后没有切换到睡觉的图"
+
+    def test_any_state_change_wakes_it_up(self):
+        text = PET_HTML.read_text(encoding="utf-8")
+        assert "idleSince = Date.now()" in text, \
+            "收到非待机状态时没有重置空闲计时（醒来逻辑）"

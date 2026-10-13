@@ -79,8 +79,10 @@
     const labelEl = document.getElementById('label');
     let hideTimer;
     let currentVisual = '';
+    let currentState = 'idle';
 
     function apply(state, label) {
+      currentState = state;
       const visual = STATE_MAP[state] || 'idle';
       if (visual !== currentVisual) {
         currentVisual = visual;
@@ -112,6 +114,26 @@
     }
     poll();
     setInterval(poll, 900);
+
+    // ── 待机久了就睡觉；任何非待机状态立刻醒 ──────────────────────────────
+    // 加这个是因为 `sleep` 状态此前**永远触发不到**：图都画好了却没有代码会切过去。
+    const SLEEP_AFTER_MS = 4 * 60 * 1000;
+    let idleSince = Date.now();
+    function sleepIfIdle() {
+      const visual = STATE_MAP[currentState] || 'idle';
+      if (visual !== 'idle') { idleSince = Date.now(); return; }
+      if (Date.now() - idleSince < SLEEP_AFTER_MS) return;
+      // 直接在本地切视觉状态，不经过服务器 —— 睡着只是宠物自己的事
+      if (currentVisual !== 'sleep') {
+        currentVisual = 'sleep';
+        petEl.classList.remove('state-idle', 'state-work', 'state-sleep', 'state-error');
+        petEl.classList.add('state-sleep');
+        imageEl.src = '/icons/pet/pet-sleep.gif';
+        labelEl.classList.remove('show');
+      }
+    }
+    setInterval(sleepIfIdle, 30000);
+
 
     // 右键菜单在悬浮宠物上没有意义，屏蔽掉（避免点出浏览器菜单遮住宠物）
     window.addEventListener('contextmenu', (event) => event.preventDefault());
