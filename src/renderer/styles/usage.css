@@ -1,0 +1,269 @@
+/* ═── 用量统计面板 ───║ */
+.usage-panel {
+  padding: 16px;
+  overflow-y: auto;
+  height: 100%;
+}
+
+.usage-summary-cards {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.usage-card {
+  flex: 1;
+  background: var(--bg-secondary);
+  border-radius: 8px;
+  padding: 14px;
+  text-align: center;
+  cursor: pointer;
+  transition: transform 0.15s, box-shadow 0.15s;
+}
+
+.usage-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 16px rgba(0,0,0,0.3);
+}
+
+.usage-card-title {
+  font-size: 11px;
+  color: var(--text-secondary);
+  margin-bottom: 6px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.usage-card-value {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--虎猫-orange);
+}
+
+.usage-card-label {
+  font-size: 10px;
+  color: var(--text-secondary);
+  margin-top: 2px;
+}
+
+.usage-card-cost {
+  font-size: 13px;
+  color: var(--text-secondary);
+  margin-top: 6px;
+}
+
+.usage-detail-section {
+  margin-bottom: 20px;
+}
+
+.usage-detail-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.usage-detail-header h4 {
+  margin: 0;
+  font-size: 13px;
+}
+
+.usage-refresh-btn {
+  background: none;
+  border: 1px solid var(--border-color);
+  color: var(--text-secondary);
+  padding: 3px 10px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 11px;
+}
+
+.usage-refresh-btn:hover {
+  border-color: var(--虎猫-orange);
+  color: var(--虎猫-orange);
+}
+
+.usage-project-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.usage-project-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: var(--bg-secondary);
+  border-radius: 6px;
+  padding: 10px 14px;
+  font-size: 12px;
+}
+
+.usage-project-item:hover {
+  background: var(--bg-hover);
+}
+
+.usage-project-name {
+  font-weight: 600;
+  color: var(--text-primary);
+  max-width: 50%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.usage-project-stats {
+  color: var(--text-secondary);
+  font-size: 11px;
+}
+
+.usage-empty {
+  text-align: center;
+  color: var(--text-secondary);
+  padding: 24px 0;
+  font-size: 12px;
+}
+
+/* 简易柱状图 */
+.usage-chart {
+  background: var(--bg-secondary);
+  border-radius: 8px;
+  padding: 12px;
+  height: 120px;
+  display: flex;
+  align-items: flex-end;
+  gap: 3px;
+  overflow-x: auto;
+}
+
+.usage-chart-bar {
+  flex: 1;
+  min-width: 6px;
+  background: var(--虎猫-orange);
+  border-radius: 2px 2px 0 0;
+  min-height: 2px;
+  transition: height 0.3s;
+  position: relative;
+}
+
+.usage-chart-bar:hover::after {
+  content: attr(data-tip);
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #333;
+  color: #fff;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 10px;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+/* ═── 余额不足弹窗 ───║ */
+.balance-warning-dialog {
+  position: fixed;
+  top: 0; left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(0,0,0,0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+}
+
+.balance-warning-dialog.hidden {
+  display: none;
+}
+
+.balance-warning-content {
+  background: var(--bg-primary);
+  border: 1px solid #e74c3c;
+  border-radius: 12px;
+  padding: 32px 40px;
+  text-align: center;
+  max-width: 420px;
+  box-shadow: 0 8px 40px rgba(0,0,0,0.5);
+}
+
+.balance-warning-icon {
+  font-size: 48px;
+  margin-bottom: 12px;
+}
+
+.balance-warning-content h3 {
+  color: #e74c3c;
+  margin: 0 0 12px;
+  font-size: 18px;
+}
+
+.balance-warning-msg {
+  color: var(--text-secondary);
+  font-size: 13px;
+  line-height: 1.6;
+  margin-bottom: 20px;
+  white-space: pre-wrap;
+  text-align: left;
+}
+
+.balance-warning-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+}
+
+.balance-warning-btn {
+  background: var(--虎猫-orange);
+  color: #fff;
+  border: none;
+  padding: 8px 24px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.balance-warning-btn:hover {
+  background: var(--虎猫-orange-dark);
+}
+
+/* ═── 状态栏用量 ───║ */
+.status-usage {
+  cursor: pointer;
+}
+
+.status-usage:hover {
+  color: var(--虎猫-orange);
+}
+
+/* ═── feature-icon-svg 补全 ───║ */
+.feature-icon-svg {
+  width: 36px;
+  height: 36px;
+  margin-bottom: 8px;
+  display: block;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.welcome-logo-img {
+  width: 80px;
+  height: 80px;
+  margin: 0 auto 12px;
+  display: block;
+}
+
+.about-logo-img {
+  width: 64px;
+  height: 64px;
+  margin: 0 auto 8px;
+  display: block;
+}
+
+.about-li-icon {
+  width: 18px;
+  height: 18px;
+  vertical-align: middle;
+  margin-right: 6px;
+}

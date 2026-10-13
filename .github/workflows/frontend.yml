@@ -1,0 +1,60 @@
+name: frontend
+
+# 为什么单独一个工作流：本机在**仓库外两层**存在一个损坏的 package.json
+# （Desktop/Vincent/package.json，内容是截断的 React Native 清单）。esbuild 在为
+# vite.config.ts 解析模块类型时会向上查找并读到它，于是本地 `vite build` 必然失败：
+#     ../../../../package.json:55:15: ERROR: Unterminated string literal
+# 代码本身是好的（本地已经跑到 1064 modules transformed）。CI runner 的祖先链干净，
+# 所以"前端能不能重建"这件事在这里才验证得准。
+#
+# 这个工作流的价值：把"前端可重建"变成**持续可验证**的事实 —— 一旦源码被改坏，
+# 这里会红。
+
+on:
+  push:
+    branches: [main, tcide-py]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: 安装构建所需依赖（不装 Electron）
+        run: |
+          npm install --omit=dev --no-audit --no-fund
+          npm install --no-save --no-audit --no-fund vite@5.4.21
+
+      - name: 确认没有把 Electron 拉进来
+        run: |
+          if [ -d node_modules/electron ]; then
+            echo "::warning::node_modules 里出现了 electron（构建并不需要它）"
+          fi
+
+      - name: 构建渲染层
+        run: npx vite build
+
+      - name: 校验产物（缺了就等于没构建）
+        run: |
+          set -e
+          test -f dist/renderer/index.html
+          test -d dist/renderer/assets
+          echo "产物文件数：$(find dist/renderer -type f | wc -l)"
+          # 关键资源必须在：少了 monaco/xterm 的产物，界面会直接不可用
+          ls dist/renderer/assets | grep -q 'index-.*\.js'
+          ls dist/renderer/assets | grep -q 'index-.*\.css'
+
+      - name: 上传产物（便于人工核对）
+        uses: actions/upload-artifact@v4
+        with:
+          name: renderer-dist
+          path: dist/renderer
+          retention-days: 7
+          if-no-files-found: error
