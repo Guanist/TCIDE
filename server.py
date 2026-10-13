@@ -144,6 +144,38 @@ if os.path.isdir(static_dir):
 
 # ── 页面 ──
 
+
+# ── 桌面宠物（独立悬浮窗口）───────────────────────────────────────────────
+# 宠物的状态只关心"现在在干什么"，所以存内存就够；进程重启后回到待机也合理。
+_pet_state: dict = {"state": "idle", "label": ""}
+
+
+@app.get("/pet")
+async def pet_page():
+    """宠物窗口加载的页面（独立透明置顶小窗口，见 main.py 的 open_pet_window）。"""
+    pet_html = os.path.join(web_dir, "pet.html")
+    if not os.path.isfile(pet_html):
+        return HTMLResponse("<h1>宠物页面缺失</h1>", status_code=404)
+    return FileResponse(pet_html, media_type="text/html")
+
+
+@app.get("/api/pet/state")
+async def get_pet_state():
+    return {"success": True, **_pet_state}
+
+
+@app.post("/api/pet/state")
+async def set_pet_state(request: Request):
+    """应用里十处 petSetState 最终都打到这里（经 electron-shim 转发）。"""
+    try:
+        body = await request.json()
+    except Exception:      # noqa: BLE001 - 空 body 也算合法
+        body = {}
+    state = str(body.get("state") or "idle")
+    _pet_state.update({"state": state, "label": str(body.get("label") or "")})
+    return {"success": True, **_pet_state}
+
+
 @app.get("/")
 async def index():
     html_path = os.path.join(web_dir, "index.html")

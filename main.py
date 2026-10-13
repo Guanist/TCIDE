@@ -45,7 +45,35 @@ def wait_for_server(url: str, timeout: int = 10) -> bool:
     return False
 
 
-def open_window(url: str, title: str = "虎猫 TCIDE") -> bool:
+def open_pet_window(url: str, *, x: int | None = None, y: int | None = None) -> None:
+    """开一个独立悬浮的桌面宠物窗口。
+
+    为什么这样开：
+    - `frameless` + `transparent`：桌面上只看到那只猫，没有窗口边框与底色；
+    - `on_top`：不被编辑器窗口盖住；
+    - `easy_drag`：**无边框窗口的拖动交给 PyWebView** —— 不用自己写鼠标捕获，
+      整个窗口区域都可以拖；
+    - 尺寸 140x170：够放下 104px 的宠物与一行状态标签。
+
+    必须与主窗口在**同一个** `webview.start()` 之前创建 —— PyWebView 是多窗口的，
+    但事件循环只能起一次。
+    """
+    try:
+        import webview
+    except ImportError:
+        # 和主窗口一致：没有 pywebview 就安静不开宠物窗口，不能影响主流程。
+        print("[TCIDE] 未安装 pywebview，跳过桌面宠物窗口")
+        return
+    webview.create_window(
+        "虎猫", f"{url}/pet",
+        width=140, height=170,
+        x=x, y=y,
+        frameless=True, transparent=True, on_top=True, easy_drag=True,
+        resizable=False, min_size=(120, 140),
+    )
+
+
+def open_window(url: str, title: str = "虎猫 TCIDE", *, no_pet: bool = False) -> bool:
     """用 PyWebView 打开原生窗口（**不依赖 PawUI**）。
 
     为什么换掉 PawUI：本仓库的界面本来就是 ``web/`` —— 它是原 Electron 渲染层
@@ -59,6 +87,9 @@ def open_window(url: str, title: str = "虎猫 TCIDE") -> bool:
         print("[TCIDE] 未安装 pywebview，回退到浏览器。安装: pip install pywebview")
         return False
     webview.create_window(title, url, width=1440, height=900)
+    # 桌面宠物：独立、透明、置顶、可拖动的小窗口（`--no-pet` 可关）
+    if not no_pet:
+        open_pet_window(url)
     webview.start()
     return True
 
@@ -79,6 +110,8 @@ def main():
     parser.add_argument("--port", type=int, default=18420, help="Server port")
     parser.add_argument("--host", default="127.0.0.1", help="Server host")
     parser.add_argument("--no-window", action="store_true", help="Run server only (no GUI)")
+    parser.add_argument("--no-pet", action="store_true",
+                        help="Do not open the floating desktop pet window")
     parser.add_argument("--browser", action="store_true",
                         help="用系统浏览器而不是原生窗口")
     args = parser.parse_args()
@@ -111,7 +144,7 @@ def main():
         return
 
     # 原生窗口（PyWebView）；失败或显式 --browser 时用系统浏览器打开
-    if not args.browser and open_window(url):
+    if not args.browser and open_window(url, no_pet=args.no_pet):
         print("[TCIDE] Window closed")
         return
     print(f"[TCIDE] 在浏览器中打开: {url}")

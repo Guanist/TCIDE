@@ -104,7 +104,11 @@
     sendToAIWithTools: (msgs, opts) => apiCall('POST', '/api/ai/chat/tools', {messages: msgs, ...opts}),
     aiComplete: (p, c) => apiCall('POST', '/api/ai/complete', {prefix: p, context: c}),
     abortAI: () => apiCall('POST', '/api/ai/abort'),
-    testModelConnection: (cfg) => apiCall('POST', '/api/ai/test', cfg),
+    // 宠物状态：应用里十处 petSetState 都经这里转发给后端（原来**没有实现**，
+  // 所以 Web 版里那些调用全落空了）
+  petSetState: (state, label) => apiCall('POST', '/api/pet/state',
+    { state, label }),
+  testModelConnection: (cfg) => apiCall('POST', '/api/ai/test', cfg),
     getTaskSession: () => apiCall('GET', '/api/ai/task-session'),
 
     // Git

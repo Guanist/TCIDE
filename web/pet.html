@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<!--
+  SPDX-FileCopyrightText: 2026 Guanist, Inc.
+  SPDX-License-Identifier: LGPL-3.0-only
+
+  虎猫宠物 · 独立悬浮窗口页面
+
+  为什么是**独立页面**而不是嵌在主界面里：
+  用户要的是"独立悬浮在桌面、可以拖动"的宠物（参考 MollyPaw —— 它为此专门用了一个
+  独立进程）。做成独立页面有三个好处：
+    · 窗口可以透明、无边框、置顶（PyWebView 的 transparent/frameless/on_top）
+    · 拖动交给 PyWebView 的 easy_drag，不用自己实现鼠标捕获
+    · 它是 web/ 下的静态文件，不走前端构建 —— 改一次看一眼，迭代快
+
+  页面只做三件事：内联矢量虎猫、跟随状态、把状态显示成标签。
+  拖动由宿主窗口负责（easy_drag），所以这里不写拖拽代码 —— 只有 CSS 的 -webkit-app-region
+  之外不需要任何 hack。
+-->
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>虎猫</title>
+  <style>
+    /* 透明背景：窗口本身是透明的，页面不能再铺底色，否则会看到一块方形的板 */
+    html, body {
+      margin: 0; padding: 0; width: 100%; height: 100%;
+      background: transparent; overflow: hidden;
+      /* 让整个窗口区域都能被拖动 —— 但按钮要能点，所以按钮单独设 no-drag */
+      user-select: none;
+    }
+    #pet {
+      width: 100%; height: 100%;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: flex-end;
+      padding-bottom: 4px; box-sizing: border-box;
+    }
+    #pet svg { display: block; width: 104px; height: 104px; }
+    #label {
+      margin-top: 2px; padding: 1px 7px; border-radius: 9px;
+      font: 11px/1.5 "Microsoft YaHei UI", system-ui, sans-serif;
+      color: #F6EFE3; background: rgba(20, 16, 12, .72);
+      white-space: nowrap; opacity: 0; transition: opacity .25s ease;
+    }
+    #label.show { opacity: 1; }
+    /* 状态底色：与主界面的宠物标签色一致 */
+    #pet.state-work  #label { color: #FFD700; }
+    #pet.state-error #label { color: #FF9E8A; }
+    body.loading #pet svg { display: none; }
+  </style>
+</head>
+<body class="loading">
+  <div id="pet" class="state-idle">
+    <div id="label">待机</div>
+  </div>
+
+  <script>
+    // ── 状态映射：与应用里十个状态一一对应（与 docs/PET_DESIGN.md 一致）──
+    const STATE_MAP = {
+      idle: 'idle', thinking: 'work', tool: 'work', run: 'work', review: 'work',
+      success: 'idle', jump: 'idle', wave: 'idle', error: 'error', failed: 'error',
+    };
+    const LABELS = {
+      idle: '待机', thinking: '分析中…', tool: '调用工具', run: '执行中…',
+      review: '审查中…', success: '完成', jump: '完成', wave: '在的',
+      error: '出错', failed: '失败',
+    };
+
+    const petEl = document.getElementById('pet');
+    const labelEl = document.getElementById('label');
+    let hideTimer;
+
+    function apply(state, label) {
+      const visual = STATE_MAP[state] || 'idle';
+      petEl.classList.remove('state-idle', 'state-work', 'state-sleep', 'state-error');
+      petEl.classList.add('state-' + visual);
+      const text = label || LABELS[state] || '';
+      if (text) {
+        labelEl.textContent = text;
+        labelEl.classList.add('show');
+        clearTimeout(hideTimer);
+        // 待机时不挂着一句话，让它自己淡出 —— 悬浮宠物不该一直占着文字
+        if (visual === 'idle') hideTimer = setTimeout(() => labelEl.classList.remove('show'), 2500);
+      }
+      petEl.setAttribute('aria-label', '虎猫宠物：' + (text || visual));
+    }
+
+    // 内联而不是 <img>：外链 SVG 会变成独立文档，外部类名改不到内部元素，
+    // 状态就切不了（这个坑在主界面里已经踩过一次）。
+    fetch('/icons/pet/tcide-pet.svg')
+      .then((r) => (r.ok ? r.text() : Promise.reject(new Error('svg ' + r.status))))
+      .then((markup) => {
+        petEl.insertAdjacentHTML('afterbegin', markup);
+        document.body.classList.remove('loading');
+      })
+      .catch(() => { document.body.classList.remove('loading'); });
+
+    // 轮询状态。用轮询而不是 SSE/WebSocket：宠物只要 1~2 次/秒的粒度，
+    // 而轮询在"服务器重启/网络抖动"下自愈，不需要重连逻辑。
+    async function poll() {
+      try {
+        const info = await fetch('/api/pet/state').then((r) => r.json());
+        apply(info.state || 'idle', info.label || '');
+      } catch { /* 拉不到就保持现状，下次再试 */ }
+    }
+    poll();
+    setInterval(poll, 900);
+
+    // 右键菜单在悬浮宠物上没有意义，屏蔽掉（避免点出浏览器菜单遮住宠物）
+    window.addEventListener('contextmenu', (event) => event.preventDefault());
+  </script>
+</body>
+</html>

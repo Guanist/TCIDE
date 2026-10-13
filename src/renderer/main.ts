@@ -9,7 +9,6 @@ import 'xterm/css/xterm.css';
 import { getLspClient, lspDidOpen, lspDidChange, lspDidClose, stopAllLspClients, getAllDiagnostics } from './lsp-client';
 import { initSnippets, registerSnippets, listSnippets } from './snippet-service';
 import { initPixelPet, petToolCallStart, petToolCallEnd } from './pet';
-import { initSvgPet } from './svg-pet';
 import { DebugPanel } from './debug-panel';
 
 // ── 轻量 Emmet 解析器 (内联, 避免外部依赖) ──
@@ -5361,9 +5360,8 @@ function setupEventListeners(): void {
   });
 
   // ── 宠物 ──
-  // 先挂界面里的矢量宠物：它只依赖 DOM 与一张本地图，不该被下面那个
-  // "向 Electron 独立宠物窗口发消息"的桥接拖累（上游抛错会带走同一块里后续代码）。
-  initSvgPet();
+  // 宠物是**独立的桌面悬浮窗口**（见 main.py 的 open_pet_window 与 web/pet.html），
+  // 不再嵌在界面里 —— 这里只保留把状态转发出去的桥接。
   initPixelPet();
 
 }
