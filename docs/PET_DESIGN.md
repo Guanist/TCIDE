@@ -50,6 +50,30 @@ assets/pet/pet_idle.png   pet_work.png   pet_sleep.png   pet_cry.png
 - 睡觉：闭眼 + 冒 `z`，节奏放慢
 - 出错：耳朵下垂 + 落泪
 
+## 交付形式：矢量原稿 → 位图（PNG/GIF）
+
+**宠物图与动画用 PNG/GIF，不用 SVG。** 这是明确要求，也确实是更稳的选择：
+
+- SVG 内联进页面后，要同时跟 CSS 层叠、容器尺寸、百分比高度、透明背景打交道。
+  我在真机无头验证里反复被它绊住 —— 服务端返回的 HTML 完全正确（`<svg` 与
+  `class="fur"` 都在），页面却整页纯白。位图不存在这类问题：`<img>` 该显示就显示。
+- 这也正是 MollyPaw 的做法（`pet_idle.png` / `pet_work.png` / `pet_sleep.png`）。
+
+所以现在的链路是：
+
+```
+web/icons/pet/tcide-pet.svg      手绘矢量原稿（改图从这里改）
+        │  Edge 无头渲染 + Pillow 裁剪缩放   （.tcide-sync/render_pet_bitmaps.py）
+        ▼
+web/icons/pet/pet-{state}.png    静态帧（透明背景，104×104）
+web/icons/pet/pet-{state}.gif    会呼吸的动画（4 帧，索引 255 透明）
+        │  <img src> 换图
+        ▼
+web/pet.html                     独立悬浮窗口页面
+```
+
+改画的流程：改 SVG → 跑 `render_pet_bitmaps.py` → 位图与 GIF 自动更新。
+
 ## 三轮迭代（每轮都渲染成图、看过再改）
 
 这不是"画一次就完"：每改一版都用无头 Edge 渲染成图（`.tcide-sync/render_pet_preview.py`，

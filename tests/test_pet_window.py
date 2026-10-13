@@ -32,7 +32,8 @@ import server
 ROOT = Path(__file__).resolve().parent.parent
 PET_HTML = ROOT / "web" / "pet.html"
 SHIM = ROOT / "web" / "electron-shim.js"
-SVG = ROOT / "web" / "icons" / "pet" / "tcide-pet.svg"
+ASSETS = ROOT / "web" / "icons" / "pet"
+SVG = ASSETS / "tcide-pet.svg"
 
 client = TestClient(server.app)
 
@@ -44,21 +45,40 @@ class TestPetPage:
     def test_page_exists(self):
         assert PET_HTML.is_file(), "宠物页面不存在"
 
-    def test_is_served_at_pet(self):
+
+    def test_page_is_served(self):
         response = client.get("/pet")
         assert response.status_code == 200
-        assert "tcide-pet.svg" in response.text
+        assert "pet-idle" in response.text, "页面里没有宠物位图引用"
 
     def test_background_is_transparent(self):
         """悬浮宠物窗口是透明的，页面铺底色就会看到一块方板。"""
         text = PET_HTML.read_text(encoding="utf-8")
         assert re.search(r"background:\s*transparent", text), "页面没有透明背景"
 
-    def test_inlines_the_svg_instead_of_linking_it(self):
-        """外链 <img> 里外部类名影响不到内部元素，状态就切不了（已踩过这个坑）。"""
+    def test_uses_bitmaps_not_svg(self):
+        """宠物图与动画用 PNG/GIF，不用 SVG（用户明确要求，也更稳）。
+
+        位图没有"内联 SVG + CSS 层叠 + 容器尺寸"那套互相牵扯的渲染问题 ——
+        我为此在无头验证里反复被绊住（服务端 HTML 完全正确，页面却整页纯白）。
+        """
         text = PET_HTML.read_text(encoding="utf-8")
-        assert "fetch('/icons/pet/tcide-pet.svg')" in text
-        assert "insertAdjacentHTML" in text
+        assert "pet-idle.gif" in text, "页面没有用 GIF 动画"
+        assert "pet-idle.png" in text, "没有 PNG 兜底"
+        assert "<svg" not in text, "页面里不该再有内联 SVG"
+        assert "fetch('/icons/pet/tcide-pet.svg')" not in text
+
+    def test_bitmap_assets_exist_for_every_state(self):
+        for state in ("idle", "work", "sleep", "error"):
+            for suffix in (".gif", ".png"):
+                asset = ASSETS / f"pet-{state}{suffix}"
+                assert asset.is_file(), f"缺少 {asset.name}"
+                assert asset.stat().st_size > 1000, f"{asset.name} 太小，可能是空图"
+
+    def test_page_swaps_the_image_source_per_state(self):
+        text = PET_HTML.read_text(encoding="utf-8")
+        assert "'/icons/pet/pet-' + visual + '.gif'" in text, \
+            "状态切换没有换图，宠物不会跟着变"
 
     def test_maps_every_app_state(self):
         text = PET_HTML.read_text(encoding="utf-8")
@@ -161,7 +181,7 @@ class TestSvgArtwork:
     """
 
     def test_svg_exists(self):
-        assert SVG.is_file(), "矢量宠物文件不见了"
+        assert SVG.is_file(), "矢量原稿不见了（位图由它渲染而来）"
 
     def test_defines_all_four_state_classes(self):
         text = SVG.read_text(encoding="utf-8")

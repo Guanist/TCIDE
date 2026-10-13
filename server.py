@@ -152,11 +152,21 @@ _pet_state: dict = {"state": "idle", "label": ""}
 
 @app.get("/pet")
 async def pet_page():
-    """宠物窗口加载的页面（独立透明置顶小窗口，见 main.py 的 open_pet_window）。"""
+    """宠物窗口加载的页面（独立透明置顶小窗口，见 main.py 的 open_pet_window）。
+
+    **服务端内联 SVG**，而不是让页面异步 fetch —— 实测那样会拍到"还没插进去"的
+    那一帧（对用户就是打开后先空一下再出现）。桌面宠物本来就该一出现就在那儿。
+    """
     pet_html = os.path.join(web_dir, "pet.html")
     if not os.path.isfile(pet_html):
         return HTMLResponse("<h1>宠物页面缺失</h1>", status_code=404)
-    return FileResponse(pet_html, media_type="text/html")
+    with open(pet_html, "r", encoding="utf-8") as handle:
+        page = handle.read()
+    svg_path = os.path.join(web_dir, "icons", "pet", "tcide-pet.svg")
+    if os.path.isfile(svg_path):
+        with open(svg_path, "r", encoding="utf-8") as handle:
+            page = page.replace("<!--PET_SVG-->", handle.read())
+    return HTMLResponse(page)
 
 
 @app.get("/api/pet/state")

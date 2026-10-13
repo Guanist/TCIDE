@@ -1,0 +1,444 @@
+<!DOCTYPE html>
+<!--
+  SPDX-FileCopyrightText: 2026 Guanist, Inc.
+  SPDX-License-Identifier: LGPL-3.0-only
+
+  虎猫宠物 · 独立悬浮窗口页面
+
+  为什么是**独立页面**而不是嵌在主界面里：
+  用户要的是"独立悬浮在桌面、可以拖动"的宠物（参考 MollyPaw —— 它为此专门用了一个
+  独立进程）。做成独立页面有三个好处：
+    · 窗口可以透明、无边框、置顶（PyWebView 的 transparent/frameless/on_top）
+    · 拖动交给 PyWebView 的 easy_drag，不用自己实现鼠标捕获
+    · 它是 web/ 下的静态文件，不走前端构建 —— 改一次看一眼，迭代快
+
+  页面只做三件事：内联矢量虎猫、跟随状态、把状态显示成标签。
+  拖动由宿主窗口负责（easy_drag），所以这里不写拖拽代码 —— 只有 CSS 的 -webkit-app-region
+  之外不需要任何 hack。
+-->
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>虎猫</title>
+  <style>
+    /* 透明背景：窗口本身是透明的，页面不能再铺底色，否则会看到一块方形的板 */
+    html, body {
+      margin: 0; padding: 0; width: 100%; height: 100%;
+      background: transparent; overflow: hidden;
+      /* 让整个窗口区域都能被拖动 —— 但按钮要能点，所以按钮单独设 no-drag */
+      user-select: none;
+    }
+    #pet {
+      width: 100%; height: 100%;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: flex-end;
+      padding-bottom: 4px; box-sizing: border-box;
+    }
+    #pet svg { display: block; width: 104px; height: 104px; }
+    #label {
+      margin-top: 2px; padding: 1px 7px; border-radius: 9px;
+      font: 11px/1.5 "Microsoft YaHei UI", system-ui, sans-serif;
+      color: #F6EFE3; background: rgba(20, 16, 12, .72);
+      white-space: nowrap; opacity: 0; transition: opacity .25s ease;
+    }
+    #label.show { opacity: 1; }
+    /* 状态底色：与主界面的宠物标签色一致 */
+    #pet.state-work  #label { color: #FFD700; }
+    #pet.state-error #label { color: #FF9E8A; }
+    body.loading #pet svg { display: none; }
+  </style>
+</head>
+<body class="loading">
+  <div id="pet" class="state-idle">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="200" height="200"
+     class="tcide-pet-svg" role="img" aria-label="虎猫">
+  <!--
+    SPDX-FileCopyrightText: 2026 Guanist, Inc.
+    SPDX-License-Identifier: LGPL-3.0-only
+
+    虎猫宠物（平面矢量版 · 第三轮）
+
+    每轮都先渲染成图、自己看过再改（见 .tcide-sync/render_pet_preview.py）。
+    第三轮改掉了：
+      · 尾巴原来是「粗橙条 + 深色圆点」—— 像胳膊上挂了个球。
+        改成**两段粗细递减的细尾**：根部粗、末端细，尾尖一小段深色收尾，
+        起止都贴住身体右侧下缘，不再外飘。
+      · 出错状态原来把尾巴转到头顶 —— 变成一根悬空的灰弧。现在**不动尾巴**，
+        只垂耳 + 落泪（足够表达，也不破坏剪影）。
+      · 前后爪原来画在身体之前被盖住 —— 挪到身体之后（也就是画在更靠后的层），
+        并且位置下移到身体下缘，能看见。
+  -->
+  <defs>
+    <style>
+      .fur      { fill: #F2A03D; }
+      .fur-dark { fill: #DE7F1E; }
+      .cream    { fill: #FDF3E3; }
+      .pink     { fill: #F7A8B8; }
+      .ink      { fill: #3B2B20; }
+      .line     { stroke: #3B2B20; fill: none; stroke-linecap: round; }
+      .eye      { fill: #3B2B20; }
+      .glint    { fill: #FFFFFF; }
+      .laptop   { display: none; }
+
+      .body-group { transform-origin: 100px 150px; animation: pet-breathe 3.2s ease-in-out infinite; }
+      .tail       { transform-origin: 124px 170px; animation: pet-tail 2.8s ease-in-out infinite; }
+      @keyframes pet-breathe {
+        0%, 100% { transform: translateY(0) scale(1); }
+        50%      { transform: translateY(-2px) scale(1.012); }
+      }
+      @keyframes pet-tail {
+        0%, 100% { transform: rotate(-4deg); }
+        50%      { transform: rotate(6deg); }
+      }
+      @keyframes pet-type {
+        0%, 100% { transform: translateY(0); }
+        50%      { transform: translateY(-1.5px); }
+      }
+
+      .eyes-open { display: block; }
+      .eyes-shut { display: none; }
+      .zzz, .tear { display: none; }
+
+      /* ── idle 是基础态：不覆盖任何元素，只把节奏放慢一档 ──
+         显式写出来，是为了让四个状态在样式里自证（也避免读者以为待机是什么都没有）*/
+      .state-idle .body-group  { animation-duration: 3.6s; }
+      .state-idle .tail        { animation-duration: 3s; }
+
+      .state-work .laptop      { display: block; }
+      .state-work .body-group  { animation: pet-type .5s ease-in-out infinite; }
+      .state-work .tail        { animation-duration: 1.4s; }
+
+      .state-sleep .eyes-open  { display: none; }
+      .state-sleep .eyes-shut  { display: block; }
+      .state-sleep .body-group { animation-duration: 5s; }
+      .state-sleep .tail       { animation-duration: 4.5s; }
+      .state-sleep .zzz        { display: block; }
+
+      .state-error .ear-l      { transform: rotate(-18deg); }
+      .state-error .ear-r      { transform: rotate(18deg); }
+      .state-error .tear       { display: block; }
+
+      @media (prefers-reduced-motion: reduce) {
+        .body-group, .tail { animation: none; }
+      }
+    </style>
+  </defs>
+
+  <!-- 尾巴：两段粗细递减，起止都贴住身体右下缘（画在最底层） -->
+  <g class="tail">
+    <path d="M126 168 C152 166 166 150 166 130"
+          stroke="#F2A03D" stroke-width="11" fill="none" stroke-linecap="round"/>
+    <path d="M166 130 C166 122 163 116 159 112"
+          stroke="#F2A03D" stroke-width="7.5" fill="none" stroke-linecap="round"/>
+    <path d="M162 118 C161 115 159 113 157 111"
+          stroke="#DE7F1E" stroke-width="6.5" fill="none" stroke-linecap="round"/>
+  </g>
+
+  <!-- 身体（坐姿，上半收窄出肩线） -->
+  <path class="fur" d="M100 100
+                       C122 100 138 118 142 142
+                       C146 166 126 184 100 184
+                       C74 184 54 166 58 142
+                       C62 118 78 100 100 100 Z"/>
+  <!-- 腹部 -->
+  <ellipse class="cream" cx="100" cy="150" rx="26" ry="23"/>
+  <!-- 前后爪：画在腹部之上，落在身体下缘，能看见 -->
+  <ellipse class="cream" cx="78" cy="176" rx="13" ry="7"/>
+  <ellipse class="cream" cx="122" cy="176" rx="13" ry="7"/>
+  <path class="line" stroke-width="1.6" d="M73 177 h10 M117 177 h10" opacity="0.55"/>
+  <!-- 肩部虎纹 -->
+  <path d="M63 134 q9 3 13 10" stroke="#DE7F1E" stroke-width="5" fill="none" stroke-linecap="round"/>
+  <path d="M137 134 q-9 3 -13 10" stroke="#DE7F1E" stroke-width="5" fill="none" stroke-linecap="round"/>
+
+  <!-- 头 -->
+  <circle class="fur" cx="100" cy="74" r="44"/>
+  <path d="M92 38 q0 10 0 15" stroke="#DE7F1E" stroke-width="6" fill="none" stroke-linecap="round"/>
+  <path d="M100 35 q0 12 0 18" stroke="#DE7F1E" stroke-width="6" fill="none" stroke-linecap="round"/>
+  <path d="M108 38 q0 10 0 15" stroke="#DE7F1E" stroke-width="6" fill="none" stroke-linecap="round"/>
+  <ellipse class="cream" cx="100" cy="90" rx="25" ry="17"/>
+
+  <!-- 耳朵（画在头之后，才露在头上面） -->
+  <g class="ear-l">
+    <path class="fur" d="M62 60 C54 26 66 12 82 24 C90 30 92 48 88 60 Z"/>
+    <path class="pink" d="M68 56 C63 34 69 24 79 31 C84 35 85 47 82 56 Z"/>
+  </g>
+  <g class="ear-r">
+    <path class="fur" d="M138 60 C146 26 134 12 118 24 C110 30 108 48 112 60 Z"/>
+    <path class="pink" d="M132 56 C137 34 131 24 121 31 C116 35 115 47 118 56 Z"/>
+  </g>
+
+  <!-- 胡须 -->
+  <path class="line" stroke-width="2.6" d="M64 82 L43 74"/>
+  <path class="line" stroke-width="2.6" d="M64 91 L41 91"/>
+  <path class="line" stroke-width="2.6" d="M136 82 L157 74"/>
+  <path class="line" stroke-width="2.6" d="M136 91 L159 91"/>
+
+  <!-- 腮红 -->
+  <ellipse class="pink" cx="70" cy="92" rx="10.5" ry="6.5" opacity="0.85"/>
+  <ellipse class="pink" cx="130" cy="92" rx="10.5" ry="6.5" opacity="0.85"/>
+
+  <!-- 睁眼 -->
+  <g class="eyes-open">
+    <ellipse class="eye" cx="81" cy="70" rx="9.5" ry="11.5"/>
+    <ellipse class="eye" cx="119" cy="70" rx="9.5" ry="11.5"/>
+    <circle class="glint" cx="77.5" cy="65.5" r="3.6"/>
+    <circle class="glint" cx="115.5" cy="65.5" r="3.6"/>
+    <circle class="glint" cx="84.5" cy="75.5" r="1.7"/>
+    <circle class="glint" cx="122.5" cy="75.5" r="1.7"/>
+  </g>
+  <!-- 闭眼 -->
+  <g class="eyes-shut">
+    <path class="line" stroke-width="3.2" d="M72 72 q9 8 18 0"/>
+    <path class="line" stroke-width="3.2" d="M110 72 q9 8 18 0"/>
+  </g>
+
+  <!-- 鼻与嘴 -->
+  <path class="pink" d="M100 83 l-6.5 5.5 h13 Z"/>
+  <path class="line" stroke-width="2.4" d="M100 88.5 v3.5"/>
+  <path class="line" stroke-width="2.4" d="M100 92 q-8.5 7.5 -15 0.5"/>
+  <path class="line" stroke-width="2.4" d="M100 92 q8.5 7.5 15 0.5"/>
+
+  <!-- 工作状态的小笔电 -->
+  <g class="laptop">
+    <rect x="76" y="148" width="48" height="30" rx="4" class="ink"/>
+    <rect x="79" y="151" width="42" height="24" rx="2.5" fill="#2E7D9A"/>
+    <text x="100" y="168" font-family="monospace" font-size="11" fill="#BDE8F5"
+          text-anchor="middle">&gt;_</text>
+    <rect x="70" y="178" width="60" height="7" rx="3.5" class="cream"/>
+  </g>
+
+  <!-- 睡觉的 z -->
+  <g class="zzz">
+    <text x="146" y="46" font-family="monospace" font-size="20" fill="#8A7864">z</text>
+    <text x="158" y="30" font-family="monospace" font-size="14" fill="#8A7864">z</text>
+  </g>
+
+  <!-- 出错的泪滴 -->
+  <g class="tear">
+    <path d="M81 86 q-5.5 9 0 13.5 q5.5 -4.5 0 -13.5 Z" fill="#8CC7F0"/>
+    <path d="M119 86 q-5.5 9 0 13.5 q5.5 -4.5 0 -13.5 Z" fill="#8CC7F0"/>
+  </g>
+</svg>
+
+    <div id="label">待机</div>
+  </div>
+
+  <script>
+    // ── 状态映射：与应用里十个状态一一对应（与 docs/PET_DESIGN.md 一致）──
+    const STATE_MAP = {
+      idle: 'idle', thinking: 'work', tool: 'work', run: 'work', review: 'work',
+      success: 'idle', jump: 'idle', wave: 'idle', error: 'error', failed: 'error',
+    };
+    const LABELS = {
+      idle: '待机', thinking: '分析中…', tool: '调用工具', run: '执行中…',
+      review: '审查中…', success: '完成', jump: '完成', wave: '在的',
+      error: '出错', failed: '失败',
+    };
+
+    const petEl = document.getElementById('pet');
+    // SVG 由服务端内联在 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="200" height="200"
+     class="tcide-pet-svg" role="img" aria-label="虎猫">
+  <!--
+    SPDX-FileCopyrightText: 2026 Guanist, Inc.
+    SPDX-License-Identifier: LGPL-3.0-only
+
+    虎猫宠物（平面矢量版 · 第三轮）
+
+    每轮都先渲染成图、自己看过再改（见 .tcide-sync/render_pet_preview.py）。
+    第三轮改掉了：
+      · 尾巴原来是「粗橙条 + 深色圆点」—— 像胳膊上挂了个球。
+        改成**两段粗细递减的细尾**：根部粗、末端细，尾尖一小段深色收尾，
+        起止都贴住身体右侧下缘，不再外飘。
+      · 出错状态原来把尾巴转到头顶 —— 变成一根悬空的灰弧。现在**不动尾巴**，
+        只垂耳 + 落泪（足够表达，也不破坏剪影）。
+      · 前后爪原来画在身体之前被盖住 —— 挪到身体之后（也就是画在更靠后的层），
+        并且位置下移到身体下缘，能看见。
+  -->
+  <defs>
+    <style>
+      .fur      { fill: #F2A03D; }
+      .fur-dark { fill: #DE7F1E; }
+      .cream    { fill: #FDF3E3; }
+      .pink     { fill: #F7A8B8; }
+      .ink      { fill: #3B2B20; }
+      .line     { stroke: #3B2B20; fill: none; stroke-linecap: round; }
+      .eye      { fill: #3B2B20; }
+      .glint    { fill: #FFFFFF; }
+      .laptop   { display: none; }
+
+      .body-group { transform-origin: 100px 150px; animation: pet-breathe 3.2s ease-in-out infinite; }
+      .tail       { transform-origin: 124px 170px; animation: pet-tail 2.8s ease-in-out infinite; }
+      @keyframes pet-breathe {
+        0%, 100% { transform: translateY(0) scale(1); }
+        50%      { transform: translateY(-2px) scale(1.012); }
+      }
+      @keyframes pet-tail {
+        0%, 100% { transform: rotate(-4deg); }
+        50%      { transform: rotate(6deg); }
+      }
+      @keyframes pet-type {
+        0%, 100% { transform: translateY(0); }
+        50%      { transform: translateY(-1.5px); }
+      }
+
+      .eyes-open { display: block; }
+      .eyes-shut { display: none; }
+      .zzz, .tear { display: none; }
+
+      /* ── idle 是基础态：不覆盖任何元素，只把节奏放慢一档 ──
+         显式写出来，是为了让四个状态在样式里自证（也避免读者以为待机是什么都没有）*/
+      .state-idle .body-group  { animation-duration: 3.6s; }
+      .state-idle .tail        { animation-duration: 3s; }
+
+      .state-work .laptop      { display: block; }
+      .state-work .body-group  { animation: pet-type .5s ease-in-out infinite; }
+      .state-work .tail        { animation-duration: 1.4s; }
+
+      .state-sleep .eyes-open  { display: none; }
+      .state-sleep .eyes-shut  { display: block; }
+      .state-sleep .body-group { animation-duration: 5s; }
+      .state-sleep .tail       { animation-duration: 4.5s; }
+      .state-sleep .zzz        { display: block; }
+
+      .state-error .ear-l      { transform: rotate(-18deg); }
+      .state-error .ear-r      { transform: rotate(18deg); }
+      .state-error .tear       { display: block; }
+
+      @media (prefers-reduced-motion: reduce) {
+        .body-group, .tail { animation: none; }
+      }
+    </style>
+  </defs>
+
+  <!-- 尾巴：两段粗细递减，起止都贴住身体右下缘（画在最底层） -->
+  <g class="tail">
+    <path d="M126 168 C152 166 166 150 166 130"
+          stroke="#F2A03D" stroke-width="11" fill="none" stroke-linecap="round"/>
+    <path d="M166 130 C166 122 163 116 159 112"
+          stroke="#F2A03D" stroke-width="7.5" fill="none" stroke-linecap="round"/>
+    <path d="M162 118 C161 115 159 113 157 111"
+          stroke="#DE7F1E" stroke-width="6.5" fill="none" stroke-linecap="round"/>
+  </g>
+
+  <!-- 身体（坐姿，上半收窄出肩线） -->
+  <path class="fur" d="M100 100
+                       C122 100 138 118 142 142
+                       C146 166 126 184 100 184
+                       C74 184 54 166 58 142
+                       C62 118 78 100 100 100 Z"/>
+  <!-- 腹部 -->
+  <ellipse class="cream" cx="100" cy="150" rx="26" ry="23"/>
+  <!-- 前后爪：画在腹部之上，落在身体下缘，能看见 -->
+  <ellipse class="cream" cx="78" cy="176" rx="13" ry="7"/>
+  <ellipse class="cream" cx="122" cy="176" rx="13" ry="7"/>
+  <path class="line" stroke-width="1.6" d="M73 177 h10 M117 177 h10" opacity="0.55"/>
+  <!-- 肩部虎纹 -->
+  <path d="M63 134 q9 3 13 10" stroke="#DE7F1E" stroke-width="5" fill="none" stroke-linecap="round"/>
+  <path d="M137 134 q-9 3 -13 10" stroke="#DE7F1E" stroke-width="5" fill="none" stroke-linecap="round"/>
+
+  <!-- 头 -->
+  <circle class="fur" cx="100" cy="74" r="44"/>
+  <path d="M92 38 q0 10 0 15" stroke="#DE7F1E" stroke-width="6" fill="none" stroke-linecap="round"/>
+  <path d="M100 35 q0 12 0 18" stroke="#DE7F1E" stroke-width="6" fill="none" stroke-linecap="round"/>
+  <path d="M108 38 q0 10 0 15" stroke="#DE7F1E" stroke-width="6" fill="none" stroke-linecap="round"/>
+  <ellipse class="cream" cx="100" cy="90" rx="25" ry="17"/>
+
+  <!-- 耳朵（画在头之后，才露在头上面） -->
+  <g class="ear-l">
+    <path class="fur" d="M62 60 C54 26 66 12 82 24 C90 30 92 48 88 60 Z"/>
+    <path class="pink" d="M68 56 C63 34 69 24 79 31 C84 35 85 47 82 56 Z"/>
+  </g>
+  <g class="ear-r">
+    <path class="fur" d="M138 60 C146 26 134 12 118 24 C110 30 108 48 112 60 Z"/>
+    <path class="pink" d="M132 56 C137 34 131 24 121 31 C116 35 115 47 118 56 Z"/>
+  </g>
+
+  <!-- 胡须 -->
+  <path class="line" stroke-width="2.6" d="M64 82 L43 74"/>
+  <path class="line" stroke-width="2.6" d="M64 91 L41 91"/>
+  <path class="line" stroke-width="2.6" d="M136 82 L157 74"/>
+  <path class="line" stroke-width="2.6" d="M136 91 L159 91"/>
+
+  <!-- 腮红 -->
+  <ellipse class="pink" cx="70" cy="92" rx="10.5" ry="6.5" opacity="0.85"/>
+  <ellipse class="pink" cx="130" cy="92" rx="10.5" ry="6.5" opacity="0.85"/>
+
+  <!-- 睁眼 -->
+  <g class="eyes-open">
+    <ellipse class="eye" cx="81" cy="70" rx="9.5" ry="11.5"/>
+    <ellipse class="eye" cx="119" cy="70" rx="9.5" ry="11.5"/>
+    <circle class="glint" cx="77.5" cy="65.5" r="3.6"/>
+    <circle class="glint" cx="115.5" cy="65.5" r="3.6"/>
+    <circle class="glint" cx="84.5" cy="75.5" r="1.7"/>
+    <circle class="glint" cx="122.5" cy="75.5" r="1.7"/>
+  </g>
+  <!-- 闭眼 -->
+  <g class="eyes-shut">
+    <path class="line" stroke-width="3.2" d="M72 72 q9 8 18 0"/>
+    <path class="line" stroke-width="3.2" d="M110 72 q9 8 18 0"/>
+  </g>
+
+  <!-- 鼻与嘴 -->
+  <path class="pink" d="M100 83 l-6.5 5.5 h13 Z"/>
+  <path class="line" stroke-width="2.4" d="M100 88.5 v3.5"/>
+  <path class="line" stroke-width="2.4" d="M100 92 q-8.5 7.5 -15 0.5"/>
+  <path class="line" stroke-width="2.4" d="M100 92 q8.5 7.5 15 0.5"/>
+
+  <!-- 工作状态的小笔电 -->
+  <g class="laptop">
+    <rect x="76" y="148" width="48" height="30" rx="4" class="ink"/>
+    <rect x="79" y="151" width="42" height="24" rx="2.5" fill="#2E7D9A"/>
+    <text x="100" y="168" font-family="monospace" font-size="11" fill="#BDE8F5"
+          text-anchor="middle">&gt;_</text>
+    <rect x="70" y="178" width="60" height="7" rx="3.5" class="cream"/>
+  </g>
+
+  <!-- 睡觉的 z -->
+  <g class="zzz">
+    <text x="146" y="46" font-family="monospace" font-size="20" fill="#8A7864">z</text>
+    <text x="158" y="30" font-family="monospace" font-size="14" fill="#8A7864">z</text>
+  </g>
+
+  <!-- 出错的泪滴 -->
+  <g class="tear">
+    <path d="M81 86 q-5.5 9 0 13.5 q5.5 -4.5 0 -13.5 Z" fill="#8CC7F0"/>
+    <path d="M119 86 q-5.5 9 0 13.5 q5.5 -4.5 0 -13.5 Z" fill="#8CC7F0"/>
+  </g>
+</svg>
+ 处（见 server.py 的 /pet 路由）：
+    // 没有异步 fetch，也就没有"先空一下再出现"的闪烁。
+    const labelEl = document.getElementById('label');
+    let hideTimer;
+
+    function apply(state, label) {
+      const visual = STATE_MAP[state] || 'idle';
+      petEl.classList.remove('state-idle', 'state-work', 'state-sleep', 'state-error');
+      petEl.classList.add('state-' + visual);
+      const text = label || LABELS[state] || '';
+      if (text) {
+        labelEl.textContent = text;
+        labelEl.classList.add('show');
+        clearTimeout(hideTimer);
+        // 待机时不挂着一句话，让它自己淡出 —— 悬浮宠物不该一直占着文字
+        if (visual === 'idle') hideTimer = setTimeout(() => labelEl.classList.remove('show'), 2500);
+      }
+      petEl.setAttribute('aria-label', '虎猫宠物：' + (text || visual));
+    }
+
+    // 轮询状态。用轮询而不是 SSE/WebSocket：宠物只要 1~2 次/秒的粒度，
+    // 而轮询在"服务器重启/网络抖动"下自愈，不需要重连逻辑。
+    async function poll() {
+      try {
+        const info = await fetch('/api/pet/state').then((r) => r.json());
+        apply(info.state || 'idle', info.label || '');
+      } catch { /* 拉不到就保持现状，下次再试 */ }
+    }
+    poll();
+    setInterval(poll, 900);
+
+    // 右键菜单在悬浮宠物上没有意义，屏蔽掉（避免点出浏览器菜单遮住宠物）
+    window.addEventListener('contextmenu', (event) => event.preventDefault());
+  </script>
+</body>
+</html>

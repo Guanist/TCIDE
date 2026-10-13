@@ -12,9 +12,11 @@
     · 拖动交给 PyWebView 的 easy_drag，不用自己实现鼠标捕获
     · 它是 web/ 下的静态文件，不走前端构建 —— 改一次看一眼，迭代快
 
-  页面只做三件事：内联矢量虎猫、跟随状态、把状态显示成标签。
-  拖动由宿主窗口负责（easy_drag），所以这里不写拖拽代码 —— 只有 CSS 的 -webkit-app-region
-  之外不需要任何 hack。
+  **用位图（GIF/PNG）而不是 SVG**：这是明确要求，也确实是更稳的选择 ——
+  位图没有"内联 SVG + CSS 层叠 + 容器尺寸 + 透明背景"这些互相牵扯的渲染问题。
+  资源由 Edge 渲染矢量原稿生成（见 .tcide-sync/render_pet_bitmaps.py）：
+    pet-{state}.gif  会呼吸的动画（4 帧，透明背景）
+    pet-{state}.png  静态帧（GIF 加载失败时的兜底）
 -->
 <html lang="zh-CN">
 <head>
@@ -24,18 +26,23 @@
   <style>
     /* 透明背景：窗口本身是透明的，页面不能再铺底色，否则会看到一块方形的板 */
     html, body {
-      margin: 0; padding: 0; width: 100%; height: 100%;
-      background: transparent; overflow: hidden;
-      /* 让整个窗口区域都能被拖动 —— 但按钮要能点，所以按钮单独设 no-drag */
+      margin: 0; padding: 0;
+      background: transparent;
       user-select: none;
+      overflow: hidden;
     }
     #pet {
-      width: 100%; height: 100%;
       display: flex; flex-direction: column;
-      align-items: center; justify-content: flex-end;
-      padding-bottom: 4px; box-sizing: border-box;
+      align-items: center;
+      padding: 4px 0 6px;
     }
-    #pet svg { display: block; width: 104px; height: 104px; }
+    #pet img {
+      display: block;
+      width: 104px; height: 104px;
+      image-rendering: auto;      /* 位图按原比例平滑缩放，不要像素化 */
+      -webkit-user-drag: none;
+      pointer-events: none;       /* 让鼠标事件落到窗口上，拖动更顺 */
+    }
     #label {
       margin-top: 2px; padding: 1px 7px; border-radius: 9px;
       font: 11px/1.5 "Microsoft YaHei UI", system-ui, sans-serif;
@@ -43,14 +50,15 @@
       white-space: nowrap; opacity: 0; transition: opacity .25s ease;
     }
     #label.show { opacity: 1; }
-    /* 状态底色：与主界面的宠物标签色一致 */
+    /* 状态底色：与主界面里宠物标签的配色一致 */
     #pet.state-work  #label { color: #FFD700; }
     #pet.state-error #label { color: #FF9E8A; }
-    body.loading #pet svg { display: none; }
   </style>
 </head>
-<body class="loading">
-  <div id="pet" class="state-idle">
+<body>
+  <div id="pet" class="state-idle" role="img" aria-label="虎猫宠物：待机">
+    <img id="pet-img" src="/icons/pet/pet-idle.gif" alt="" draggable="false"
+         onerror="this.onerror=null;this.src='/icons/pet/pet-idle.png'" />
     <div id="label">待机</div>
   </div>
 
@@ -67,33 +75,32 @@
     };
 
     const petEl = document.getElementById('pet');
+    const imageEl = document.getElementById('pet-img');
     const labelEl = document.getElementById('label');
     let hideTimer;
+    let currentVisual = '';
 
     function apply(state, label) {
       const visual = STATE_MAP[state] || 'idle';
-      petEl.classList.remove('state-idle', 'state-work', 'state-sleep', 'state-error');
-      petEl.classList.add('state-' + visual);
+      if (visual !== currentVisual) {
+        currentVisual = visual;
+        petEl.classList.remove('state-idle', 'state-work', 'state-sleep', 'state-error');
+        petEl.classList.add('state-' + visual);
+        // 只换 src：GIF 会自己动，不需要任何 JS 动画
+        imageEl.src = '/icons/pet/pet-' + visual + '.gif';
+      }
       const text = label || LABELS[state] || '';
       if (text) {
         labelEl.textContent = text;
         labelEl.classList.add('show');
         clearTimeout(hideTimer);
         // 待机时不挂着一句话，让它自己淡出 —— 悬浮宠物不该一直占着文字
-        if (visual === 'idle') hideTimer = setTimeout(() => labelEl.classList.remove('show'), 2500);
+        if (visual === 'idle') {
+          hideTimer = setTimeout(() => labelEl.classList.remove('show'), 2500);
+        }
       }
       petEl.setAttribute('aria-label', '虎猫宠物：' + (text || visual));
     }
-
-    // 内联而不是 <img>：外链 SVG 会变成独立文档，外部类名改不到内部元素，
-    // 状态就切不了（这个坑在主界面里已经踩过一次）。
-    fetch('/icons/pet/tcide-pet.svg')
-      .then((r) => (r.ok ? r.text() : Promise.reject(new Error('svg ' + r.status))))
-      .then((markup) => {
-        petEl.insertAdjacentHTML('afterbegin', markup);
-        document.body.classList.remove('loading');
-      })
-      .catch(() => { document.body.classList.remove('loading'); });
 
     // 轮询状态。用轮询而不是 SSE/WebSocket：宠物只要 1~2 次/秒的粒度，
     // 而轮询在"服务器重启/网络抖动"下自愈，不需要重连逻辑。
