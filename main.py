@@ -43,6 +43,33 @@ def wait_for_server(url: str, timeout: int = 10) -> bool:
     return False
 
 
+def open_window(url: str, title: str = "虎猫 TCIDE") -> bool:
+    """用 PyWebView 打开原生窗口（**不依赖 PawUI**）。
+
+    为什么换掉 PawUI：本仓库的界面本来就是 ``web/`` —— 它是原 Electron 渲染层
+    用 Vite 构建的产物，配 ``electron-shim.js`` 把 ``window.api`` 换成对后端的
+    fetch 调用。PawUI 那条路（``tcide.paw`` + ``tcide_pawui.py``）是并行的**第二套
+    UI**，等于同一份功能维护两遍、还多一个 GPL 依赖。
+    """
+    try:
+        import webview
+    except ImportError:
+        print("[TCIDE] 未安装 pywebview，回退到浏览器。安装: pip install pywebview")
+        return False
+    webview.create_window(title, url, width=1440, height=900)
+    webview.start()
+    return True
+
+
+def keep_alive() -> None:
+    """没有原生窗口时保持后端存活（浏览器模式）。"""
+    try:
+        while True:
+            time.sleep(1)
+    except KeyboardInterrupt:
+        print("\n[TCIDE] Stopped")
+
+
 def main():
     import argparse
     parser = argparse.ArgumentParser(description="TCIDE - Python IDE")
@@ -50,11 +77,15 @@ def main():
     parser.add_argument("--port", type=int, default=18420, help="Server port")
     parser.add_argument("--host", default="127.0.0.1", help="Server host")
     parser.add_argument("--no-window", action="store_true", help="Run server only (no GUI)")
+    parser.add_argument("--browser", action="store_true",
+                        help="用系统浏览器而不是原生窗口")
     args = parser.parse_args()
 
-    # 双击（无参数）直接打开 TCIDE 自身项目进入 IDE；其它工程用 IDE 内「打开项目」按钮
-    DEFAULT_PROJECT = r"C:\Users\noirh\.qclaw\workspace-ua58rsb93veqtxl7\personal-ide"
-    project_root = os.path.abspath(args.project) if args.project else os.path.abspath(DEFAULT_PROJECT)
+    # 默认项目：**不硬编码路径**。原版写死了一台机器上的目录
+    # （C:\Users\<某人>\.qclaw\workspace-...\personal-ide），换台机器就指向不存在的
+    # 位置、界面里空空如也。顺序：命令行参数 → 环境变量 → 当前工作目录。
+    project_root = os.path.abspath(
+        args.project or os.environ.get("TCIDE_PROJECT") or os.getcwd())
     url = f"http://{args.host}:{args.port}"
 
     # 启动后端服务（后台线程）
@@ -74,36 +105,18 @@ def main():
 
     if args.no_window:
         print("[TCIDE] Running in headless mode (Ctrl+C to stop)")
-        try:
-            while True:
-                time.sleep(1)
-        except KeyboardInterrupt:
-            print("\n[TCIDE] Stopped")
+        keep_alive()
         return
 
-    # 启动 pawui + rich 原生桌面窗口
-    try:
-        import pawui
-    except ImportError:
-        print("[TCIDE] pawui 未安装。运行: pip install pawui rich")
-        print(f"[TCIDE] 回退到浏览器打开: {url}")
-        import webbrowser
-        webbrowser.open(url)
-        try:
-            while True:
-                time.sleep(1)
-        except KeyboardInterrupt:
-            print("\n[TCIDE] Stopped")
+    # 原生窗口（PyWebView）；失败或显式 --browser 时用系统浏览器打开
+    if not args.browser and open_window(url):
+        print("[TCIDE] Window closed")
         return
+    print(f"[TCIDE] 在浏览器中打开: {url}")
+    import webbrowser
 
-    os.environ["TCIDE_URL"] = url
-    if project_root:
-        os.environ["TCIDE_PROJECT"] = project_root
-
-    pawui_file = os.path.join(APP_DIR, "tcide.paw")
-    print(f"[TCIDE] 启动 pawui UI: {pawui_file}")
-    pawui.run(pawui_file)
-    print("[TCIDE] Window closed")
+    webbrowser.open(url)
+    keep_alive()
 
 
 if __name__ == "__main__":
