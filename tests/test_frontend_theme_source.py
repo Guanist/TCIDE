@@ -142,9 +142,22 @@ class TestSourceIndexHooksTheme:
         assert "/static/tcide-theme.js" in html, \
             "源码首页没挂切换脚本 —— 构建出来的页面就没有切换入口"
 
-    def test_source_html_links_the_overlay_skin(self):
+    def test_source_html_does_not_link_the_overlay_skin(self):
+        """覆盖层 CSS **不该**写在源码里 —— 这是刻意的，有具体原因。
+
+        源码里的 `<link>` 位于 vite 追加的 bundle 标签**之前**，同特异性下会被压过
+        （实测：构建后皮肤排在 bundle 前面，于是失效）。第 6 轮之所以有效，是因为
+        它注入的是**产物**。所以分工是：
+
+        - 颜色/主题 → 源码 main.css 的变量（随构建进产物）；
+        - JS 切换器 → 源码（无级联问题）；
+        - CSS 覆盖层 → 构建后注入产物，落在 bundle 之后。
+
+        "覆盖层确实排在 bundle 之后"由 tests/test_web_theme.py 在**服务端**验证。
+        """
         html = INDEX_HTML.read_text(encoding="utf-8")
-        assert "/static/tcide-theme.css" in html
+        assert "/static/tcide-theme.css" not in html, \
+            "覆盖层被写回源码了 —— 它会排在 bundle 前面而被覆盖"
 
     def test_only_one_head_close_tag(self):
         """注入靠这个假设 —— 多了就说明源码被改坏了。"""
