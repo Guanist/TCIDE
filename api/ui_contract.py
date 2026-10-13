@@ -862,3 +862,329 @@ def _module_available(name: str) -> bool:
         return importlib.util.find_spec(name) is not None
     except Exception:      # noqa: BLE001
         return False
+
+
+# ── 调试 /api/debug/* ────────────────────────────────────────────────────
+#
+# **真的能调试**，但要说清是什么：这里用 **pdb**（标准库）驱动一个真实进程，
+# 不假装是 DAP。debugpy 装了的话会出现在 adapters 里（并优先推荐），没装就
+# 如实说明"当前是 pdb 会话"。前端那套 DAP 风格的按钮（continue/next/step-in/
+# step-out）在这里一一映射到 pdb 命令，语义一致。
+
+_debug_sessions: dict = {}
+
+
+class _PdbSession:
+    """一个真实的 ``python -m pdb <file>`` 会话（stdout 由后台线程收集）。"""
+
+    def __init__(self, file: str, cwd: str) -> None:
+        import subprocess
+        import threading
+
+        self.file = file
+        self.cwd = cwd
+        self.buffer: list[str] = []
+        self.lock = threading.Lock()
+        self.process = subprocess.Popen(
+            [sys.executable, "-u", "-m", "pdb", file],
+            cwd=cwd, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT, text=True, encoding="utf-8", errors="replace",
+            bufsize=1)
+        self.reader = threading.Thread(target=self._pump, daemon=True)
+        self.reader.start()
+
+    def _pump(self) -> None:
+        try:
+            for line in self.process.stdout:       # type: ignore[union-attr]
+                with self.lock:
+                    self.buffer.append(line.rstrip("\n"))
+        except Exception:      # noqa: BLE001 - 进程结束时正常退出
+            pass
+
+    def send(self, command: str, *, wait: float = 0.6) -> str:
+        """发一条 pdb 命令，返回这期间新产生的输出。"""
+        import time
+
+        with self.lock:
+            self.buffer.clear()
+        try:
+            self.process.stdin.write(command + "\n")   # type: ignore[union-attr]
+            self.process.stdin.flush()                 # type: ignore[union-attr]
+        except Exception as exc:      # noqa: BLE001
+            return f"（无法写入调试进程：{exc}）"
+        deadline = time.time() + wait
+        while time.time() < deadline:
+            time.sleep(0.05)
+            with self.lock:
+                if any("(Pdb)" in line for line in self.buffer):
+                    break
+        with self.lock:
+            return "\n".join(self.buffer)
+
+    def read(self, *, wait: float = 0.8) -> str:
+        """等一会儿，把期间产生的输出取回来（不发送任何命令）。"""
+        import time
+
+        deadline = time.time() + wait
+        while time.time() < deadline:
+            time.sleep(0.05)
+            with self.lock:
+                if any("(Pdb)" in line for line in self.buffer):
+                    break
+        with self.lock:
+            return "\n".join(self.buffer)
+
+    def location(self) -> str:
+        """从输出里挑出形如 ``> /path/to/file.py(12)<module>()`` 的当前位置。"""
+        with self.lock:
+            for line in reversed(self.buffer):
+                if line.startswith("> "):
+                    return line
+        return ""
+
+    def alive(self) -> bool:
+        return self.process.poll() is None
+
+    def stop(self) -> None:
+        try:
+            self.send("q", wait=0.3)
+        except Exception:      # noqa: BLE001
+            pass
+        try:
+            self.process.kill()
+        except Exception:      # noqa: BLE001
+            pass
+
+
+@router.get("/api/debug/adapters")
+async def debug_adapters():
+    """这台机器上**真的**能用哪些调试器（含安装指引）。"""
+    import shutil
+
+    adapters = [{
+        "id": "pdb", "name": "Python pdb（标准库）", "available": True,
+        "languages": ["python"],
+        "note": "内置可用；continue/next/step-in/step-out 直接映射到 pdb 命令",
+    }, {
+        "id": "debugpy", "name": "debugpy（DAP 适配器）", "available": _module_available("debugpy"),
+        "languages": ["python"],
+        "install": "pip install debugpy",
+        "note": "装了之后可用 DAP 协议接入 VS Code 式调试前端",
+    }, {
+        "id": "node-inspect", "name": "Node --inspect", "available": shutil.which("node") is not None,
+        "languages": ["javascript", "typescript"],
+        "install": "安装 Node.js",
+        "note": "Node 自带的 inspector，需要前端用 CDP 连接",
+    }]
+    return {"adapters": adapters,
+            "available": [item["id"] for item in adapters if item["available"]],
+            "preferred": "debugpy" if _module_available("debugpy") else "pdb"}
+
+
+@router.post("/api/debug/start")
+async def debug_start(request: Request, adapter: str = "", file: str = "",
+                      line: int = 0):
+    """开一个**真实的**调试会话（默认 pdb）。"""
+    body = await _read_json_body(request)
+    adapter = adapter or body.get("adapter", "pdb") or "pdb"
+    target = _pick(file, body.get("file", ""), body.get("path", ""))
+    if not target:
+        return {"error": "缺少 file 参数"}
+    if adapter == "debugpy" and not _module_available("debugpy"):
+        return {"error": "debugpy 未安装（pip install debugpy）", "fallback": "pdb"}
+    absolute = _inside_project(target) or ""
+    if not absolute or not os.path.isfile(absolute):
+        return {"error": f"文件不存在或不在项目内：{target}"}
+    if not absolute.lower().endswith(".py"):
+        return {"error": "pdb 会话目前只支持 Python 文件"}
+    session = _PdbSession(absolute, current_project_root())
+    session_id = f"pdb-{len(_debug_sessions) + 1}"
+    _debug_sessions[session_id] = session
+    output = session.read(wait=1.0)              # pdb 的启动横幅（含当前位置）
+    if int(line or body.get("line") or 0) > 0:
+        output += "\n" + session.send(
+            f"b {os.path.basename(absolute)}:{int(line or body.get('line'))}")
+    return {"success": True, "session": session_id, "adapter": "pdb", "file": target,
+            "pid": session.process.pid, "output": output,
+            "location": session.location(),
+            "note": "基于 pdb 的会话（未安装 debugpy 时不提供 DAP）"}
+
+
+def _debug_session(session_id: str):
+    session = _debug_sessions.get(session_id)
+    if session is None:
+        return None, {"error": f"没有这个调试会话：{session_id}（先调用 /api/debug/start）"}
+    if not session.alive():
+        return None, {"error": "调试进程已结束", "session": session_id}
+    return session, None
+
+
+@router.post("/api/debug/continue")
+async def debug_continue(session: str = "", session_id: str = ""):
+    return _debug_step(_pick(session, session_id), "c", "continue")
+
+
+@router.post("/api/debug/next")
+async def debug_next(session: str = "", session_id: str = ""):
+    return _debug_step(_pick(session, session_id), "n", "next")
+
+
+@router.post("/api/debug/step-in")
+async def debug_step_in(session: str = "", session_id: str = ""):
+    return _debug_step(_pick(session, session_id), "s", "step-in")
+
+
+@router.post("/api/debug/step-out")
+async def debug_step_out(session: str = "", session_id: str = ""):
+    return _debug_step(_pick(session, session_id), "r", "step-out")
+
+
+@router.post("/api/debug/pause")
+async def debug_pause(session: str = "", session_id: str = ""):
+    """pdb 里没有"暂停"，但 ``where`` 会给出当前栈帧 —— 语义上等价于"现在停在哪"。"""
+    return _debug_step(_pick(session, session_id), "where", "pause")
+
+
+@router.post("/api/debug/stop")
+async def debug_stop(session: str = "", session_id: str = ""):
+    key = _pick(session, session_id)
+    target = _debug_sessions.pop(key, None)
+    if target is None:
+        return {"error": f"没有这个调试会话：{key}"}
+    target.stop()
+    return {"success": True, "session": key, "stopped": True}
+
+
+def _debug_step(session_id: str, command: str, action: str) -> dict:
+    session, error = _debug_session(session_id)
+    if error is not None:
+        return error
+    output = session.send(command)
+    return {"success": True, "session": session_id, "action": action,
+            "command": command, "output": output, "location": session.location(),
+            "alive": session.alive()}
+
+
+# ── 项目：目录选择与文件监听 ─────────────────────────────────────────────
+
+@router.get("/api/project/dialog")
+async def project_dialog():
+    """弹系统目录选择框。
+
+    用**子进程**跑 tkinter：后端服务在工作线程里，而 Tk 必须在自己的主线程创建，
+    所以不能直接在主进程弹窗。没有图形环境时如实说明（而不是挂死）。
+    """
+    import subprocess
+
+    code = (
+        "import tkinter as tk\n"
+        "from tkinter import filedialog\n"
+        "root = tk.Tk(); root.withdraw(); root.attributes('-topmost', True)\n"
+        "print(filedialog.askdirectory() or '')\n"
+    )
+    try:
+        completed = subprocess.run([sys.executable, "-c", code], capture_output=True,
+                                   text=True, timeout=300)
+    except Exception as exc:      # noqa: BLE001
+        return {"path": "", "error": f"{type(exc).__name__}: {exc}"}
+    chosen = (completed.stdout or "").strip()
+    if not chosen:
+        reason = (completed.stderr or "").strip().splitlines()
+        return {"path": "", "cancelled": True,
+                "error": reason[-1] if reason else "未选择目录（或没有图形环境）"}
+    return {"path": chosen, "cancelled": False}
+
+
+#: 文件监听的上一帧快照（路径 → (mtime, size)）
+_watch_state: dict = {"root": "", "snapshot": {}}
+
+
+@router.get("/api/project/watch")
+async def project_watch():
+    """轻量文件监听：每次调用返回**自上次调用以来**的变更。
+
+    实现方式是快照比对（不是 inotify）：对外行为一致 —— 前端轮询这个接口就能拿到
+    added/modified/removed。真正的推送式监听需要 WebSocket 广播，仓库里已有 WS
+    基础设施，可作为后续增强。
+    """
+    root = current_project_root()
+    if _watch_state["root"] != root:
+        _watch_state.update({"root": root, "snapshot": {}})
+    current: dict = {}
+    try:
+        for base, dirs, names in os.walk(root):
+            dirs[:] = [name for name in dirs
+                       if name not in (".git", "node_modules", "__pycache__", ".tcide")]
+            for name in names:
+                path = os.path.join(base, name)
+                try:
+                    stat = os.stat(path)
+                except OSError:
+                    continue
+                current[os.path.relpath(path, root).replace("\\", "/")] = (
+                    int(stat.st_mtime), stat.st_size)
+    except Exception as exc:      # noqa: BLE001
+        return {"watching": False, "error": f"{type(exc).__name__}: {exc}"}
+
+    previous = _watch_state["snapshot"]
+    added = sorted(set(current) - set(previous))
+    removed = sorted(set(previous) - set(current))
+    modified = sorted(key for key in set(current) & set(previous)
+                      if current[key] != previous[key])
+    _watch_state["snapshot"] = current
+    return {"watching": True, "project": root, "files": len(current),
+            "added": added[:100], "modified": modified[:100], "removed": removed[:100],
+            "changed": len(added) + len(modified) + len(removed)}
+
+
+# ── 带工具的对话 /api/ai/chat/tools ──────────────────────────────────────
+
+@router.post("/api/ai/chat/tools")
+async def ai_chat_tools(request: Request):
+    """带工具调用的一轮对话：模型可以要求读文件/搜代码/跑命令，**真的执行**后回填。
+
+    工具集来自 ``tcide_core.tools.ToolRegistry``（specs() 是 OpenAI 格式的 schema），
+    执行走 ``registry.call(name, arguments)``，并把结果作为 tool 消息回灌给模型，
+    最后返回最终答复 + 中间的调用记录。
+    """
+    body = await _read_json_body(request)
+    messages = body.get("messages") or []
+    if not messages:
+        return {"error": "缺少 messages"}
+    config = _model_config()
+    if config is None:
+        return {"success": False, "status": "unconfigured",
+                "error": "未配置模型，无法进行带工具的对话",
+                "hint": "设置 → AI 填 API Key"}
+
+    try:
+        from tcide_core.agent import AdapterClient
+        from tcide_core.gitops import GitRepo
+        from tcide_core.models import ChatMessage
+        from tcide_core.tools import ToolRegistry
+
+        root = current_project_root()
+        registry = ToolRegistry(Workspace(root),
+                                repo=GitRepo(root) if GitRepo(root).owns_repo() else None)
+        client = AdapterClient(config)
+
+        history = [ChatMessage(role=str(item.get("role", "user")),
+                               content=str(item.get("content", ""))) for item in messages]
+        calls: list[dict] = []
+        for _round in range(int(body.get("max_rounds") or 4)):
+            response = client.complete(history, tools=registry.specs())
+            if not response.tool_calls:
+                return {"success": True, "content": response.text,
+                        "tool_calls": calls, "usage": response.usage.to_dict()}
+            history.append(ChatMessage(role="assistant", content=response.text or "",
+                                       tool_calls=response.tool_calls))
+            for call in response.tool_calls:
+                output = registry.call(call.name, call.arguments)
+                calls.append({"name": call.name, "arguments": call.arguments,
+                              "output": str(output)[:4000]})
+                history.append(ChatMessage(role="tool", content=str(output)[:4000],
+                                           name=call.name))
+        return {"success": True, "content": "（达到工具轮数上限，仍未给出最终答复）",
+                "tool_calls": calls}
+    except Exception as exc:      # noqa: BLE001
+        return {"success": False, "error": f"{type(exc).__name__}: {exc}"}

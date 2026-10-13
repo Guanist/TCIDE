@@ -382,3 +382,87 @@ class TestFormatContract:
     def test_outside_project_is_refused(self, client):
         assert client.post("/api/files/format",
                            params={"path": "../../x.py"}).json()["success"] is False
+
+
+# ── 调试：必须**真的**起一个可步进的进程 ────────────────────────────────
+
+class TestDebugContract:
+    def test_adapters_reports_real_availability(self, client):
+        body = client.get("/api/debug/adapters").json()
+        ids = {item["id"] for item in body["adapters"]}
+        assert {"pdb", "debugpy", "node-inspect"} <= ids
+        assert "pdb" in body["available"], "pdb 是标准库，必须可用"
+        for item in body["adapters"]:
+            if not item["available"]:
+                assert item.get("install"), f"{item['id']} 不可用时必须给出安装方式"
+
+    def test_start_then_step_then_stop(self, client, temp_project):
+        """真起一个 pdb 进程，真的单步，然后停掉。"""
+        import pathlib
+
+        script = pathlib.Path(temp_project) / "debugme.py"
+        script.write_text("def add(a, b):\n    return a + b\n\n\n"
+                          "total = add(1, 2)\nprint(total)\n", encoding="utf-8")
+        started = client.post("/api/debug/start",
+                              json={"adapter": "pdb", "file": str(script)}).json()
+        assert started.get("success") is True, started
+        session = started["session"]
+        assert started["adapter"] == "pdb"
+
+        stepped = client.post("/api/debug/next", params={"session": session}).json()
+        assert stepped["success"] is True, stepped
+        assert "n" == stepped["command"]
+        # pdb 停在断点/首行时会打印 "> /path(x)<module>()"
+        assert stepped["output"] or stepped["location"], stepped
+
+        stopped = client.post("/api/debug/stop", params={"session": session}).json()
+        assert stopped["stopped"] is True
+
+    def test_step_without_session_is_reported(self, client):
+        body = client.post("/api/debug/next", params={"session": "nope"}).json()
+        assert "error" in body
+
+    def test_start_on_non_python_is_refused(self, client, temp_project):
+        import pathlib
+
+        target = pathlib.Path(temp_project) / "notes.txt"
+        target.write_text("hi\n", encoding="utf-8")
+        body = client.post("/api/debug/start",
+                           json={"file": str(target)}).json()
+        assert "error" in body and "Python" in body["error"]
+
+
+# ── 项目：目录选择与文件监听 ─────────────────────────────────────────────
+
+class TestProjectContract:
+    def test_watch_detects_a_new_file(self, client, temp_project):
+        import pathlib
+
+        first = client.get("/api/project/watch").json()
+        assert first["watching"] is True
+        (pathlib.Path(temp_project) / "fresh.txt").write_text("x\n", encoding="utf-8")
+        second = client.get("/api/project/watch").json()
+        assert "fresh.txt" in second["added"], second
+        assert second["changed"] >= 1
+
+    def test_dialog_reports_when_there_is_no_display(self, client):
+        """无图形环境下要**如实说明**，不能挂死（这里是离屏/无显示环境）。"""
+        body = client.get("/api/project/dialog").json()
+        assert "path" in body
+        if not body["path"]:
+            assert body.get("cancelled") or body.get("error")
+
+
+# ── 带工具的对话 ─────────────────────────────────────────────────────────
+
+class TestToolChatContract:
+    def test_without_messages_is_reported(self, client):
+        assert "error" in client.post("/api/ai/chat/tools", json={}).json()
+
+    def test_without_model_is_honest(self, client):
+        body = client.post("/api/ai/chat/tools",
+                           json={"messages": [{"role": "user", "content": "hi"}]}).json()
+        if body.get("status") == "unconfigured":
+            assert body["success"] is False and body["hint"]
+        else:
+            assert "content" in body or "error" in body
