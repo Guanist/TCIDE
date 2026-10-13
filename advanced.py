@@ -919,23 +919,21 @@ class VectorIndexer:
 # ═══════════════════════════════════════════
 # Unattended Runner
 # ═══════════════════════════════════════════
-class UnattendedRunner:
-    def __init__(self):
-        self.running = False
-        self.results: List[Dict] = []
+class UnattendedRunnerRemoved:
+    """说明占位：原 ``UnattendedRunner`` **已删除**（它是"演戏"实现）。
 
-    def run_task(self, task: str, adapter=None, max_retries: int = 3) -> Dict:
-        self.running = True
-        attempt = 0
-        while attempt < max_retries and self.running:
-            attempt += 1
-            self.results.append({"attempt": attempt, "task": task, "status": "running"})
-        self.running = False
-        return {"status": "completed", "attempts": attempt, "results": self.results}
+    它原来的 ``run_task`` 只是循环往 ``results`` 里塞几条 ``{"status": "running"}``
+    然后返回 ``{"status": "completed"}`` —— **什么都没执行**，界面上却显示"已完成"。
 
-    def abort(self):
-        self.running = False
-        return {"status": "aborted"}
+    真正的执行器在 ``tcide_core.runner``（真跑子进程，带超时/重试/检查点），
+    由 ``/api/runner/*`` 使用（见 ``api/ui_contract.py``）。
 
-    def get_status(self):
-        return {"running": self.running, "total_results": len(self.results)}
+    保留这个占位类而不是留空：让"这里曾经有过一个假实现"在代码里可见，
+    免得日后有人照着旧名字再写一个空壳。
+    """
+
+    def __init__(self) -> None:      # pragma: no cover - 只为留下可搜索的线索
+        raise RuntimeError(
+            "UnattendedRunner 已删除（原实现什么都没执行）。请改用 tcide_core.runner，"
+            "见 api/ui_contract.py 的 /api/runner/*")
+

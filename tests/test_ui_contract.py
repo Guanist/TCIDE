@@ -271,6 +271,25 @@ class TestRunnerContract:
     def test_execute_without_task_or_steps_is_reported(self, client, temp_project):
         assert "error" in client.post("/api/runner/execute", json={}).json()
 
+    def test_legacy_run_route_now_really_executes(self, client, temp_project):
+        """老接口 ``/api/runner/run`` 也接上了真实执行器。
+
+        原来它走 ``advanced.UnattendedRunner.run_task``：只塞几条 ``"running"``
+        就返回 ``"completed"``，**什么都没跑**。现在必须能看到命令的真实输出。
+        """
+        body = client.post("/api/runner/run",
+                           params={"task": "echo legacy-run-marker"}).json()
+        assert body.get("success") is True, body
+        assert "legacy-run-marker" in str(body), body
+
+    def test_legacy_status_and_abort_are_wired(self, client, temp_project):
+        body = client.post("/api/runner/run",
+                           params={"task": "echo status-probe"}).json()
+        assert body.get("success") is True
+        status = client.get("/api/runner/status").json()
+        assert "report" in status and status["report"] is not None
+        assert client.post("/api/runner/abort").json()["aborted"] in (True, False)
+
 
 # ── 双 Agent 编排 ────────────────────────────────────────────────────────
 

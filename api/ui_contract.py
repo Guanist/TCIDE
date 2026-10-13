@@ -576,6 +576,52 @@ async def runner_execute(request: Request, task: str = ""):
     return await orchestrator_run(request, task=requirement)
 
 
+async def runner_run_task(task: str, *, max_retries: int = 3) -> dict:
+    """老接口 ``/api/runner/run`` 的实现 —— 把 task 当**命令**真跑。
+
+    语义变更（有意）：原来的 ``advanced.UnattendedRunner.run_task`` 什么都不执行，
+    只塞几条 ``"running"`` 就返回 ``"completed"``。现在这里是一条真实的命令步骤；
+    需要"多步骤 + 检查点"就用 ``/api/runner/execute`` 的 ``steps`` 形式。
+    """
+    request_stub = _StubRequest({"task": task, "steps": [
+        {"name": "task", "command": task, "retries": max(0, int(max_retries) - 1)}]})
+    return await runner_execute(request_stub, task=task)
+
+
+class _StubRequest:
+    """给内部复用构造一个最小 Request（只需要 ``body()``）。"""
+
+    def __init__(self, payload: dict) -> None:
+        import json as _json
+
+        self._payload = _json.dumps(payload).encode("utf-8")
+
+    async def body(self) -> bytes:
+        return self._payload
+
+
+def runner_abort() -> dict:
+    """取消正在跑的步骤执行。"""
+    runner = _runner_state.get("runner")
+    if runner is None:
+        return {"status": "idle", "aborted": False}
+    try:
+        runner.cancel()
+    except Exception as exc:      # noqa: BLE001
+        return {"status": "error", "aborted": False, "error": str(exc)}
+    return {"status": "aborted", "aborted": True}
+
+
+def runner_status() -> dict:
+    """当前执行状态（老接口 ``/api/runner/status``）。"""
+    runner = _runner_state.get("runner")
+    return {"root": _runner_state.get("root", ""),
+            "running": bool(runner is not None and not runner.cancelled()
+                            and _runner_state.get("report") is None),
+            "cancelled": bool(runner is not None and runner.cancelled()),
+            "report": _runner_state.get("report")}
+
+
 # ── 双 Agent 编排 /api/orchestrator/* ────────────────────────────────────
 
 _orchestrator_state: dict = {"root": "", "events": [], "report": None,

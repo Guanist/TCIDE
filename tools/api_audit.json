@@ -1,0 +1,518 @@
+{
+ "missing": [],
+ "unused": [
+  "/",
+  "/api/ai/configure",
+  "/api/ai/orchestrate",
+  "/api/ai/review",
+  "/api/autoheal/diagnose",
+  "/api/autoheal/stats",
+  "/api/compat/detect",
+  "/api/debug/breakpoint",
+  "/api/debug/info",
+  "/api/debug/logs",
+  "/api/entropy/project",
+  "/api/files/search",
+  "/api/files/stats",
+  "/api/git/branch",
+  "/api/git/intelligence",
+  "/api/git/log",
+  "/api/git/merge",
+  "/api/git/remotes",
+  "/api/git/stage",
+  "/api/git/stage/path",
+  "/api/git/unstage",
+  "/api/health",
+  "/api/lsp/completion",
+  "/api/lsp/definition",
+  "/api/lsp/diagnostics",
+  "/api/lsp/didChange",
+  "/api/lsp/didOpen",
+  "/api/lsp/format",
+  "/api/lsp/references",
+  "/api/mcp/call",
+  "/api/mcp/connect",
+  "/api/mcp/disconnect",
+  "/api/mcp/servers",
+  "/api/mcp/tools",
+  "/api/memory/add",
+  "/api/memory/clear",
+  "/api/memory/export",
+  "/api/memory/import",
+  "/api/memory/summary",
+  "/api/perf/slow",
+  "/api/perf/stats",
+  "/api/privacy/block",
+  "/api/privacy/rules",
+  "/api/project/recent",
+  "/api/runner/abort",
+  "/api/runner/run",
+  "/api/runner/status",
+  "/api/snapshot/clear",
+  "/api/snapshot/compare",
+  "/api/snapshot/latest",
+  "/api/terminal/close",
+  "/api/terminal/create",
+  "/api/terminal/list",
+  "/api/terminal/read/{}",
+  "/api/terminal/resize",
+  "/api/terminal/write",
+  "/api/usage/cost",
+  "/api/usage/reset",
+  "/api/usage/track",
+  "/api/vector/clear",
+  "/api/vector/index",
+  "/api/vector/index/project",
+  "/api/vector/search",
+  "/api/vector/stats",
+  "/api/warehouse/analyze"
+ ],
+ "routes": {
+  "/": [
+   "GET"
+  ],
+  "/api/project/open": [
+   "POST"
+  ],
+  "/api/project/recent": [
+   "GET"
+  ],
+  "/api/project/rules": [
+   "GET",
+   "POST"
+  ],
+  "/api/files/list": [
+   "GET"
+  ],
+  "/api/files/read": [
+   "GET"
+  ],
+  "/api/files/write": [
+   "POST"
+  ],
+  "/api/files/delete": [
+   "POST"
+  ],
+  "/api/files/rename": [
+   "POST"
+  ],
+  "/api/files/mkdir": [
+   "POST"
+  ],
+  "/api/files/search": [
+   "GET"
+  ],
+  "/api/files/stats": [
+   "GET"
+  ],
+  "/api/git/status": [
+   "GET"
+  ],
+  "/api/git/diff": [
+   "GET"
+  ],
+  "/api/git/stage": [
+   "POST"
+  ],
+  "/api/git/stage/path": [
+   "POST"
+  ],
+  "/api/git/unstage": [
+   "POST"
+  ],
+  "/api/git/commit": [
+   "POST"
+  ],
+  "/api/git/push": [
+   "POST"
+  ],
+  "/api/git/pull": [
+   "POST"
+  ],
+  "/api/git/log": [
+   "GET"
+  ],
+  "/api/git/branches": [
+   "GET"
+  ],
+  "/api/git/checkout": [
+   "POST"
+  ],
+  "/api/git/branch": [
+   "POST"
+  ],
+  "/api/git/merge": [
+   "POST"
+  ],
+  "/api/git/remotes": [
+   "GET"
+  ],
+  "/api/terminal/create": [
+   "POST"
+  ],
+  "/api/terminal/write": [
+   "POST"
+  ],
+  "/api/terminal/read/{}": [
+   "GET"
+  ],
+  "/api/terminal/close": [
+   "POST"
+  ],
+  "/api/terminal/list": [
+   "GET"
+  ],
+  "/api/terminal/resize": [
+   "POST"
+  ],
+  "/api/exec": [
+   "POST"
+  ],
+  "/api/ai/configure": [
+   "POST"
+  ],
+  "/api/ai/test": [
+   "POST"
+  ],
+  "/api/ai/chat": [
+   "POST"
+  ],
+  "/api/ai/chat/stream": [
+   "POST"
+  ],
+  "/api/ai/complete": [
+   "POST"
+  ],
+  "/api/ai/orchestrate": [
+   "POST"
+  ],
+  "/api/ai/build": [
+   "POST"
+  ],
+  "/api/ai/code": [
+   "POST"
+  ],
+  "/api/ai/review": [
+   "POST"
+  ],
+  "/api/mcp/servers": [
+   "GET"
+  ],
+  "/api/mcp/connect": [
+   "POST"
+  ],
+  "/api/mcp/disconnect": [
+   "POST"
+  ],
+  "/api/mcp/tools": [
+   "GET"
+  ],
+  "/api/mcp/call": [
+   "POST"
+  ],
+  "/api/lsp/start": [
+   "POST"
+  ],
+  "/api/lsp/stop": [
+   "POST"
+  ],
+  "/api/lsp/servers": [
+   "GET"
+  ],
+  "/api/lsp/didOpen": [
+   "POST"
+  ],
+  "/api/lsp/didChange": [
+   "POST"
+  ],
+  "/api/lsp/diagnostics": [
+   "GET"
+  ],
+  "/api/lsp/format": [
+   "POST"
+  ],
+  "/api/lsp/definition": [
+   "POST"
+  ],
+  "/api/lsp/references": [
+   "POST"
+  ],
+  "/api/lsp/completion": [
+   "POST"
+  ],
+  "/api/lsp/completion/get": [
+   "POST"
+  ],
+  "/api/gitintel/commit-message": [
+   "POST"
+  ],
+  "/api/terminal/open": [
+   "POST"
+  ],
+  "/api/memory/context": [
+   "GET"
+  ],
+  "/api/memory/add": [
+   "POST"
+  ],
+  "/api/memory/clear": [
+   "POST"
+  ],
+  "/api/memory/summary": [
+   "GET"
+  ],
+  "/api/memory/export": [
+   "GET"
+  ],
+  "/api/memory/import": [
+   "POST"
+  ],
+  "/api/vector/index": [
+   "POST"
+  ],
+  "/api/vector/index/project": [
+   "POST"
+  ],
+  "/api/vector/search": [
+   "POST"
+  ],
+  "/api/vector/clear": [
+   "DELETE"
+  ],
+  "/api/vector/stats": [
+   "GET"
+  ],
+  "/api/snapshot/list": [
+   "GET"
+  ],
+  "/api/snapshot/latest": [
+   "GET"
+  ],
+  "/api/snapshot/compare": [
+   "GET"
+  ],
+  "/api/snapshot/restore": [
+   "POST"
+  ],
+  "/api/snapshot/clear": [
+   "DELETE"
+  ],
+  "/api/usage/stats": [
+   "GET"
+  ],
+  "/api/usage/history": [
+   "GET"
+  ],
+  "/api/usage/cost": [
+   "GET"
+  ],
+  "/api/usage/track": [
+   "POST"
+  ],
+  "/api/usage/reset": [
+   "POST"
+  ],
+  "/api/debug/info": [
+   "GET"
+  ],
+  "/api/debug/logs": [
+   "GET"
+  ],
+  "/api/debug/breakpoint": [
+   "DELETE",
+   "POST"
+  ],
+  "/api/debug/breakpoints": [
+   "GET"
+  ],
+  "/api/debug/evaluate": [
+   "POST"
+  ],
+  "/api/settings": [
+   "GET",
+   "POST"
+  ],
+  "/api/settings/ai": [
+   "GET",
+   "POST"
+  ],
+  "/api/settings/models": [
+   "GET"
+  ],
+  "/api/health": [
+   "GET"
+  ],
+  "/api/entropy/evaluate": [
+   "GET"
+  ],
+  "/api/entropy/project": [
+   "GET"
+  ],
+  "/api/autoheal/diagnose": [
+   "GET"
+  ],
+  "/api/autoheal/stats": [
+   "GET"
+  ],
+  "/api/warehouse/analyze": [
+   "GET"
+  ],
+  "/api/git/intelligence": [
+   "GET"
+  ],
+  "/api/compat/detect": [
+   "GET"
+  ],
+  "/api/chunker/chunk": [
+   "GET"
+  ],
+  "/api/perf/slow": [
+   "GET"
+  ],
+  "/api/privacy/rules": [
+   "GET"
+  ],
+  "/api/privacy/block": [
+   "POST"
+  ],
+  "/api/perf/stats": [
+   "GET"
+  ],
+  "/api/runner/run": [
+   "POST"
+  ],
+  "/api/runner/abort": [
+   "POST"
+  ],
+  "/api/runner/status": [
+   "GET"
+  ],
+  "/api/entropy/init": [
+   "POST"
+  ],
+  "/api/entropy/ctrl/init": [
+   "POST"
+  ],
+  "/api/entropy/ctrl/tick": [
+   "POST"
+  ],
+  "/api/entropy/ctrl/recommendation": [
+   "GET"
+  ],
+  "/api/warehouse/init": [
+   "POST"
+  ],
+  "/api/warehouse/analyze-all": [
+   "GET",
+   "POST"
+  ],
+  "/api/warehouse/call-chain": [
+   "GET"
+  ],
+  "/api/warehouse/impact": [
+   "GET"
+  ],
+  "/api/chunker/needs-chunking": [
+   "GET"
+  ],
+  "/api/lint": [
+   "GET"
+  ],
+  "/api/lsp/request": [
+   "POST"
+  ],
+  "/api/lsp/notify": [
+   "POST"
+  ],
+  "/api/lsp/install-guide": [
+   "GET"
+  ],
+  "/api/files/hex": [
+   "GET"
+  ],
+  "/api/files/open": [
+   "POST"
+  ],
+  "/api/files/show": [
+   "POST"
+  ],
+  "/api/files/open-url": [
+   "POST"
+  ],
+  "/api/git/stage-all": [
+   "POST"
+  ],
+  "/api/runner/init": [
+   "POST"
+  ],
+  "/api/runner/execute": [
+   "POST"
+  ],
+  "/api/orchestrator/init": [
+   "POST"
+  ],
+  "/api/orchestrator/run": [
+   "POST"
+  ],
+  "/api/ai/task-session": [
+   "GET"
+  ],
+  "/api/ai/abort": [
+   "POST"
+  ],
+  "/api/session/save": [
+   "POST"
+  ],
+  "/api/session/restore": [
+   "POST"
+  ],
+  "/api/search/batch": [
+   "POST"
+  ],
+  "/api/memory/init": [
+   "POST"
+  ],
+  "/api/vector/init": [
+   "POST"
+  ],
+  "/api/vector/index-all": [
+   "POST"
+  ],
+  "/api/files/format": [
+   "POST"
+  ],
+  "/api/debug/adapters": [
+   "GET"
+  ],
+  "/api/debug/start": [
+   "POST"
+  ],
+  "/api/debug/continue": [
+   "POST"
+  ],
+  "/api/debug/next": [
+   "POST"
+  ],
+  "/api/debug/step-in": [
+   "POST"
+  ],
+  "/api/debug/step-out": [
+   "POST"
+  ],
+  "/api/debug/pause": [
+   "POST"
+  ],
+  "/api/debug/stop": [
+   "POST"
+  ],
+  "/api/project/dialog": [
+   "GET"
+  ],
+  "/api/project/watch": [
+   "GET"
+  ],
+  "/api/ai/chat/tools": [
+   "POST"
+  ]
+ }
+}

@@ -25,7 +25,7 @@ from advanced import (
     ContextTrimmer, AutoHealManager, WarehouseAnalyzer, GitIntelligence,
     SnapshotManager, UsageTracker, DebugManager, PrivacyNet,
     ProjectCompatManager, SemanticChunker, PerfOptimizer,
-    ProjectMemory, VectorIndexer, UnattendedRunner
+    ProjectMemory, VectorIndexer
 )
 
 lsp_client = LSPClient()
@@ -45,7 +45,8 @@ chunker = SemanticChunker()
 perf = PerfOptimizer()
 memory_mgr = ProjectMemory(os.path.join(os.path.dirname(os.path.abspath(__file__)), '.tcide', 'memory.db'))
 vector_idx = VectorIndexer()
-runner = UnattendedRunner()
+# 执行器：原 ``advanced.UnattendedRunner`` 是空实现（什么都不执行），已删除。
+# 真实执行在 api/ui_contract.py 里用 tcide_core.runner 完成。
 
 # ── 生命周期 ──
 
@@ -1051,12 +1052,15 @@ async def perf_stats(operation: str = None):
 
 @app.post("/api/runner/run")
 async def runner_run(task: str, max_retries: int = 3):
-    return runner.run_task(task, max_retries=max_retries)
+    # 语义变更（有意）：原实现是 advanced.UnattendedRunner.run_task —— 它只往
+    # results 里塞几条 "running" 就返回 "completed"，**什么都没执行**。现在把
+    # task 当命令真跑（见 api/ui_contract.runner_run_task）。
+    return await ui_contract.runner_run_task(task, max_retries=max_retries)
 
 @app.post("/api/runner/abort")
 async def runner_abort():
-    return runner.abort()
+    return ui_contract.runner_abort()
 
 @app.get("/api/runner/status")
 async def runner_status():
-    return runner.get_status()
+    return ui_contract.runner_status()
