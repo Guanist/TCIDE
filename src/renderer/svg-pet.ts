@@ -101,6 +101,7 @@ export function initSvgPet(): void {
   container.setAttribute('role', 'img');
   container.setAttribute('aria-label', '虎猫宠物：待机');
   container.title = '虎猫会跟着 AI 的状态变化';
+  container.style.cssText = 'display:flex;align-items:center;gap:4px;padding:0 6px 0 4px';
 
   labelEl = document.createElement('span');
   labelEl.className = 'pet-label';
@@ -113,7 +114,11 @@ export function initSvgPet(): void {
   // 内联 SVG：外部 <img> 会把 SVG 变成独立文档，外部类名影响不到内部元素，状态就切不了。
   const holder = document.createElement('span');
   holder.className = 'pet-canvas';
-  holder.style.cssText = ('display:inline-flex;width:36px;height:36px;flex-shrink:0;'
+  // 尺寸跟状态栏走：状态栏约 24px 高，36px 的宠物会被上下裁掉（实测）。
+  // 22px 留出呼吸空间，也让标签贴着它。
+  const PET_PX = 22;
+  holder.style.cssText = ('display:inline-flex;width:' + PET_PX + 'px;height:' + PET_PX
+    + 'px;flex-shrink:0;align-items:center;justify-content:center;'
     + 'image-rendering:auto');   // 注入样式里带 pixelated，矢量图要覆盖掉
   container.append(holder, labelEl, speechEl);
 
@@ -128,7 +133,7 @@ export function initSvgPet(): void {
       holder.innerHTML = markup;
       // SVG 自带 200x200 的宽高属性，不缩会溢出 36px 的容器
       const svg = holder.querySelector('svg');
-      if (svg) { svg.setAttribute('width', '36'); svg.setAttribute('height', '36'); }
+      if (svg) { svg.setAttribute('width', String(PET_PX)); svg.setAttribute('height', String(PET_PX)); }
     })
     .catch(() => {
       // 取不到就不显示宠物，但**不隐藏状态栏**，也不抛错。
