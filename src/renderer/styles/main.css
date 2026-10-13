@@ -4659,31 +4659,21 @@ html.theme-light {
 
 
 /* ═══════════════════════════════════════════════════════════════════
-   布局与密度打磨（对照 DSH 界面逐处比对后的一版）
+   布局与密度：把"工作"还给主列
 
-   为什么加这一段而不是改原规则：原样式散在 124KB 里、彼此有覆盖关系，
-   直接改容易牵连别处。这一段集中放在文件末尾、只做"收紧与降噪"，
-   每条都写明依据，便于以后回退或继续调整。
+   依据见 docs/DESIGN_PRINCIPLES.md 的第 ① 与 ③ 条：
+     ① 主列是"正在进行的工作"，不是欢迎页 —— 落地页元素只该在第一次出现；
+     ③ 状态是环境不是弹窗 —— 状态栏应当退回"元信息"层级，不抢主区。
+
+   **刻意不做的事**（上一版做过，已撤）：
+   - 不隐藏活动栏的中文标签：那是中文用户的发现性资产，藏起来只是模仿
+     "细图标轨"的**形状**，反而让界面更难上手；
+   - 不把发送键改成圆形、不改页签圆角：那些是形状，不是原则。
+     颜色与圆角的"主次关系"由 DESIGN_PRINCIPLES 第 ⑤ 条约束（强调色克制），
+     而克制的手段是**层级**，不是把某个按钮改成圆的。
    ═══════════════════════════════════════════════════════════════════ */
 
-/* ① 活动栏：改成细图标轨 -------------------------------------------------
-   对比：DSH 左缘是一条窄图标轨，名称靠悬停显示。我们原本常驻"图标 + 文字"，
-   既占宽又抢注意力。名称仍然保留在 title 与 aria-label 里（读屏与悬停都有）。 */
-.activity-bar {
-  width: 52px;
-}
-.activity-btn {
-  padding: 8px 0;
-  gap: 0;
-  justify-content: center;
-}
-.activity-label {
-  display: none;
-}
-
-/* ② 欢迎页降噪：把"落地页"收成"工作台" -------------------------------
-   对比：DSH 首屏直接是内容（项目列表 + 会话 + 浏览器）；我们的欢迎页
-   给插画和大标题留了过多垂直空间。这里只缩，不删。 */
+/* ① 欢迎页降噪：给主列让出垂直空间（只缩，不删） */
 .welcome-page {
   padding-top: 28px;
   gap: 14px;
@@ -4702,9 +4692,7 @@ html.theme-light {
   font-size: 13px;
 }
 
-/* ③ AI 面板：欢迎区缩小 + 输入区卡片化 -------------------------------
-   对比：DSH 的输入区是一张圆角卡片，右下角圆形主按钮；我们的是
-   "直角文本域 + 方形按钮"，视觉上碎。 */
+/* ① AI 面板的欢迎区同理：它在没有会话时才出现，不该占满整栏 */
 .ai-welcome-icon {
   width: 52px;
   height: 52px;
@@ -4720,32 +4708,8 @@ html.theme-light {
   gap: 8px;
   padding-top: 10px;
 }
-.ai-prompt-chip {
-  padding: 7px 12px;
-  font-size: 12.5px;
-  border-radius: 10px;
-}
-#chat-input {
-  border-radius: 14px;
-  padding: 10px 12px;
-  font-size: 13px;
-  line-height: 1.6;
-  resize: none;
-}
-#btn-send.send-btn {
-  width: 34px;
-  height: 34px;
-  min-width: 34px;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0;
-}
 
-/* ④ 状态栏：退回元信息层级 ---------------------------------------------
-   对比：DSH 底部的统计行小而密（轮/步、tok/s、缓存命中）；我们的状态栏
-   字号偏大、间距偏松，抢了主区注意力。 */
+/* ③ 状态栏退回元信息层级（下一步要给它**加**内容，见原则 ③ 的判定标准） */
 #status-bar,
 .status-bar {
   font-size: 11.5px;
@@ -4753,21 +4717,4 @@ html.theme-light {
   padding: 0 10px;
   min-height: 24px;
   opacity: 0.92;
-}
-#status-bar .status-item,
-.status-bar .status-item {
-  padding: 0 2px;
-}
-
-/* ⑤ 页签与面板头：统一更小的圆角与更安静的边框 -------------------------
-   对比：DSH 的标签/卡片圆角更大、边框对比更低，整体更"软"；我们有 VS Code
-   遗风的硬边。这里只调圆角与边框透明度。 */
-.tab,
-.tab-item {
-  border-top-left-radius: 8px;
-  border-top-right-radius: 8px;
-}
-.panel-tab,
-.ai-tab {
-  letter-spacing: 0.2px;
 }
