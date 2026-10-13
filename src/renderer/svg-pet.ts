@@ -160,3 +160,28 @@ export function showSpeech(text: string, ms = 2200): void {
   window.clearTimeout(speechTimer);
   speechTimer = window.setTimeout(() => speechEl?.classList.remove('show'), ms);
 }
+
+
+/**
+ * 自己初始化，不等宿主调用。
+ *
+ * 为什么：这个模块的调用点在宿主一段 7000 行的初始化链里，位于主题观察者之后
+ * 约 500 行 —— 中间任何一行抛错，后面的代码就都不会执行（实测就是这样：
+ * 构建产物里有这段代码、服务也正常，但 DOM 里根本没有宠物元素）。
+ * 宠物是个独立小组件，不该被别人的异常连累。
+ *
+ * 幂等：initSvgPet() 内部有 `if (container) return`，重复调用无副作用。
+ */
+function bootSvgPet(): void {
+  initSvgPet();
+}
+
+if (typeof document !== 'undefined') {
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', bootSvgPet);
+  } else {
+    bootSvgPet();
+  }
+  // 兜底：如果 DOMContentLoaded 已经错过，或状态栏是稍后才出现的
+  window.addEventListener('load', bootSvgPet);
+}
