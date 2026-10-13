@@ -19,6 +19,7 @@ TCIDE 原版宣称「LSP 支持 TS/Python、自动识别」。这里实现**真�
 from __future__ import annotations
 
 import json
+import os
 import pathlib
 import shutil
 import subprocess
@@ -261,8 +262,15 @@ def detect_servers(languages=None, *, which=shutil.which) -> list[LspStatus]:
             continue
         for candidate in candidates:
             command = candidate["command"]
-            if which(command):
-                status.command = command
+            resolved = which(command)
+            if resolved:
+                # **必须存解析后的绝对路径**，不能存裸名字：
+                # Windows 的 CreateProcess 不会按 PATHEXT 去解析 `.CMD`，
+                # 于是 Popen(["pyright-langserver", ...]) 直接
+                # `FileNotFoundError: [WinError 2]` —— 而 shutil.which 明明找得到它。
+                # 这正是"探测到有服务器、客户端却永远起不来"的真实原因
+                # （npm 装出来的服务器在 Windows 上都是 .CMD shim）。
+                status.command = resolved
                 status.args = list(candidate.get("args") or [])
                 status.available = True
                 status.hint = ""
@@ -315,9 +323,15 @@ class LspClient:
             self.error = f"没有可用的 {self.status.language} 语言服务器"
             return False
         launcher = popen or subprocess.Popen
+        argv = [self.status.command, *self.status.args]
+        # 这里**不需要** cmd /c 包装：detect_servers 存的是 which() 解析出来的
+        # 绝对路径（Windows 上形如 ...\npm\pyright-langserver.CMD），而
+        # 绝对路径的 .CMD 是可以被 Popen 直接执行的（已用最小探针实测三种写法，
+        # 见 .tcide-sync/probe_lsp_popen.py）。之前我以为是引号问题加了 cmd /c，
+        # 那是基于错误假设 —— 真正的原因在 detect_servers 存了裸名字。
         try:
             self.process = launcher(                     # type: ignore[assignment]
-                [self.status.command, *self.status.args], stdin=subprocess.PIPE,
+                argv, stdin=subprocess.PIPE,
                 stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
                 cwd=str(self.root))
         except Exception as exc:      # noqa: BLE001 - 外部程序
