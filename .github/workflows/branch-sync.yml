@@ -1,0 +1,30 @@
+name: branch-sync
+
+# 为什么需要这一条：`main` 与 `tcide-py` 是**同一份内容的两条分支**（都指向 Python 版）。
+# 实测发现它们会不知不觉漂移 —— 我在 main 上连着提交几次之后，tcide-py 就落后了
+# 28 个文件 / 5,074 行，而且是我自己没注意到。靠"记得同步"不可靠，所以交给 CI 守。
+
+on:
+  push:
+    branches: [main, tcide-py]
+  workflow_dispatch:
+
+jobs:
+  in-sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0        # 需要两条分支的历史才能比较
+
+      - name: 两条分支必须内容一致
+        run: |
+          git fetch origin main tcide-py --quiet
+          diff=$(git diff --shortstat origin/main origin/tcide-py || true)
+          if [ -n "$diff" ]; then
+            echo "::error::main 与 tcide-py 内容不一致：$diff"
+            echo "修法：git checkout tcide-py && git merge --ff-only main && git push origin tcide-py"
+            exit 1
+          fi
+          echo "main 与 tcide-py 内容一致（$(git rev-parse --short origin/main)）"
