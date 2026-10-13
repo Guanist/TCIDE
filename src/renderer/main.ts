@@ -288,16 +288,16 @@ function initMonaco(): void {
       { token: 'function', foreground: '795E26' },
     ],
     colors: {
-      'editor.background': '#FFFFFF',
-      'editor.foreground': '#1E1E1E',
-      'editor.lineHighlightBackground': '#F5F5F5',
-      'editor.selectionBackground': '#DBE4F0',
-      'editorLineNumber.foreground': '#999999',
-      'editorCursor.foreground': '#333333',
-      'editorIndentGuide.background': '#E0E0E0',
-      'editorWidget.background': '#F5F5F5',
-      'editorSuggestWidget.background': '#F5F5F5',
-      'editorSuggestWidget.border': '#D0D0D0',
+      'editor.background': '#FDFAF5',
+      'editor.foreground': '#1A1512',
+      'editor.lineHighlightBackground': '#F6F1E8',
+      'editor.selectionBackground': '#FBE3C9',
+      'editorLineNumber.foreground': '#9C8F80',
+      'editorCursor.foreground': '#C2651A',
+      'editorIndentGuide.background': '#E6DCCD',
+      'editorWidget.background': '#F6F1E8',
+      'editorSuggestWidget.background': '#F6F1E8',
+      'editorSuggestWidget.border': '#D8CBB8',
       'scrollbar.shadow': '#00000000',
       'scrollbarSlider.background': '#C0C0C060',
       'scrollbarSlider.hoverBackground': '#A0A0A0',
@@ -3563,7 +3563,7 @@ function switchSettingsSubTab(tab: string): void {
 // ─────────────────────────────────────────
 const VERSION_HISTORY: Array<{ version: string; date: string; emoji: string; title: string; features: string[]; philosophy: string }> = [
   {
-    version: 'v0.0.1',
+    version: 'v0.0.1.2',
     date: '2026-08-18',
     emoji: '🐱',
     title: '虎猫 TCIDE 全新起点',
@@ -4830,9 +4830,12 @@ function setupEventListeners(): void {
   // ═══ 主题切换(白虎 / 老虎) ═══
   const themeBtn = document.getElementById('btn-toggle-theme');
   function applyEditorTheme(isLight: boolean): void {
-    if (editor) {
+    // 刻意**不判断 editor 实例**：`monaco.editor.setTheme` 设置的是全局主题，
+    // 在编辑器创建之前调用同样有效。原实现有 `if (editor)` 守卫，于是"启动时先定
+    // 主题"这条路被堵死 —— 编辑器创建后仍用默认深色。
+    try {
       monaco.editor.setTheme(isLight ? 'trae-light' : 'trae-dark');
-    }
+    } catch { /* monaco 尚未就绪时忽略，观察者随后会再试 */ }
   }
   if (themeBtn) {
     themeBtn.addEventListener('click', () => {
@@ -4849,6 +4852,24 @@ function setupEventListeners(): void {
       }
     } catch {}
   }
+
+  // 让编辑器**跟随主题状态本身**，而不是只在按钮被点击时切换。
+  // 实测的坑：皮肤层脚本（/static/tcide-theme.js）改的是 <html> 上的
+  // data-tcide-theme 与 .theme-light 类，不经过上面按钮的 click 处理函数 ——
+  // 结果是外壳换成浅色、编辑器还留在深色。用观察者把状态当唯一依据即可。
+  function themeStateIsLight(): boolean {
+    const root = document.documentElement;
+    return root.classList.contains('theme-light')
+      || root.getAttribute('data-tcide-theme') === 'light';
+  }
+  try {
+    new MutationObserver(() => applyEditorTheme(themeStateIsLight()))
+      .observe(document.documentElement, {
+        attributes: true, attributeFilter: ['class', 'data-tcide-theme'],
+      });
+  } catch { /* 老浏览器没有 MutationObserver，退化为只在启动时应用一次 */ }
+  // 启动时无条件应用一次：不看按钮是否存在，也不看 localStorage。
+  applyEditorTheme(themeStateIsLight());
 
   // ═══ Git 面板 ═══
   async function refreshGitPanel() {
@@ -5646,7 +5667,7 @@ function createSnakeDemo(): void {
 // ─────────────────────────────────────────
 // 首次启动欢迎 README
 // ─────────────────────────────────────────
-const FIRST_LAUNCH_README = `# 🐅 欢迎使用虎猫 TCIDE v0.0.1
+const FIRST_LAUNCH_README = `# 🐅 欢迎使用虎猫 TCIDE v0.0.1.2
 
 **个人专属超级 AI 编程 IDE**
 
