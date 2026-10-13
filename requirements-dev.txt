@@ -1,0 +1,8 @@
+# 开发/测试依赖（运行本体只需要 requirements.txt）
+#
+# 用法：
+#   pip install -r requirements.txt -r requirements-dev.txt
+#   python -m pytest tests/ -q
+#
+# 说明：httpx 本体已需要（后端探活用），TestClient 也依赖它；这里只额外列出测试框架。
+pytest>=8.0
