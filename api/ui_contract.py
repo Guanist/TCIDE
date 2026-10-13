@@ -120,6 +120,90 @@ def _engine(name: str):
 
 # ── 代码熵 /api/entropy/* ────────────────────────────────────────────────
 
+@router.post("/api/agent/best-of-n")
+async def agent_best_of_n(request: Request):
+    """同一需求跑多个**隔离**尝试，按可验证的分数选优。
+
+    参照 Codex 的 ``codex cloud exec --attempts 1-4`` 与它强调的 worktree 隔离：
+    不隔离的话，多个尝试会同时改同一批文件，得到的不是 N 个候选而是一个残局。
+
+    评分口径写在 ``tcide_core/bestof.py`` 的模块文档里（完成率是主项、测试通过是
+    最强加分、改动规模轻微扣分）。胜出者的改动**以提案形式返回**，不直接写盘 ——
+    本项目的原则是"写操作要可拦可审"。
+    """
+    from tcide_core.bestof import apply_winner, read_changes, run_best_of
+
+    body = await _read_json_body(request)
+    requirement = str(body.get("requirement") or "").strip()
+    if not requirement:
+        return {"success": False, "error": "缺少 requirement"}
+    attempts = max(1, min(int(body.get("attempts") or 3), 4))
+
+    config = _model_config()
+    if config is None:
+        return {"success": False, "status": "unconfigured",
+                "error": "未配置模型，无法跑 best-of-N",
+                "hint": "设置 → AI 填 API Key"}
+
+    root = current_project_root()
+    from tcide_core.agent import AdapterClient, AgentOrchestrator
+    from tcide_core.gitops import GitRepo
+    from tcide_core.memory import ProjectMemoryBuilder
+    from tcide_core.tools import ToolRegistry, current_policy
+
+    def runner(workdir):
+        registry = ToolRegistry(
+            Workspace(str(workdir)),
+            repo=GitRepo(str(workdir)) if GitRepo(str(workdir)).owns_repo() else None,
+            policy=current_policy())
+        _register_mcp_tools(registry, str(workdir))
+        memory = ProjectMemoryBuilder(Workspace(str(workdir))).build()
+        agent = AgentOrchestrator(AdapterClient(config), registry, memory=memory)
+        return agent.run(requirement)
+
+    def verify(workdir, report):
+        """默认只做**廉价且只读**的验证：跑 linter。
+
+        不默认跑项目测试命令：那可能很慢、也可能有副作用。要跑测试的调用方
+        可以自己传 verify（库层已支持注入）。
+        """
+        try:
+            from tcide_core.lint import Linter
+
+            issues = Linter(Workspace(str(workdir))).run()
+            return {"lint_issues": len(issues)}
+        except Exception:      # noqa: BLE001 - 验证失败不该判尝试失败
+            return {}
+
+    result = run_best_of(requirement, attempts=attempts, runner=runner,
+                         verify=verify, source=root)
+
+    # 把胜出者的改动转成待审提案（不落盘）
+    winner = result.winner
+    proposals = []
+    if winner is not None:
+        try:
+            collected = read_changes(pathlib.Path(winner.workdir), pathlib.Path(root))
+        except Exception:      # noqa: BLE001
+            collected = winner.changes
+        proposals = [{"path": path, "content": text}
+                     for path, text in sorted(collected.items())]
+
+    return {
+        "success": True,
+        "summary": result.summary(),
+        "attempts": [{"index": item.index, "ok": item.ok, "score": item.score,
+                      "notes": item.notes, "error": item.error,
+                      "changed_files": sorted(item.changes)}
+                     for item in result.attempts],
+        "winner": None if winner is None else {
+            "index": winner.index, "score": winner.score, "notes": winner.notes},
+        "all_failed": result.all_failed,
+        "proposals": proposals,
+        "note": "改动以提案形式返回，未写盘 —— 请经审核流程接受。",
+    }
+
+
 @router.post("/api/entropy/init")
 async def entropy_init(project: str = "", project_root: str = ""):
     """前端在打开项目后调用；登记项目并清空上一轮状态。"""

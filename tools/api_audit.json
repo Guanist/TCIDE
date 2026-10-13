@@ -2,6 +2,7 @@
  "missing": [],
  "unused": [
   "/",
+  "/api/agent/best-of-n",
   "/api/ai/configure",
   "/api/ai/orchestrate",
   "/api/ai/review",
@@ -386,6 +387,9 @@
   ],
   "/api/runner/status": [
    "GET"
+  ],
+  "/api/agent/best-of-n": [
+   "POST"
   ],
   "/api/entropy/init": [
    "POST"
