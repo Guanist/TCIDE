@@ -67,9 +67,17 @@
   "/api/vector/index/project",
   "/api/vector/search",
   "/api/vector/stats",
-  "/api/warehouse/analyze"
+  "/api/warehouse/analyze",
+  "/pet"
  ],
  "routes": {
+  "/pet": [
+   "GET"
+  ],
+  "/api/pet/state": [
+   "GET",
+   "POST"
+  ],
   "/": [
    "GET"
   ],
@@ -388,6 +396,10 @@
   ],
   "/api/runner/status": [
    "GET"
+  ],
+  "/api/policy": [
+   "GET",
+   "POST"
   ],
   "/api/agent/checkpoints": [
    "GET"
