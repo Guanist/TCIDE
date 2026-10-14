@@ -1,7 +1,7 @@
 name: tests
 
-# 原版 TCIDE 的工程缺口之一是"0 测试、无 CI"。测试这一半在本仓库已经补上
-# （213 条，且**完全不依赖 Qt**），这个工作流把另一半也补上：每次都真的跑。
+# 原版 TCIDE 的工程缺口之一是"0 测试、无 CI"。测试这一半在本仓库已经补上，
+# 且完全不依赖 Qt，这个工作流把另一半也补上：每次都真的跑。
 
 on:
   push:
@@ -21,13 +21,18 @@ jobs:
           python-version: "3.12"
           cache: pip
 
-      # 只装测试真正需要的依赖。
-      # **刻意不装 pywebview**：那是桌面窗口用的，Linux 上还要 GTK/WebKit 系统库，
-      # 而测试全都不需要它（已验证 tests/ 里没有任何 Qt/WebView 依赖）。
+      # 依赖按 requirements.txt 装，避免这里的手写清单与项目声明漂移。
+      # 唯一的例外是 pywebview：那是桌面窗口用的，Linux 上还要 GTK/WebKit 系统库，
+      # 而测试不需要真货 —— tests/test_pet_window.py 用假 webview 模块验证窗口参数。
+      #
+      # 这个教训是真金白银换来的：此前这里手写了七个包，漏了 uvicorn，
+      # 而 main.py 顶层就 import 它。测试一 import main 就在收集阶段炸掉，
+      # 整个工作流红灯，报错却是难以定位的 collection error。
       - name: 装依赖
         run: |
           python -m pip install --upgrade pip
-          pip install pytest fastapi httpx pydantic python-multipart gitpython openai
+          grep -v '^pywebview' requirements.txt > /tmp/requirements-ci.txt
+          pip install -r /tmp/requirements-ci.txt pytest
 
       - name: 跑测试
         # DAP 集成测试默认跳过（需要 debugpy 且本机偶发），要跑就设 TCIDE_DAP_TESTS=1
