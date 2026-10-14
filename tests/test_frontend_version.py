@@ -30,7 +30,7 @@ MAIN_TS = ROOT / "src" / "renderer" / "main.ts"
 PKG = ROOT / "package.json"
 PYPROJECT = ROOT / "pyproject.toml"
 
-RELEASED = "0.0.1.2"
+RELEASED = "0.0.1.3"
 
 pytestmark = pytest.mark.skipif(
     not MAIN_TS.is_file(),
@@ -157,3 +157,36 @@ class TestCreateTimeThemeUsesTheSameJudge:
         block = text[start:start + 400]
         assert "isLightThemeActive()" in block, \
             "观察者没有复用统一判断 —— 两处逻辑又会漂移"
+
+
+class TestNoStaleReleaseString:
+    """**声明版本**的那几个地方不该还写着上一版。
+
+    发布时最容易出的事，是版本串改了七处漏了一处，于是界面显示旧版本、安装包是新版本。
+    这个测试只盯"声明与展示版本"的位置。
+
+    刻意**不**检查的地方，以及原因：
+    - `docs/` 下的历史记录（发布说明、分支对比表）本来就该留着旧版本号；
+    - `main.ts` 的 VERSION_HISTORY：应用内更新日志，旧条目是历史，不能删；
+    - `web/assets/`：构建产物，由 CI 重建，改源码到重建之间必然短暂不一致。
+
+    第一版守卫就是扫了全仓，结果把上面这些**故意保留的历史**判成了违规。
+    """
+
+    #: 拼接而不是字面量 —— 否则这个文件自己就会被下面的断言抓到
+    STALE = "0.0.1" + ".2"
+    #: 声明或展示版本的地方
+    DECLARATIONS = ("pyproject.toml", "package.json", "api/mcp.py", "README.md")
+
+    def test_declarations_carry_the_new_version(self):
+        offenders = []
+        for name in self.DECLARATIONS:
+            path = ROOT / name
+            if path.is_file() and self.STALE in path.read_text(encoding="utf-8"):
+                offenders.append(name)
+        assert not offenders, f"这些地方还写着 {self.STALE}：{offenders}"
+
+    def test_the_installed_package_version_is_bumped(self):
+        """包元数据是最终会被用户看到的那一份，单独再钉一次。"""
+        text = (ROOT / "pyproject.toml").read_text(encoding="utf-8")
+        assert f'version = "{RELEASED}"' in text

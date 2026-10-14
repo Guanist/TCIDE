@@ -245,7 +245,7 @@ def connect_server(name: str, command: str, args: list | None = None,
         state.request("initialize", {
             "protocolVersion": PROTOCOL_VERSION,
             "capabilities": {"tools": {}},
-            "clientInfo": {"name": "TCIDE", "version": "0.0.1.2"},
+            "clientInfo": {"name": "TCIDE", "version": "0.0.1.3"},
         })
         state.notify("notifications/initialized", {})
         result = state.request("tools/list", {})

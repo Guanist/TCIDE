@@ -3580,6 +3580,20 @@ function switchSettingsSubTab(tab: string): void {
 // ─────────────────────────────────────────
 const VERSION_HISTORY: Array<{ version: string; date: string; emoji: string; title: string; features: string[]; philosophy: string }> = [
   {
+    version: 'v0.0.1.3',
+    date: '2026-10-14',
+    emoji: '🐅',
+    title: '桌面宠物与发布工程',
+    features: [
+      '桌面宠物改为独立悬浮窗口：透明、无边框、置顶，可拖到任意位置并记住坐标',
+      '宠物美术换成透明 PNG 与会呼吸的 GIF，跟着会话状态换动作，闲置会打盹',
+      'README 与发布说明重写，补上首次运行的模型配置说明',
+      'CI 依赖按项目声明安装，修掉漏 uvicorn 导致的测试红灯',
+      '发布产物校验加入宠物页面与位图资源断言',
+    ],
+    philosophy: '宠物是陪着干活的，不是装饰。'
+  },
+  {
     version: 'v0.0.1.2',
     date: '2026-08-18',
     emoji: '🐱',
@@ -5730,7 +5744,7 @@ function createSnakeDemo(): void {
 // ─────────────────────────────────────────
 // 首次启动欢迎 README
 // ─────────────────────────────────────────
-const FIRST_LAUNCH_README = `# 🐅 欢迎使用虎猫 TCIDE v0.0.1.2
+const FIRST_LAUNCH_README = `# 🐅 欢迎使用虎猫 TCIDE v0.0.1.3
 
 **个人专属超级 AI 编程 IDE**
 

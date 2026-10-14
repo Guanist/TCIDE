@@ -26,7 +26,7 @@ tcide
 或者下发布包。wheel 里已经带了构建好的前端，装完直接能开界面：
 
 ```bash
-pip install tcide-0.0.1.2-py3-none-any.whl
+pip install tcide-0.0.1.3-py3-none-any.whl
 tcide
 ```
 

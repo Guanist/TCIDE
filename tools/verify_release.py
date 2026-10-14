@@ -41,6 +41,13 @@ WHEEL_REQUIRED = (
     "web/index.html",
     "static/tcide-theme.css",
     "static/tcide-theme.js",
+    # 桌面宠物：页面缺了 `tcide` 里那个悬浮窗口就会开出一片空白
+    "web/pet.html",
+    "web/icons/pet/pet-idle.png",
+    "web/icons/pet/pet-idle.gif",
+    "web/icons/pet/pet-work.png",
+    "web/icons/pet/pet-sleep.png",
+    "web/icons/pet/pet-error.png",
 )
 WHEEL_REQUIRED_PREFIX = ("api/", "tcide_core/", "web/assets/")
 #: sdist 里必须存在的（源码包要能重建前端）

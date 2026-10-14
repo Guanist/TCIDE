@@ -11,7 +11,8 @@
 | `main` | `aaf50a1` | **Python 版**（FastAPI + PyWebView + `web/`）—— 已经取代 Electron 版成为主线 |
 | `tcide-py` | `aaf50a1` | 与 `main` **完全一致**（差异为空）。本次勘察发现它一度落后 28 个文件 / 5,074 行，已快进同步 |
 | tag `archive/electron-v0.0.9` | `e8583cb` | **旧的 Electron/TS 版**（已归档，可随时找回） |
-| tag `v0.0.1.2` | 见 release | Python 版当前发布（LGPL-3.0 严格第 3 版） |
+| tag `v0.0.1.3` | 见 release | Python 版当前发布（LGPL-3.0 严格第 3 版） |
+| tag `v0.0.1.2` | 见 release | 上一版，不含桌面宠物 |
 
 **可找回性**：`git checkout archive/electron-v0.0.9` 即可回到 Electron 版；标签已推送到
 GitHub（`gh api .../git/ref/tags/archive/electron-v0.0.9` 有记录），所以**没有丢**。
